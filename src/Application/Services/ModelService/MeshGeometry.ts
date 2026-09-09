@@ -1,0 +1,136 @@
+import { Vector3D } from "../../Common/Vector3D";
+import { Face3D } from "./Face3D";
+
+export class MeshGeometry {
+  public readonly vertices: readonly Vector3D[];
+  public readonly faces: readonly Face3D[];
+  private readonly wireframeEdges: readonly [number, number][];
+
+  public constructor(
+    vertices: readonly Vector3D[],
+    faces: readonly Face3D[]
+  ) {
+    this.vertices = [...vertices];
+    this.faces = [...faces];
+    this.wireframeEdges = this.buildUniqueEdges();
+  }
+
+  public isEmpty(): boolean {
+    return this.vertices.length === 0;
+  }
+
+  public getVertexCount(): number {
+    return this.vertices.length;
+  }
+
+  public getFaceCount(): number {
+    return this.faces.length;
+  }
+
+  public getWireframeEdges(): readonly [number, number][] {
+    return this.wireframeEdges;
+  }
+
+  public calculateBoundingBox(): {
+    minimum: Vector3D;
+    maximum: Vector3D;
+  } {
+    if (this.vertices.length === 0) {
+      const zeroVector = new Vector3D(0, 0, 0);
+      return { minimum: zeroVector, maximum: zeroVector };
+    }
+
+    let minCoordinateX = Infinity;
+    let minCoordinateY = Infinity;
+    let minCoordinateZ = Infinity;
+    let maxCoordinateX = -Infinity;
+    let maxCoordinateY = -Infinity;
+    let maxCoordinateZ = -Infinity;
+
+    for (const currentVertex of this.vertices) {
+      if (currentVertex.coordinateX < minCoordinateX) {
+        minCoordinateX = currentVertex.coordinateX;
+      }
+      if (currentVertex.coordinateY < minCoordinateY) {
+        minCoordinateY = currentVertex.coordinateY;
+      }
+      if (currentVertex.coordinateZ < minCoordinateZ) {
+        minCoordinateZ = currentVertex.coordinateZ;
+      }
+
+      if (currentVertex.coordinateX > maxCoordinateX) {
+        maxCoordinateX = currentVertex.coordinateX;
+      }
+      if (currentVertex.coordinateY > maxCoordinateY) {
+        maxCoordinateY = currentVertex.coordinateY;
+      }
+      if (currentVertex.coordinateZ > maxCoordinateZ) {
+        maxCoordinateZ = currentVertex.coordinateZ;
+      }
+    }
+
+    return {
+      minimum: new Vector3D(minCoordinateX, minCoordinateY, minCoordinateZ),
+      maximum: new Vector3D(maxCoordinateX, maxCoordinateY, maxCoordinateZ),
+    };
+  }
+
+  public calculateCenter(): Vector3D {
+    const boundingBox = this.calculateBoundingBox();
+    return new Vector3D(
+      (boundingBox.minimum.coordinateX + boundingBox.maximum.coordinateX) / 2,
+      (boundingBox.minimum.coordinateY + boundingBox.maximum.coordinateY) / 2,
+      (boundingBox.minimum.coordinateZ + boundingBox.maximum.coordinateZ) / 2
+    );
+  }
+
+  public calculateBoundingRadius(): number {
+    const centerPoint = this.calculateCenter();
+    let maximumDistance = 0;
+
+    for (const currentVertex of this.vertices) {
+      const distanceToCenter = currentVertex.calculateDistanceTo(centerPoint);
+      if (distanceToCenter > maximumDistance) {
+        maximumDistance = distanceToCenter;
+      }
+    }
+
+    return maximumDistance > 0 ? maximumDistance : 1;
+  }
+
+  private buildUniqueEdges(): readonly [number, number][] {
+    const edgeKeySet = new Set<string>();
+    const uniqueEdgeList: [number, number][] = [];
+
+    for (const currentFace of this.faces) {
+      const vertexIndices = currentFace.vertexIndices;
+      const vertexCount = vertexIndices.length;
+
+      for (
+        let currentIndex = 0;
+        currentIndex < vertexCount;
+        currentIndex += 1
+      ) {
+        const nextIndex = (currentIndex + 1) % vertexCount;
+        const startVertexIndex = vertexIndices[currentIndex];
+        const endVertexIndex = vertexIndices[nextIndex];
+
+        if (
+          startVertexIndex !== undefined &&
+          endVertexIndex !== undefined
+        ) {
+          const lowerIndex = Math.min(startVertexIndex, endVertexIndex);
+          const higherIndex = Math.max(startVertexIndex, endVertexIndex);
+          const edgeIdentifier = `${lowerIndex}_${higherIndex}`;
+
+          if (!edgeKeySet.has(edgeIdentifier)) {
+            edgeKeySet.add(edgeIdentifier);
+            uniqueEdgeList.push([lowerIndex, higherIndex]);
+          }
+        }
+      }
+    }
+
+    return uniqueEdgeList;
+  }
+}
