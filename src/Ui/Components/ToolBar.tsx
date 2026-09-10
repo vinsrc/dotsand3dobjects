@@ -10,6 +10,7 @@ export const ToolBar: React.FC = () => {
     "MODEL_CHANGED",
     "MODE_CHANGED",
     "AUTO_CONNECT_CHANGED",
+    "GRID_SNAP_CHANGED",
     "SELECTION_CHANGED",
     "UNDO_REDO_STATE_CHANGED",
   ]);
@@ -18,6 +19,7 @@ export const ToolBar: React.FC = () => {
   const isWireframe = controller.getRenderModeService().isWireframe();
   const currentMode = controller.getEditorModeService().getMode();
   const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
+  const isGridSnap = controller.isGridSnapEnabled();
   const canUndo = controller.canUndo();
   const canRedo = controller.canRedo();
   const selectedVertexCount = controller
@@ -103,6 +105,10 @@ export const ToolBar: React.FC = () => {
 
   const handleToggleAutoConnect = () => {
     controller.toggleAutoConnect();
+  };
+
+  const handleToggleGridSnap = () => {
+    controller.toggleGridSnap();
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -283,6 +289,19 @@ export const ToolBar: React.FC = () => {
             Face Fill
           </button>
         )}
+
+        <button
+          data-testid="grid-snap-toggle-button"
+          onClick={handleToggleGridSnap}
+          style={{
+            ...buttonStyle,
+            backgroundColor: isGridSnap ? "#4caf50" : "#ffffff",
+            color: isGridSnap ? "#ffffff" : "#333333",
+            borderColor: isGridSnap ? "#388e3c" : "#999999",
+          }}
+        >
+          {isGridSnap ? "Grid Snap: ON" : "Grid Snap: OFF"}
+        </button>
       </div>
     </header>
   );

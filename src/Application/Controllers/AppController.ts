@@ -1,4 +1,5 @@
 import { ModelService } from "../Services/ModelService/ModelService";
+import { MeshGeometry } from "../Services/ModelService/MeshGeometry";
 import { CameraStateService } from "../Services/CameraService/CameraStateService";
 import { RenderModeService } from "../Services/RenderModeService/RenderModeService";
 import { EditorModeService, UiMode } from "../Services/EditorModeService/EditorModeService";
@@ -21,6 +22,7 @@ export class AppController {
   private readonly geometryEditorService: GeometryEditorService;
   private readonly undoRedoService: UndoRedoService;
   private readonly stateNotifier: ApplicationStateNotifier;
+  private translationInitialModel: MeshGeometry | null = null;
 
   public constructor(
     modelService: ModelService,
@@ -145,6 +147,14 @@ export class AppController {
     this.editorModeService.toggleAutoConnect();
   }
 
+  public isGridSnapEnabled(): boolean {
+    return this.editorModeService.isGridSnapEnabled();
+  }
+
+  public toggleGridSnap(): void {
+    this.editorModeService.toggleGridSnap();
+  }
+
   public recordSnapshot(): void {
     this.undoRedoService.recordSnapshot({
       model: this.modelService.getCurrentModel(),
@@ -220,6 +230,52 @@ export class AppController {
 
   public beginTranslation(): void {
     this.recordSnapshot();
+    this.translationInitialModel = this.modelService.getCurrentModel();
+  }
+
+  public endTranslation(): void {
+    this.translationInitialModel = null;
+  }
+
+  public applyDragTranslation(totalDragOffset: Vector3D): void {
+    const isOrthographic = this.cameraStateService.isOrthographic();
+    if (!isOrthographic) {
+      this.stateNotifier.notify(
+        "ERROR_OCCURRED",
+        "Switch to an Orthographic view"
+      );
+      return;
+    }
+
+    if (!this.translationInitialModel) {
+      this.translationInitialModel = this.modelService.getCurrentModel();
+    }
+
+    const activeGridPlane = this.cameraStateService
+      .getActiveStrategy()
+      .getGridPlane();
+    const isSnapEnabled = this.editorModeService.isGridSnapEnabled();
+
+    this.geometryEditorService.applyTranslationFromInitial(
+      this.translationInitialModel,
+      totalDragOffset,
+      activeGridPlane,
+      isSnapEnabled
+    );
+  }
+
+  public getPlacementPlaneAnchor(): Vector3D {
+    const activeVertexIndex = this.selectionService.getActiveVertex();
+    if (activeVertexIndex !== null) {
+      const currentModel = this.modelService.getCurrentModel();
+      if (
+        activeVertexIndex >= 0 &&
+        activeVertexIndex < currentModel.vertices.length
+      ) {
+        return currentModel.vertices[activeVertexIndex] as Vector3D;
+      }
+    }
+    return this.cameraStateService.getTargetPoint();
   }
 
   public addVertexAtPosition(worldPosition: Vector3D): void {
@@ -233,9 +289,18 @@ export class AppController {
     }
 
     this.recordSnapshot();
-    const snappedPosition = this.geometryEditorService.snapToGrid(worldPosition);
+    let targetPosition = worldPosition;
+    if (this.editorModeService.isGridSnapEnabled()) {
+      const activeGridPlane = this.cameraStateService
+        .getActiveStrategy()
+        .getGridPlane();
+      targetPosition = this.geometryEditorService.snapToGridOnPlane(
+        worldPosition,
+        activeGridPlane
+      );
+    }
     this.geometryEditorService.addVertex(
-      snappedPosition,
+      targetPosition,
       this.editorModeService.isAutoConnectEnabled()
     );
   }
@@ -250,7 +315,18 @@ export class AppController {
       return;
     }
 
-    this.geometryEditorService.translateSelected(offsetVector);
+    let effectiveOffset = offsetVector;
+    if (this.editorModeService.isGridSnapEnabled()) {
+      const activeGridPlane = this.cameraStateService
+        .getActiveStrategy()
+        .getGridPlane();
+      effectiveOffset = this.geometryEditorService.snapToGridOnPlane(
+        offsetVector,
+        activeGridPlane
+      );
+    }
+
+    this.geometryEditorService.translateSelected(effectiveOffset);
   }
 
   public insertVertexOnEdge(startVertexIndex: number, endVertexIndex: number): void {

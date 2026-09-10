@@ -108,6 +108,10 @@ export class ViewportRenderer {
     return this.axisLinesInstance;
   }
 
+  public getCurrentModel(): MeshGeometry | null {
+    return this.currentModelGeometry;
+  }
+
   public render(): void {
     if (this.isRendererDisposed) {
       return;

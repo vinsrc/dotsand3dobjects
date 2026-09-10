@@ -216,6 +216,7 @@ export const AxisGizmo: React.FC = () => {
           <button
             key={axisDefinition.axisId}
             data-testid={`gizmo-axis-${axisDefinition.axisId}`}
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => handleAxisSelect(axisDefinition.axisId, event)}
             title={`Orthographic ${axisDefinition.axisId} View`}
             style={{

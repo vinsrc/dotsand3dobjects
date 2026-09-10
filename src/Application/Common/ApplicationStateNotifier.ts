@@ -6,6 +6,7 @@ export type StateEventType =
   | "MODE_CHANGED"
   | "SELECTION_CHANGED"
   | "AUTO_CONNECT_CHANGED"
+  | "GRID_SNAP_CHANGED"
   | "UNDO_REDO_STATE_CHANGED";
 
 export type StateListenerCallback = (payload?: unknown) => void;

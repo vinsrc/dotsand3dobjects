@@ -212,6 +212,19 @@ describe("AppController", () => {
     expect(editorModeService.isAutoConnectEnabled()).toBe(true);
   });
 
+  it("should toggle grid snap", () => {
+    const { appController, editorModeService } = createController();
+    expect(appController.isGridSnapEnabled()).toBe(true);
+    expect(editorModeService.isGridSnapEnabled()).toBe(true);
+
+    appController.toggleGridSnap();
+    expect(appController.isGridSnapEnabled()).toBe(false);
+    expect(editorModeService.isGridSnapEnabled()).toBe(false);
+
+    appController.toggleGridSnap();
+    expect(appController.isGridSnapEnabled()).toBe(true);
+  });
+
   it("should manage vertex selection", () => {
     const { appController, selectionService } = createController();
     appController.selectSingleVertex(3);
@@ -241,6 +254,59 @@ describe("AppController", () => {
     expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount + 1);
   });
 
+  it("should provide placement plane anchor based on selection or fallback to target point", () => {
+    const { appController, modelService, selectionService } = createController();
+    // Default model is a unit cube centered at origin
+    const targetPoint = appController.getCameraStateService().getTargetPoint();
+
+    // No selection: anchor should equal target point
+    const defaultAnchor = appController.getPlacementPlaneAnchor();
+    expect(defaultAnchor.coordinateX).toBe(targetPoint.coordinateX);
+    expect(defaultAnchor.coordinateY).toBe(targetPoint.coordinateY);
+    expect(defaultAnchor.coordinateZ).toBe(targetPoint.coordinateZ);
+
+    // Select vertex index 0
+    appController.selectSingleVertex(0);
+    const selectedVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
+    const vertexAnchor = appController.getPlacementPlaneAnchor();
+    expect(vertexAnchor.coordinateX).toBe(selectedVertex.coordinateX);
+    expect(vertexAnchor.coordinateY).toBe(selectedVertex.coordinateY);
+    expect(vertexAnchor.coordinateZ).toBe(selectedVertex.coordinateZ);
+
+    // Out of bounds selection falls back to target point
+    selectionService.restoreSelection([999], 999);
+    const fallbackAnchor = appController.getPlacementPlaneAnchor();
+    expect(fallbackAnchor.coordinateX).toBe(targetPoint.coordinateX);
+  });
+
+  it("should preserve view axis coordinate when adding vertex in orthographic view", () => {
+    const { appController, modelService } = createController();
+
+    // In +Z view (gridPlane = XY): view axis is Z, Z is preserved while X and Y snap
+    appController.selectOrthographicView("+Z");
+    appController.addVertexAtPosition(new Vector3D(2.1, 3.8, 5.432));
+    const addedZVertex = modelService.getCurrentModel().vertices.slice(-1)[0] as Vector3D;
+    expect(addedZVertex.coordinateX).toBe(2);
+    expect(addedZVertex.coordinateY).toBe(4);
+    expect(addedZVertex.coordinateZ).toBe(5.432);
+
+    // In +Y view (gridPlane = XZ): view axis is Y, Y is preserved while X and Z snap
+    appController.selectOrthographicView("+Y");
+    appController.addVertexAtPosition(new Vector3D(4.2, 7.891, 1.9));
+    const addedYVertex = modelService.getCurrentModel().vertices.slice(-1)[0] as Vector3D;
+    expect(addedYVertex.coordinateX).toBe(4);
+    expect(addedYVertex.coordinateY).toBe(7.891);
+    expect(addedYVertex.coordinateZ).toBe(2);
+
+    // In +X view (gridPlane = YZ): view axis is X, X is preserved while Y and Z snap
+    appController.selectOrthographicView("+X");
+    appController.addVertexAtPosition(new Vector3D(9.123, 2.2, 8.7));
+    const addedXVertex = modelService.getCurrentModel().vertices.slice(-1)[0] as Vector3D;
+    expect(addedXVertex.coordinateX).toBe(9.123);
+    expect(addedXVertex.coordinateY).toBe(2);
+    expect(addedXVertex.coordinateZ).toBe(9);
+  });
+
   it("should translate selected vertices in orthographic view but reject in perspective", () => {
     const { appController, modelService, selectionService, stateNotifier } =
       createController();
@@ -259,6 +325,83 @@ describe("AppController", () => {
     appController.translateSelectedVertices(new Vector3D(0, 5, 0));
     const afterY = modelService.getCurrentModel().vertices[0].coordinateY;
     expect(afterY).toBeCloseTo(beforeY + 5, 5);
+  });
+
+  it("should add vertex at exact position when grid snap is disabled", () => {
+    const { appController, modelService } = createController();
+    appController.selectOrthographicView("+Z");
+    appController.toggleGridSnap();
+    expect(appController.isGridSnapEnabled()).toBe(false);
+
+    appController.addVertexAtPosition(new Vector3D(1.234, 5.678, 9.101));
+    const latestVertex = modelService
+      .getCurrentModel()
+      .vertices.slice(-1)[0] as Vector3D;
+    expect(latestVertex.coordinateX).toBe(1.234);
+    expect(latestVertex.coordinateY).toBe(5.678);
+    expect(latestVertex.coordinateZ).toBe(9.101);
+  });
+
+  it("should translate selected vertices continuously when grid snap is disabled", () => {
+    const { appController, modelService, selectionService } = createController();
+    selectionService.selectSingle(0);
+    appController.selectOrthographicView("+X");
+    appController.toggleGridSnap();
+    expect(appController.isGridSnapEnabled()).toBe(false);
+
+    const initialY = modelService.getCurrentModel().vertices[0].coordinateY;
+    appController.translateSelectedVertices(new Vector3D(0, 0.456, 0));
+    const updatedY = modelService.getCurrentModel().vertices[0].coordinateY;
+    expect(updatedY).toBeCloseTo(initialY + 0.456, 5);
+  });
+
+  it("should handle applyDragTranslation in orthographic and reject in perspective", () => {
+    const { appController, modelService, selectionService, stateNotifier } =
+      createController();
+    selectionService.selectSingle(0);
+    const errorListener = vi.fn();
+    stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+
+    // Rejects in perspective view
+    appController.applyDragTranslation(new Vector3D(1, 2, 0));
+    expect(errorListener).toHaveBeenCalledWith("Switch to an Orthographic view");
+
+    // Switch to orthographic with snap enabled
+    appController.selectOrthographicView("+Z");
+    appController.beginTranslation();
+    const initialPos = modelService.getCurrentModel().vertices[0] as Vector3D;
+
+    // Drag by small offset (0.2, 0.1, 0) -> candidate stays at integer, effective delta is 0
+    appController.applyDragTranslation(new Vector3D(0.2, 0.1, 0));
+    expect(modelService.getCurrentModel().vertices[0]?.coordinateX).toBe(
+      initialPos.coordinateX
+    );
+
+    // Drag past 0.5 threshold (0.8, 1.1, 0) -> candidate snaps to +1 on X, +1 on Y
+    appController.applyDragTranslation(new Vector3D(0.8, 1.1, 0));
+    expect(modelService.getCurrentModel().vertices[0]?.coordinateX).toBe(
+      initialPos.coordinateX + 1
+    );
+    expect(modelService.getCurrentModel().vertices[0]?.coordinateY).toBe(
+      initialPos.coordinateY + 1
+    );
+
+    appController.endTranslation();
+
+    // Now test applyDragTranslation with grid snap disabled
+    appController.toggleGridSnap();
+    appController.beginTranslation();
+    appController.applyDragTranslation(new Vector3D(0.35, -0.45, 0));
+    const continuousVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
+    expect(continuousVertex.coordinateX).toBeCloseTo(
+      initialPos.coordinateX + 1 + 0.35,
+      5
+    );
+    expect(continuousVertex.coordinateY).toBeCloseTo(
+      initialPos.coordinateY + 1 - 0.45,
+      5
+    );
+    appController.endTranslation();
   });
 
   it("should insert vertex on edge and connect vertices", () => {

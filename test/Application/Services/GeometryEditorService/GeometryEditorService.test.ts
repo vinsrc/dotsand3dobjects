@@ -46,6 +46,38 @@ describe("GeometryEditorService", () => {
     expect(snapped2.coordinateZ).toBe(1);
   });
 
+  it("should snap coordinates on plane preserving perpendicular view axis", () => {
+    const { editorService } = setupService();
+
+    // On XY plane (looking from Z axis): X and Y snap, Z is preserved exactly
+    const positionForXY = new Vector3D(1.2, 2.7, 3.456);
+    const snappedOnXY = editorService.snapToGridOnPlane(positionForXY, "XY");
+    expect(snappedOnXY.coordinateX).toBe(1);
+    expect(snappedOnXY.coordinateY).toBe(3);
+    expect(snappedOnXY.coordinateZ).toBe(3.456);
+
+    // On XZ plane (looking from Y axis): X and Z snap, Y is preserved exactly
+    const positionForXZ = new Vector3D(1.2, 2.789, 4.6);
+    const snappedOnXZ = editorService.snapToGridOnPlane(positionForXZ, "XZ");
+    expect(snappedOnXZ.coordinateX).toBe(1);
+    expect(snappedOnXZ.coordinateY).toBe(2.789);
+    expect(snappedOnXZ.coordinateZ).toBe(5);
+
+    // On YZ plane (looking from X axis): Y and Z snap, X is preserved exactly
+    const positionForYZ = new Vector3D(0.123, 2.7, 4.6);
+    const snappedOnYZ = editorService.snapToGridOnPlane(positionForYZ, "YZ");
+    expect(snappedOnYZ.coordinateX).toBe(0.123);
+    expect(snappedOnYZ.coordinateY).toBe(3);
+    expect(snappedOnYZ.coordinateZ).toBe(5);
+
+    // Fallback/NONE plane: snaps all coordinates
+    const positionDefault = new Vector3D(1.2, 2.7, 3.4);
+    const snappedDefault = editorService.snapToGridOnPlane(positionDefault, "NONE");
+    expect(snappedDefault.coordinateX).toBe(1);
+    expect(snappedDefault.coordinateY).toBe(3);
+    expect(snappedDefault.coordinateZ).toBe(3);
+  });
+
   it("should add vertex without auto-connect", () => {
     const { modelService, selectionService, editorService } = setupService();
     const initialVertexCount = modelService.getCurrentModel().getVertexCount();
@@ -367,5 +399,115 @@ describe("GeometryEditorService", () => {
     expect(duplicateFace).toBe(initialFace);
     expect(modelService.getCurrentModel().faces.length).toBe(1);
     expect(selectionService.getSelectedIndices()).toEqual([]);
+  });
+
+  it("should do nothing in applyTranslationFromInitial if no vertices are selected", () => {
+    const { modelService, editorService } = setupService();
+    const initialModel = modelService.getCurrentModel();
+    editorService.applyTranslationFromInitial(
+      initialModel,
+      new Vector3D(1.5, 2.5, 3.5),
+      "XY",
+      true
+    );
+    expect(modelService.getCurrentModel()).toBe(initialModel);
+  });
+
+  it("should translate selected vertices continuously when snapEnabled is false", () => {
+    const { modelService, selectionService, editorService } = setupService();
+    const initialModel = modelService.getCurrentModel();
+    selectionService.restoreSelection([0, 1], 0);
+
+    const initialPosZero = initialModel.vertices[0] as Vector3D;
+    const initialPosOne = initialModel.vertices[1] as Vector3D;
+    const continuousOffset = new Vector3D(0.33, 0.67, 0);
+
+    editorService.applyTranslationFromInitial(
+      initialModel,
+      continuousOffset,
+      "XY",
+      false
+    );
+
+    const updatedVertices = modelService.getCurrentModel().vertices;
+    expect(updatedVertices[0]?.coordinateX).toBeCloseTo(
+      initialPosZero.coordinateX + 0.33,
+      5
+    );
+    expect(updatedVertices[0]?.coordinateY).toBeCloseTo(
+      initialPosZero.coordinateY + 0.67,
+      5
+    );
+    expect(updatedVertices[1]?.coordinateX).toBeCloseTo(
+      initialPosOne.coordinateX + 0.33,
+      5
+    );
+    expect(updatedVertices[1]?.coordinateY).toBeCloseTo(
+      initialPosOne.coordinateY + 0.67,
+      5
+    );
+    // Unselected vertex 2 remains unchanged
+    expect(updatedVertices[2]?.coordinateX).toBe(
+      initialModel.vertices[2]?.coordinateX
+    );
+  });
+
+  it("should translate selected vertices with grid snapping when snapEnabled is true using active vertex", () => {
+    const { modelService, selectionService, editorService } = setupService();
+    // Use an initial model with known integer coordinates
+    const testVertices = [
+      new Vector3D(1, 1, 0),
+      new Vector3D(2, 1, 0),
+      new Vector3D(3, 3, 0),
+    ];
+    const baseModel = new MeshGeometry(testVertices, []);
+    modelService.setCurrentModel(baseModel);
+
+    // Select vertex 0 and 1, with active vertex = 0
+    selectionService.restoreSelection([0, 1], 0);
+
+    // Drag offset moves vertex 0 candidate from (1, 1, 0) + (1.2, 0.8, 0) = (2.2, 1.8, 0) -> snaps to (2, 2, 0)
+    // Effective offset is (2, 2, 0) - (1, 1, 0) = (1, 1, 0)
+    editorService.applyTranslationFromInitial(
+      baseModel,
+      new Vector3D(1.2, 0.8, 0),
+      "XY",
+      true
+    );
+
+    const resultVertices = modelService.getCurrentModel().vertices;
+    expect(resultVertices[0]?.coordinateX).toBe(2);
+    expect(resultVertices[0]?.coordinateY).toBe(2);
+    expect(resultVertices[1]?.coordinateX).toBe(3);
+    expect(resultVertices[1]?.coordinateY).toBe(2);
+    // Unselected vertex 2 remains at (3, 3, 0)
+    expect(resultVertices[2]?.coordinateX).toBe(3);
+    expect(resultVertices[2]?.coordinateY).toBe(3);
+  });
+
+  it("should fallback to first selected vertex if active vertex is null or not in selection when snapEnabled is true", () => {
+    const { modelService, selectionService, editorService } = setupService();
+    const testVertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(5, 5, 0),
+    ];
+    const baseModel = new MeshGeometry(testVertices, []);
+    modelService.setCurrentModel(baseModel);
+
+    // Select vertex 1, but active vertex is 0 (not in selection)
+    selectionService.restoreSelection([1], 0);
+
+    // Candidate for vertex 1: (5, 5, 0) + (0.9, 0.1, 0) = (5.9, 5.1, 0) -> snaps to (6, 5, 0)
+    // Effective offset: (1, 0, 0)
+    editorService.applyTranslationFromInitial(
+      baseModel,
+      new Vector3D(0.9, 0.1, 0),
+      "XY",
+      true
+    );
+
+    const resultVertices = modelService.getCurrentModel().vertices;
+    expect(resultVertices[1]?.coordinateX).toBe(6);
+    expect(resultVertices[1]?.coordinateY).toBe(5);
   });
 });

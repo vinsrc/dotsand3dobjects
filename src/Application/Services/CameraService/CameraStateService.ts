@@ -58,6 +58,33 @@ export class CameraStateService {
   public setOrthographicAxis(axisIdentifier: OrthographicAxis): void {
     this.currentStrategy =
       this.strategyFactory.createStrategy(axisIdentifier);
+
+    switch (axisIdentifier) {
+      case "+X":
+        this.azimuthRadians = Math.PI / 2;
+        this.elevationRadians = 0;
+        break;
+      case "-X":
+        this.azimuthRadians = -Math.PI / 2;
+        this.elevationRadians = 0;
+        break;
+      case "+Y":
+        this.azimuthRadians = 0;
+        this.elevationRadians = Math.PI / 2 - 0.01;
+        break;
+      case "-Y":
+        this.azimuthRadians = 0;
+        this.elevationRadians = -Math.PI / 2 + 0.01;
+        break;
+      case "+Z":
+        this.azimuthRadians = 0;
+        this.elevationRadians = 0;
+        break;
+      case "-Z":
+        this.azimuthRadians = Math.PI;
+        this.elevationRadians = 0;
+        break;
+    }
   }
 
   public orbit(deltaAzimuth: number, deltaElevation: number): void {

@@ -90,4 +90,29 @@ describe("EditorModeService", () => {
     expect(service.isAutoConnectEnabled()).toBe(false);
     expect(autoConnectListener).toHaveBeenCalledWith(false);
   });
+
+  it("should initialize with grid snap enabled and support toggling and setting", () => {
+    const notifier = new ApplicationStateNotifier();
+    const gridSnapListener = vi.fn();
+    notifier.subscribe("GRID_SNAP_CHANGED", gridSnapListener);
+
+    const service = new EditorModeService(notifier);
+    expect(service.isGridSnapEnabled()).toBe(true);
+
+    service.toggleGridSnap();
+    expect(service.isGridSnapEnabled()).toBe(false);
+    expect(gridSnapListener).toHaveBeenCalledWith(false);
+
+    service.toggleGridSnap();
+    expect(service.isGridSnapEnabled()).toBe(true);
+    expect(gridSnapListener).toHaveBeenCalledWith(true);
+
+    service.setGridSnapEnabled(false);
+    expect(service.isGridSnapEnabled()).toBe(false);
+    expect(gridSnapListener).toHaveBeenCalledWith(false);
+
+    service.setGridSnapEnabled(true);
+    expect(service.isGridSnapEnabled()).toBe(true);
+    expect(gridSnapListener).toHaveBeenCalledWith(true);
+  });
 });

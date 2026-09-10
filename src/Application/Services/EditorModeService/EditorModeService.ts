@@ -11,11 +11,13 @@ export class EditorModeService {
   private readonly stateNotifier: ApplicationStateNotifier;
   private currentMode: UiMode;
   private autoConnectEnabled: boolean;
+  private gridSnapEnabled: boolean;
 
   public constructor(stateNotifier: ApplicationStateNotifier) {
     this.stateNotifier = stateNotifier;
     this.currentMode = "DEFAULT";
     this.autoConnectEnabled = false;
+    this.gridSnapEnabled = true;
   }
 
   public getMode(): UiMode {
@@ -51,5 +53,19 @@ export class EditorModeService {
       "AUTO_CONNECT_CHANGED",
       this.autoConnectEnabled
     );
+  }
+
+  public isGridSnapEnabled(): boolean {
+    return this.gridSnapEnabled;
+  }
+
+  public toggleGridSnap(): void {
+    this.gridSnapEnabled = !this.gridSnapEnabled;
+    this.stateNotifier.notify("GRID_SNAP_CHANGED", this.gridSnapEnabled);
+  }
+
+  public setGridSnapEnabled(enabled: boolean): void {
+    this.gridSnapEnabled = enabled;
+    this.stateNotifier.notify("GRID_SNAP_CHANGED", this.gridSnapEnabled);
   }
 }

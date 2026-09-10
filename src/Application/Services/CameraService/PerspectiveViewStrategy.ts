@@ -25,7 +25,14 @@ export class PerspectiveViewStrategy implements IViewStrategy {
   }
 
   public getUpDirection(): Vector3D {
-    return new Vector3D(0, 1, 0);
+    const horizontalScale = -Math.sin(this.elevationRadians);
+    const coordinateX =
+      horizontalScale * Math.sin(this.azimuthRadians);
+    const coordinateY = Math.cos(this.elevationRadians);
+    const coordinateZ =
+      horizontalScale * Math.cos(this.azimuthRadians);
+
+    return new Vector3D(coordinateX, coordinateY, coordinateZ).normalize();
   }
 
   public isOrthographic(): boolean {

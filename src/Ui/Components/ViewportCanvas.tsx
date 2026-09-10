@@ -19,6 +19,7 @@ export const ViewportCanvas: React.FC = () => {
   const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef<boolean>(false);
   const lastDragWorldPosRef = useRef<Vector3D | null>(null);
+  const dragStartWorldPosRef = useRef<Vector3D | null>(null);
   const clickedVertexOnDownRef = useRef<{
     index: number;
     wasSelected: boolean;
@@ -243,7 +244,7 @@ export const ViewportCanvas: React.FC = () => {
           .getActiveStrategy()
           .getGridPlane();
         const targetPoint = controller.getCameraStateService().getTargetPoint();
-        lastDragWorldPosRef.current = raycasterRef.current.unprojectToGridPlane(
+        const startWorldPos = raycasterRef.current.unprojectToGridPlane(
           clickX,
           clickY,
           camera,
@@ -252,6 +253,8 @@ export const ViewportCanvas: React.FC = () => {
           rect.height,
           targetPoint
         );
+        lastDragWorldPosRef.current = startWorldPos;
+        dragStartWorldPosRef.current = startWorldPos;
       }
     } else if (currentMode === "TRANSLATE") {
       if (controller.getSelectionService().getSelectedIndices().length > 0) {
@@ -261,7 +264,7 @@ export const ViewportCanvas: React.FC = () => {
           .getActiveStrategy()
           .getGridPlane();
         const targetPoint = controller.getCameraStateService().getTargetPoint();
-        lastDragWorldPosRef.current = raycasterRef.current.unprojectToGridPlane(
+        const startWorldPos = raycasterRef.current.unprojectToGridPlane(
           clickX,
           clickY,
           camera,
@@ -270,6 +273,8 @@ export const ViewportCanvas: React.FC = () => {
           rect.height,
           targetPoint
         );
+        lastDragWorldPosRef.current = startWorldPos;
+        dragStartWorldPosRef.current = startWorldPos;
       }
     }
   };
@@ -289,7 +294,7 @@ export const ViewportCanvas: React.FC = () => {
     if (
       currentMode === "TRANSLATE" &&
       isDraggingRef.current &&
-      lastDragWorldPosRef.current &&
+      dragStartWorldPosRef.current &&
       rendererRef.current &&
       canvasRef.current
     ) {
@@ -314,10 +319,10 @@ export const ViewportCanvas: React.FC = () => {
       );
 
       if (currentWorldPos) {
-        const translationDelta = currentWorldPos.subtract(
-          lastDragWorldPosRef.current
+        const totalDragDelta = currentWorldPos.subtract(
+          dragStartWorldPosRef.current
         );
-        controller.translateSelectedVertices(translationDelta);
+        controller.applyDragTranslation(totalDragDelta);
         lastDragWorldPosRef.current = currentWorldPos;
       }
     }
@@ -327,9 +332,15 @@ export const ViewportCanvas: React.FC = () => {
     const wasDragging = isDraggingRef.current;
     const clickedVertexInfo = clickedVertexOnDownRef.current;
 
+    const currentMode = controller.getEditorModeService().getMode();
+    if (currentMode === "TRANSLATE") {
+      controller.endTranslation();
+    }
+
     pointerDownPosRef.current = null;
     isDraggingRef.current = false;
     lastDragWorldPosRef.current = null;
+    dragStartWorldPosRef.current = null;
     clickedVertexOnDownRef.current = null;
 
     if (wasDragging) {
@@ -384,41 +395,53 @@ export const ViewportCanvas: React.FC = () => {
         controller.toggleVertexSelection(nearestVertex);
       }
     } else if (mode === "INSERT") {
-      const nearestEdge = raycasterRef.current.findNearestEdge(
+      const nearestVertex = raycasterRef.current.findNearestVertex(
         clickX,
         clickY,
-        currentModel.getWireframeEdges(),
         currentModel.vertices,
         camera,
         width,
         height
       );
-      if (nearestEdge) {
-        controller.insertVertexOnEdge(nearestEdge[0], nearestEdge[1]);
+      if (nearestVertex !== null) {
+        controller.selectSingleVertex(nearestVertex);
       } else {
-        const isOrthographic = controller.getCameraStateService().isOrthographic();
-        if (!isOrthographic) {
-          controller.getStateNotifier().notify(
-            "ERROR_OCCURRED",
-            "Switch to an Orthographic view"
-          );
+        const nearestEdge = raycasterRef.current.findNearestEdge(
+          clickX,
+          clickY,
+          currentModel.getWireframeEdges(),
+          currentModel.vertices,
+          camera,
+          width,
+          height
+        );
+        if (nearestEdge) {
+          controller.insertVertexOnEdge(nearestEdge[0], nearestEdge[1]);
         } else {
-          const gridPlane = controller
-            .getCameraStateService()
-            .getActiveStrategy()
-            .getGridPlane();
-          const targetPoint = controller.getCameraStateService().getTargetPoint();
-          const worldPos = raycasterRef.current.unprojectToGridPlane(
-            clickX,
-            clickY,
-            camera,
-            gridPlane,
-            width,
-            height,
-            targetPoint
-          );
-          if (worldPos) {
-            controller.addVertexAtPosition(worldPos);
+          const isOrthographic = controller.getCameraStateService().isOrthographic();
+          if (!isOrthographic) {
+            controller.getStateNotifier().notify(
+              "ERROR_OCCURRED",
+              "Switch to an Orthographic view"
+            );
+          } else {
+            const gridPlane = controller
+              .getCameraStateService()
+              .getActiveStrategy()
+              .getGridPlane();
+            const planeAnchor = controller.getPlacementPlaneAnchor();
+            const worldPos = raycasterRef.current.unprojectToGridPlane(
+              clickX,
+              clickY,
+              camera,
+              gridPlane,
+              width,
+              height,
+              planeAnchor
+            );
+            if (worldPos) {
+              controller.addVertexAtPosition(worldPos);
+            }
           }
         }
       }

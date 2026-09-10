@@ -3,6 +3,7 @@ import { Face3D } from "../ModelService/Face3D";
 import { MeshGeometry } from "../ModelService/MeshGeometry";
 import { ModelService } from "../ModelService/ModelService";
 import { SelectionService } from "../SelectionService/SelectionService";
+import { GridPlaneType } from "../CameraService/ViewStrategy";
 
 export class GeometryEditorService {
   private readonly modelService: ModelService;
@@ -17,10 +18,53 @@ export class GeometryEditorService {
   }
 
   public snapToGrid(worldPosition: Vector3D, gridSize: number = 1.0): Vector3D {
-    const snappedX = Math.round(worldPosition.coordinateX / gridSize) * gridSize;
-    const snappedY = Math.round(worldPosition.coordinateY / gridSize) * gridSize;
-    const snappedZ = Math.round(worldPosition.coordinateZ / gridSize) * gridSize;
-    return new Vector3D(snappedX, snappedY, snappedZ);
+    const snappedCoordinateX =
+      Math.round(worldPosition.coordinateX / gridSize) * gridSize;
+    const snappedCoordinateY =
+      Math.round(worldPosition.coordinateY / gridSize) * gridSize;
+    const snappedCoordinateZ =
+      Math.round(worldPosition.coordinateZ / gridSize) * gridSize;
+    return new Vector3D(snappedCoordinateX, snappedCoordinateY, snappedCoordinateZ);
+  }
+
+  public snapToGridOnPlane(
+    worldPosition: Vector3D,
+    gridPlane: GridPlaneType,
+    gridSize: number = 1.0
+  ): Vector3D {
+    const snappedCoordinateX =
+      Math.round(worldPosition.coordinateX / gridSize) * gridSize;
+    const snappedCoordinateY =
+      Math.round(worldPosition.coordinateY / gridSize) * gridSize;
+    const snappedCoordinateZ =
+      Math.round(worldPosition.coordinateZ / gridSize) * gridSize;
+
+    switch (gridPlane) {
+      case "XY":
+        return new Vector3D(
+          snappedCoordinateX,
+          snappedCoordinateY,
+          worldPosition.coordinateZ
+        );
+      case "XZ":
+        return new Vector3D(
+          snappedCoordinateX,
+          worldPosition.coordinateY,
+          snappedCoordinateZ
+        );
+      case "YZ":
+        return new Vector3D(
+          worldPosition.coordinateX,
+          snappedCoordinateY,
+          snappedCoordinateZ
+        );
+      default:
+        return new Vector3D(
+          snappedCoordinateX,
+          snappedCoordinateY,
+          snappedCoordinateZ
+        );
+    }
   }
 
   public addVertex(position: Vector3D, autoConnect: boolean): number {
@@ -78,6 +122,55 @@ export class GeometryEditorService {
       updatedVertices,
       currentModel.faces,
       currentModel.explicitEdges
+    );
+
+    this.modelService.setCurrentModel(updatedModel);
+  }
+
+  public applyTranslationFromInitial(
+    initialModel: MeshGeometry,
+    totalOffset: Vector3D,
+    gridPlane: GridPlaneType,
+    snapEnabled: boolean
+  ): void {
+    const selectedIndices = this.selectionService.getSelectedIndices();
+    if (selectedIndices.length === 0) {
+      return;
+    }
+
+    let effectiveOffset = totalOffset;
+    if (snapEnabled) {
+      const activeVertex = this.selectionService.getActiveVertex();
+      const referenceIndex =
+        activeVertex !== null && selectedIndices.includes(activeVertex)
+          ? activeVertex
+          : (selectedIndices[0] as number);
+      const initialReferenceVertex = initialModel.vertices[referenceIndex];
+
+      if (initialReferenceVertex) {
+        const candidatePosition = initialReferenceVertex.add(totalOffset);
+        const snappedPosition = this.snapToGridOnPlane(
+          candidatePosition,
+          gridPlane
+        );
+        effectiveOffset = snappedPosition.subtract(initialReferenceVertex);
+      }
+    }
+
+    const selectedSet = new Set(selectedIndices);
+    const updatedVertices = initialModel.vertices.map(
+      (currentVertex, vertexIndex) => {
+        if (selectedSet.has(vertexIndex)) {
+          return currentVertex.add(effectiveOffset);
+        }
+        return currentVertex;
+      }
+    );
+
+    const updatedModel = new MeshGeometry(
+      updatedVertices,
+      initialModel.faces,
+      initialModel.explicitEdges
     );
 
     this.modelService.setCurrentModel(updatedModel);

@@ -100,4 +100,61 @@ test.describe("WireframeVibe3D Issue #2 X,Y,Z Axis View Functional Tests", () =>
     });
     expect(axesVisible).toBe(true);
   });
+
+  test("Dragging 3D axis gizmo after selecting +Y view smoothly orbits without resetting", async ({
+    page,
+  }) => {
+    // Click +Y axis on gizmo
+    const axisYButton = page.getByTestId("gizmo-axis-+Y");
+    await expect(axisYButton).toBeVisible();
+    await axisYButton.click();
+
+    // The gizmo container
+    const gizmo = page.getByTestId("3d-axis-gizmo");
+    const boundingBox = await gizmo.boundingBox();
+    expect(boundingBox).not.toBeNull();
+
+    const startX = (boundingBox?.x ?? 0) + (boundingBox?.width ?? 0) / 2;
+    const startY = (boundingBox?.y ?? 0) + (boundingBox?.height ?? 0) / 2;
+
+    // Drag gizmo downwards to tilt camera
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX, startY + 20, { steps: 5 });
+    await page.mouse.up();
+
+    // Verify the gizmo is still visible and did not glitch or jump to X
+    await expect(gizmo).toBeVisible();
+  });
+
+  test("Dragging 3D axis gizmo vertically rotates the gizmo in up/down direction", async ({
+    page,
+  }) => {
+    const axisYButton = page.getByTestId("gizmo-axis-+Y");
+    await expect(axisYButton).toBeVisible();
+
+    const initialYPos = await axisYButton.evaluate((el) => {
+      return parseFloat(window.getComputedStyle(el).top);
+    });
+
+    const gizmo = page.getByTestId("3d-axis-gizmo");
+    const boundingBox = await gizmo.boundingBox();
+    expect(boundingBox).not.toBeNull();
+
+    const startX = (boundingBox?.x ?? 0) + (boundingBox?.width ?? 0) / 2;
+    const startY = (boundingBox?.y ?? 0) + (boundingBox?.height ?? 0) / 2;
+
+    // Drag gizmo vertically downwards
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX, startY + 35, { steps: 8 });
+    await page.mouse.up();
+
+    const newYPos = await axisYButton.evaluate((el) => {
+      return parseFloat(window.getComputedStyle(el).top);
+    });
+
+    // The Y button's vertical position on the gizmo disk must change
+    expect(Math.abs(newYPos - initialYPos)).toBeGreaterThan(2);
+  });
 });

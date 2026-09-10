@@ -24,6 +24,7 @@ export class ViewportRaycaster {
 
     let closestVertexIndex: number | null = null;
     let closestDistanceSquared = tolerancePixels * tolerancePixels;
+    let closestNdcZ = 1.0;
 
     for (let index = 0; index < vertices.length; index += 1) {
       const vertex = vertices[index];
@@ -52,8 +53,18 @@ export class ViewportRaycaster {
       const deltaY = screenY - projectedScreenY;
       const distanceSquared = deltaX * deltaX + deltaY * deltaY;
 
-      if (distanceSquared < closestDistanceSquared) {
+      const isSignificantlyCloserDistance =
+        distanceSquared < closestDistanceSquared - 0.25;
+      const isApproximatelySameDistance =
+        Math.abs(distanceSquared - closestDistanceSquared) <= 0.25;
+      const isCloserToCameraDepth = this.temporaryVector.z < closestNdcZ;
+
+      if (
+        isSignificantlyCloserDistance ||
+        (isApproximatelySameDistance && isCloserToCameraDepth)
+      ) {
         closestDistanceSquared = distanceSquared;
+        closestNdcZ = this.temporaryVector.z;
         closestVertexIndex = index;
       }
     }

@@ -14,17 +14,44 @@ describe("CameraStateService", () => {
     expect(cameraService.getAzimuth()).toBeCloseTo(Math.PI / 4);
   });
 
-  it("should switch to orthographic axis strategy when set", () => {
+  it("should switch to orthographic axis strategy and synchronize azimuth and elevation", () => {
     const factory = new OrthographicViewStrategyFactory();
     const cameraService = new CameraStateService(factory);
 
     cameraService.setOrthographicAxis("+X");
     expect(cameraService.isOrthographic()).toBe(true);
     expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("+X");
+    expect(cameraService.getAzimuth()).toBe(Math.PI / 2);
+    expect(cameraService.getElevation()).toBe(0);
+
+    cameraService.setOrthographicAxis("-X");
+    expect(cameraService.getAzimuth()).toBe(-Math.PI / 2);
+    expect(cameraService.getElevation()).toBe(0);
+
+    cameraService.setOrthographicAxis("+Y");
+    expect(cameraService.getAzimuth()).toBe(0);
+    expect(cameraService.getElevation()).toBeCloseTo(Math.PI / 2 - 0.01, 5);
 
     cameraService.setOrthographicAxis("-Y");
     expect(cameraService.isOrthographic()).toBe(true);
     expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("-Y");
+    expect(cameraService.getAzimuth()).toBe(0);
+    expect(cameraService.getElevation()).toBeCloseTo(-Math.PI / 2 + 0.01, 5);
+
+    cameraService.setOrthographicAxis("+Z");
+    expect(cameraService.getAzimuth()).toBe(0);
+    expect(cameraService.getElevation()).toBe(0);
+
+    cameraService.setOrthographicAxis("-Z");
+    expect(cameraService.getAzimuth()).toBe(Math.PI);
+    expect(cameraService.getElevation()).toBe(0);
+
+    // Orbiting after +Y continues seamlessly from top view
+    cameraService.setOrthographicAxis("+Y");
+    cameraService.orbit(0.1, -0.2);
+    expect(cameraService.isOrthographic()).toBe(false);
+    expect(cameraService.getAzimuth()).toBeCloseTo(0.1, 5);
+    expect(cameraService.getElevation()).toBeCloseTo(Math.PI / 2 - 0.01 - 0.2, 5);
   });
 
   it("should handle zooming in and out with limits", () => {
