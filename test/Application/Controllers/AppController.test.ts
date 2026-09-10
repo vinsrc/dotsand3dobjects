@@ -3,11 +3,16 @@ import { AppController } from "../../../src/Application/Controllers/AppControlle
 import { ModelService } from "../../../src/Application/Services/ModelService/ModelService";
 import { CameraStateService } from "../../../src/Application/Services/CameraService/CameraStateService";
 import { RenderModeService } from "../../../src/Application/Services/RenderModeService/RenderModeService";
+import { EditorModeService } from "../../../src/Application/Services/EditorModeService/EditorModeService";
+import { SelectionService } from "../../../src/Application/Services/SelectionService/SelectionService";
+import { GeometryEditorService } from "../../../src/Application/Services/GeometryEditorService/GeometryEditorService";
+import { UndoRedoService } from "../../../src/Application/Services/UndoRedoService/UndoRedoService";
 import { ApplicationStateNotifier } from "../../../src/Application/Common/ApplicationStateNotifier";
 import { ModelFactory } from "../../../src/Application/Services/ModelService/ModelFactory";
 import { ObjParser } from "../../../src/Application/Services/ModelService/ObjParser";
 import { ObjExporter } from "../../../src/Application/Services/ModelService/ObjExporter";
 import { OrthographicViewStrategyFactory } from "../../../src/Application/Services/CameraService/OrthographicViewStrategy";
+import { Vector3D } from "../../../src/Application/Common/Vector3D";
 
 describe("AppController", () => {
   const createController = () => {
@@ -27,10 +32,22 @@ describe("AppController", () => {
     const cameraStateService = new CameraStateService(orthographicViewFactory);
     const renderModeService = new RenderModeService("FLAT_SHADED");
 
+    const editorModeService = new EditorModeService(stateNotifier);
+    const selectionService = new SelectionService(stateNotifier);
+    const geometryEditorService = new GeometryEditorService(
+      modelService,
+      selectionService
+    );
+    const undoRedoService = new UndoRedoService(stateNotifier);
+
     const appController = new AppController(
       modelService,
       cameraStateService,
       renderModeService,
+      editorModeService,
+      selectionService,
+      geometryEditorService,
+      undoRedoService,
       stateNotifier
     );
 
@@ -39,22 +56,43 @@ describe("AppController", () => {
       modelService,
       cameraStateService,
       renderModeService,
+      editorModeService,
+      selectionService,
+      geometryEditorService,
+      undoRedoService,
       stateNotifier,
     };
   };
 
   it("should provide access to underlying services", () => {
-    const { appController, modelService, cameraStateService, renderModeService, stateNotifier } =
-      createController();
+    const {
+      appController,
+      modelService,
+      cameraStateService,
+      renderModeService,
+      editorModeService,
+      selectionService,
+      geometryEditorService,
+      undoRedoService,
+      stateNotifier,
+    } = createController();
 
     expect(appController.getModelService()).toBe(modelService);
     expect(appController.getCameraStateService()).toBe(cameraStateService);
     expect(appController.getRenderModeService()).toBe(renderModeService);
+    expect(appController.getEditorModeService()).toBe(editorModeService);
+    expect(appController.getSelectionService()).toBe(selectionService);
+    expect(appController.getGeometryEditorService()).toBe(geometryEditorService);
+    expect(appController.getUndoRedoService()).toBe(undoRedoService);
     expect(appController.getStateNotifier()).toBe(stateNotifier);
   });
 
-  it("should load valid model and adjust camera framing", () => {
-    const { appController, cameraStateService } = createController();
+  it("should load valid model, adjust camera framing, and clear selection", () => {
+    const { appController, cameraStateService, selectionService } =
+      createController();
+    selectionService.selectSingle(2);
+    expect(selectionService.getSelectedIndices()).toEqual([2]);
+
     const objData = `
       v -10 -10 -10
       v 10 10 10
@@ -63,7 +101,9 @@ describe("AppController", () => {
     `;
 
     appController.loadModelFromFile("large_model.obj", objData);
-    expect(cameraStateService.getCameraDistance()).toBeGreaterThan(10);
+    expect(cameraStateService.getCameraDistance()).toBeCloseTo(4.33, 1);
+    expect(cameraStateService.getTargetPoint().coordinateX).toBeCloseTo(0, 5);
+    expect(selectionService.getSelectedIndices()).toEqual([]);
   });
 
   it("should handle loading error gracefully without crashing", () => {
@@ -125,5 +165,194 @@ describe("AppController", () => {
 
     appController.zoomOut();
     expect(viewListener).toHaveBeenCalledTimes(2);
+  });
+
+  it("should pan camera and notify VIEW_CHANGED", () => {
+    const { appController, cameraStateService, stateNotifier } =
+      createController();
+    const viewListener = vi.fn();
+    stateNotifier.subscribe("VIEW_CHANGED", viewListener);
+
+    appController.panCamera(2, 4);
+    expect(viewListener).toHaveBeenCalledTimes(1);
+    expect(cameraStateService.getTargetPoint()).toBeDefined();
+  });
+
+  it("should center object and notify VIEW_CHANGED", () => {
+    const { appController, cameraStateService, stateNotifier } =
+      createController();
+    cameraStateService.setTargetPoint(new Vector3D(100, 200, 300));
+
+    const viewListener = vi.fn();
+    stateNotifier.subscribe("VIEW_CHANGED", viewListener);
+
+    appController.centerObject();
+    expect(cameraStateService.getTargetPoint().coordinateX).toBeCloseTo(0, 5);
+    expect(cameraStateService.getTargetPoint().coordinateY).toBeCloseTo(0, 5);
+    expect(cameraStateService.getTargetPoint().coordinateZ).toBeCloseTo(0, 5);
+    expect(viewListener).toHaveBeenCalledTimes(1);
+  });
+
+  it("should enter mode and finish mode", () => {
+    const { appController, editorModeService } = createController();
+    appController.selectOrthographicView("+X");
+
+    const entered = appController.enterMode("INSERT");
+    expect(entered).toBe(true);
+    expect(editorModeService.getMode()).toBe("INSERT");
+
+    appController.finishMode();
+    expect(editorModeService.getMode()).toBe("DEFAULT");
+  });
+
+  it("should toggle auto connect", () => {
+    const { appController, editorModeService } = createController();
+    expect(editorModeService.isAutoConnectEnabled()).toBe(false);
+    appController.toggleAutoConnect();
+    expect(editorModeService.isAutoConnectEnabled()).toBe(true);
+  });
+
+  it("should manage vertex selection", () => {
+    const { appController, selectionService } = createController();
+    appController.selectSingleVertex(3);
+    expect(selectionService.getSelectedIndices()).toEqual([3]);
+
+    appController.toggleVertexSelection(4);
+    expect(selectionService.getSelectedIndices()).toEqual([3, 4]);
+
+    appController.clearSelection();
+    expect(selectionService.getSelectedIndices()).toEqual([]);
+  });
+
+  it("should add vertex at position in orthographic view but reject in perspective", () => {
+    const { appController, modelService, stateNotifier } = createController();
+    const initialCount = modelService.getCurrentModel().getVertexCount();
+    const errorListener = vi.fn();
+    stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+
+    // Currently perspective view:
+    appController.addVertexAtPosition(new Vector3D(1.1, 2.2, 3.3));
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount);
+    expect(errorListener).toHaveBeenCalledWith("Switch to an Orthographic view");
+
+    // Switch to orthographic:
+    appController.selectOrthographicView("+Z");
+    appController.addVertexAtPosition(new Vector3D(1.1, 2.2, 3.3));
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount + 1);
+  });
+
+  it("should translate selected vertices in orthographic view but reject in perspective", () => {
+    const { appController, modelService, selectionService, stateNotifier } =
+      createController();
+    selectionService.selectSingle(0);
+    const errorListener = vi.fn();
+    stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+
+    // Perspective view:
+    appController.translateSelectedVertices(new Vector3D(0, 5, 0));
+    expect(errorListener).toHaveBeenCalledWith("Switch to an Orthographic view");
+
+    // Switch to orthographic:
+    appController.selectOrthographicView("+X");
+    appController.beginTranslation();
+    const beforeY = modelService.getCurrentModel().vertices[0].coordinateY;
+    appController.translateSelectedVertices(new Vector3D(0, 5, 0));
+    const afterY = modelService.getCurrentModel().vertices[0].coordinateY;
+    expect(afterY).toBeCloseTo(beforeY + 5, 5);
+  });
+
+  it("should insert vertex on edge and connect vertices", () => {
+    const { appController, modelService } = createController();
+    const initialCount = modelService.getCurrentModel().getVertexCount();
+
+    appController.insertVertexOnEdge(0, 1);
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount + 1);
+
+    const edgeCountBefore = modelService.getCurrentModel().getWireframeEdges().length;
+    appController.connectVertices(0, 2);
+    expect(modelService.getCurrentModel().getWireframeEdges().length).toBeGreaterThanOrEqual(edgeCountBefore);
+  });
+
+  it("should delete selected vertices and support undo/redo", () => {
+    const { appController, modelService, selectionService } = createController();
+    const initialCount = modelService.getCurrentModel().getVertexCount();
+
+    // Select vertex 0 and delete
+    appController.selectSingleVertex(0);
+    expect(selectionService.getSelectedIndices()).toEqual([0]);
+
+    appController.deleteSelectedVertices();
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount - 1);
+    expect(selectionService.getSelectedIndices()).toEqual([]);
+    expect(appController.canUndo()).toBe(true);
+    expect(appController.canRedo()).toBe(false);
+
+    // Undo deletion
+    appController.undo();
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount);
+    expect(selectionService.getSelectedIndices()).toEqual([0]);
+    expect(appController.canRedo()).toBe(true);
+
+    // Redo deletion
+    appController.redo();
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount - 1);
+    expect(selectionService.getSelectedIndices()).toEqual([]);
+  });
+
+  it("should undo and redo vertex addition and translation", () => {
+    const { appController, modelService, selectionService } = createController();
+    appController.selectOrthographicView("+Z");
+    const initialCount = modelService.getCurrentModel().getVertexCount();
+
+    appController.addVertexAtPosition(new Vector3D(5, 5, 5));
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount + 1);
+
+    // Undo addition
+    appController.undo();
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount);
+
+    // Redo addition
+    appController.redo();
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(initialCount + 1);
+
+    // Translate added vertex
+    appController.beginTranslation();
+    const originalPos = modelService.getCurrentModel().vertices[initialCount];
+    appController.translateSelectedVertices(new Vector3D(2, 0, 0));
+    expect(modelService.getCurrentModel().vertices[initialCount].coordinateX).toBe(originalPos.coordinateX + 2);
+
+    // Undo translation
+    appController.undo();
+    expect(modelService.getCurrentModel().vertices[initialCount].coordinateX).toBe(originalPos.coordinateX);
+
+    // Redo translation
+    appController.redo();
+    expect(modelService.getCurrentModel().vertices[initialCount].coordinateX).toBe(originalPos.coordinateX + 2);
+  });
+
+  it("should do nothing when deleting vertices with no selection", () => {
+    const { appController, modelService } = createController();
+    const beforeCount = modelService.getCurrentModel().getVertexCount();
+    appController.deleteSelectedVertices();
+    expect(modelService.getCurrentModel().getVertexCount()).toBe(beforeCount);
+  });
+
+  it("should safely handle undo and redo when stacks are empty", () => {
+    const { appController, modelService } = createController();
+    const beforeModel = modelService.getCurrentModel();
+
+    appController.undo();
+    expect(modelService.getCurrentModel()).toBe(beforeModel);
+
+    appController.redo();
+    expect(modelService.getCurrentModel()).toBe(beforeModel);
+  });
+
+  it("should safely handle clearSelection when no vertices are selected", () => {
+    const { appController, selectionService, undoRedoService } = createController();
+    expect(selectionService.getSelectedIndices().length).toBe(0);
+
+    appController.clearSelection();
+    expect(undoRedoService.canUndo()).toBe(false);
   });
 });

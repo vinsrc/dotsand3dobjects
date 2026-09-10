@@ -1,84 +1,129 @@
 import React, { useRef, useEffect } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
-import * as THREE from "three";
 import { useAppController } from "../Common/AppContext";
-import { useApplicationState } from "../Common/UseApplicationState";
-import { MeshViewer } from "./MeshViewer";
-import { GridPlane } from "./GridPlane";
-
-const CameraSynchronizer: React.FC = () => {
-  const controller = useAppController();
-  const { camera, size } = useThree();
-
-  const cameraService = controller.getCameraStateService();
-  const activeStrategy = cameraService.getActiveStrategy();
-  const isOrthographic = cameraService.isOrthographic();
-  const cameraDistance = cameraService.getCameraDistance();
-  const targetPoint = cameraService.getTargetPoint();
-  const viewDirection = activeStrategy.getViewDirection();
-  const upDirection = activeStrategy.getUpDirection();
-
-  useEffect(() => {
-    const positionX =
-      targetPoint.coordinateX + viewDirection.coordinateX * cameraDistance;
-    const positionY =
-      targetPoint.coordinateY + viewDirection.coordinateY * cameraDistance;
-    const positionZ =
-      targetPoint.coordinateZ + viewDirection.coordinateZ * cameraDistance;
-
-    camera.position.set(positionX, positionY, positionZ);
-    camera.up.set(
-      upDirection.coordinateX,
-      upDirection.coordinateY,
-      upDirection.coordinateZ
-    );
-    camera.lookAt(
-      targetPoint.coordinateX,
-      targetPoint.coordinateY,
-      targetPoint.coordinateZ
-    );
-
-    if (camera instanceof THREE.OrthographicCamera) {
-      const aspectRatio = size.width / (size.height || 1);
-      const frustumHeight = cameraDistance;
-      const frustumWidth = frustumHeight * aspectRatio;
-
-      camera.left = -frustumWidth / 2;
-      camera.right = frustumWidth / 2;
-      camera.top = frustumHeight / 2;
-      camera.bottom = -frustumHeight / 2;
-      camera.updateProjectionMatrix();
-    } else if (camera instanceof THREE.PerspectiveCamera) {
-      camera.updateProjectionMatrix();
-    }
-  }, [
-    camera,
-    size,
-    isOrthographic,
-    cameraDistance,
-    targetPoint,
-    viewDirection,
-    upDirection,
-  ]);
-
-  return null;
-};
+import { ViewportRenderer } from "../Common/ViewportRenderer";
+import { ViewportRaycaster } from "../Common/ViewportRaycaster";
+import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeometry";
+import { Vector3D } from "../../Application/Common/Vector3D";
 
 export const ViewportCanvas: React.FC = () => {
   const controller = useAppController();
-  useApplicationState(["VIEW_CHANGED", "MODEL_CHANGED", "RENDER_MODE_CHANGED"]);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<ViewportRenderer | null>(null);
+  const raycasterRef = useRef<ViewportRaycaster>(new ViewportRaycaster());
+
   const touchDistanceRef = useRef<number | null>(null);
+  const touchMidpointRef = useRef<{ x: number; y: number } | null>(null);
 
-  const modelService = controller.getModelService();
-  const cameraService = controller.getCameraStateService();
-  const renderModeService = controller.getRenderModeService();
+  const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
+  const lastDragWorldPosRef = useRef<Vector3D | null>(null);
+  const clickedVertexOnDownRef = useRef<{
+    index: number;
+    wasSelected: boolean;
+  } | null>(null);
 
-  const currentModel = modelService.getCurrentModel();
-  const renderMode = renderModeService.getRenderMode();
-  const isOrthographic = cameraService.isOrthographic();
-  const gridPlane = cameraService.getActiveStrategy().getGridPlane();
+  // Manage ViewportRenderer lifecycle and domain event subscriptions
+  useEffect(() => {
+    const targetCanvas = canvasRef.current;
+    const targetContainer = containerRef.current;
+
+    if (!targetCanvas || !targetContainer) {
+      return;
+    }
+
+    const initialWidth = targetContainer.clientWidth || 800;
+    const initialHeight = targetContainer.clientHeight || 600;
+
+    const viewportRenderer = new ViewportRenderer(targetCanvas);
+    rendererRef.current = viewportRenderer;
+
+    viewportRenderer.resize(initialWidth, initialHeight);
+    viewportRenderer.updateModel(controller.getModelService().getCurrentModel());
+    viewportRenderer.updateRenderMode(
+      controller.getRenderModeService().getRenderMode()
+    );
+    viewportRenderer.updateCamera(
+      controller.getCameraStateService(),
+      initialWidth,
+      initialHeight
+    );
+    viewportRenderer.updateSelection(
+      controller.getSelectionService().getSelectedIndices(),
+      controller.getSelectionService().getActiveVertex()
+    );
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const measuredWidth = Math.floor(entry.contentRect.width);
+        const measuredHeight = Math.floor(entry.contentRect.height);
+
+        if (measuredWidth > 0 && measuredHeight > 0) {
+          viewportRenderer.resize(measuredWidth, measuredHeight);
+          viewportRenderer.updateCamera(
+            controller.getCameraStateService(),
+            measuredWidth,
+            measuredHeight
+          );
+        }
+      }
+    });
+    resizeObserver.observe(targetContainer);
+
+    const unsubscribeModel = controller.getStateNotifier().subscribe(
+      "MODEL_CHANGED",
+      (payload) => {
+        const currentModel =
+          payload instanceof MeshGeometry
+            ? payload
+            : controller.getModelService().getCurrentModel();
+        viewportRenderer.updateModel(currentModel);
+      }
+    );
+
+    const unsubscribeRenderMode = controller.getStateNotifier().subscribe(
+      "RENDER_MODE_CHANGED",
+      () => {
+        viewportRenderer.updateRenderMode(
+          controller.getRenderModeService().getRenderMode()
+        );
+      }
+    );
+
+    const unsubscribeView = controller.getStateNotifier().subscribe(
+      "VIEW_CHANGED",
+      () => {
+        const currentWidth = targetContainer.clientWidth || 800;
+        const currentHeight = targetContainer.clientHeight || 600;
+        viewportRenderer.updateCamera(
+          controller.getCameraStateService(),
+          currentWidth,
+          currentHeight
+        );
+      }
+    );
+
+    const unsubscribeSelection = controller.getStateNotifier().subscribe(
+      "SELECTION_CHANGED",
+      () => {
+        viewportRenderer.updateSelection(
+          controller.getSelectionService().getSelectedIndices(),
+          controller.getSelectionService().getActiveVertex()
+        );
+      }
+    );
+
+    return () => {
+      unsubscribeModel();
+      unsubscribeRenderMode();
+      unsubscribeView();
+      unsubscribeSelection();
+      resizeObserver.disconnect();
+      viewportRenderer.dispose();
+      rendererRef.current = null;
+    };
+  }, [controller]);
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -91,35 +136,61 @@ export const ViewportCanvas: React.FC = () => {
 
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     if (event.touches.length === 2) {
-      const firstTouch = event.touches[0];
-      const secondTouch = event.touches[1];
-      if (firstTouch && secondTouch) {
-        const deltaX = firstTouch.clientX - secondTouch.clientX;
-        const deltaY = firstTouch.clientY - secondTouch.clientY;
-        touchDistanceRef.current = Math.hypot(deltaX, deltaY);
+      const touch1 = event.touches[0];
+      const touch2 = event.touches[1];
+      if (touch1 && touch2) {
+        touchDistanceRef.current = Math.hypot(
+          touch1.clientX - touch2.clientX,
+          touch1.clientY - touch2.clientY
+        );
+        touchMidpointRef.current = {
+          x: (touch1.clientX + touch2.clientX) / 2,
+          y: (touch1.clientY + touch2.clientY) / 2,
+        };
       }
     }
   };
 
   const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (event.touches.length === 2 && touchDistanceRef.current !== null) {
+    if (
+      event.touches.length === 2 &&
+      touchDistanceRef.current !== null &&
+      touchMidpointRef.current !== null
+    ) {
       event.preventDefault();
-      const firstTouch = event.touches[0];
-      const secondTouch = event.touches[1];
-      if (firstTouch && secondTouch) {
-        const deltaX = firstTouch.clientX - secondTouch.clientX;
-        const deltaY = firstTouch.clientY - secondTouch.clientY;
-        const currentDistance = Math.hypot(deltaX, deltaY);
-        const distanceDifference = currentDistance - touchDistanceRef.current;
+      const touch1 = event.touches[0];
+      const touch2 = event.touches[1];
+      if (touch1 && touch2) {
+        const currentDistance = Math.hypot(
+          touch1.clientX - touch2.clientX,
+          touch1.clientY - touch2.clientY
+        );
+        const currentMidpoint = {
+          x: (touch1.clientX + touch2.clientX) / 2,
+          y: (touch1.clientY + touch2.clientY) / 2,
+        };
 
-        const gestureThreshold = 10;
-        if (Math.abs(distanceDifference) > gestureThreshold) {
+        const distanceDifference = currentDistance - touchDistanceRef.current;
+        const deltaMidpointX = currentMidpoint.x - touchMidpointRef.current.x;
+        const deltaMidpointY = currentMidpoint.y - touchMidpointRef.current.y;
+
+        // Check pinch zoom threshold
+        if (Math.abs(distanceDifference) > 15) {
           if (distanceDifference > 0) {
             controller.zoomIn();
           } else {
             controller.zoomOut();
           }
           touchDistanceRef.current = currentDistance;
+        } else if (Math.hypot(deltaMidpointX, deltaMidpointY) > 3) {
+          // Double finger drag pan
+          const container = containerRef.current;
+          const containerHeight = container ? container.clientHeight : 600;
+          const cameraDistance = controller.getCameraStateService().getCameraDistance();
+          const panFactor = cameraDistance / containerHeight;
+
+          controller.panCamera(-deltaMidpointX * panFactor, deltaMidpointY * panFactor);
+          touchMidpointRef.current = currentMidpoint;
         }
       }
     }
@@ -127,6 +198,250 @@ export const ViewportCanvas: React.FC = () => {
 
   const handleTouchEnd = () => {
     touchDistanceRef.current = null;
+    touchMidpointRef.current = null;
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    pointerDownPosRef.current = { x: event.clientX, y: event.clientY };
+    isDraggingRef.current = false;
+    clickedVertexOnDownRef.current = null;
+    lastDragWorldPosRef.current = null;
+
+    if (!rendererRef.current || !canvasRef.current) {
+      return;
+    }
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+    const camera = rendererRef.current.getActiveCamera();
+    const currentModel = controller.getModelService().getCurrentModel();
+    const currentMode = controller.getEditorModeService().getMode();
+
+    const nearestVertex = raycasterRef.current.findNearestVertex(
+      clickX,
+      clickY,
+      currentModel.vertices,
+      camera,
+      rect.width,
+      rect.height
+    );
+
+    if (nearestVertex !== null) {
+      const wasSelected = controller
+        .getSelectionService()
+        .isSelected(nearestVertex);
+      clickedVertexOnDownRef.current = { index: nearestVertex, wasSelected };
+
+      if (currentMode === "TRANSLATE") {
+        if (!wasSelected) {
+          controller.selectSingleVertex(nearestVertex);
+        }
+        controller.beginTranslation();
+        const gridPlane = controller
+          .getCameraStateService()
+          .getActiveStrategy()
+          .getGridPlane();
+        const targetPoint = controller.getCameraStateService().getTargetPoint();
+        lastDragWorldPosRef.current = raycasterRef.current.unprojectToGridPlane(
+          clickX,
+          clickY,
+          camera,
+          gridPlane,
+          rect.width,
+          rect.height,
+          targetPoint
+        );
+      }
+    } else if (currentMode === "TRANSLATE") {
+      if (controller.getSelectionService().getSelectedIndices().length > 0) {
+        controller.beginTranslation();
+        const gridPlane = controller
+          .getCameraStateService()
+          .getActiveStrategy()
+          .getGridPlane();
+        const targetPoint = controller.getCameraStateService().getTargetPoint();
+        lastDragWorldPosRef.current = raycasterRef.current.unprojectToGridPlane(
+          clickX,
+          clickY,
+          camera,
+          gridPlane,
+          rect.width,
+          rect.height,
+          targetPoint
+        );
+      }
+    }
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!pointerDownPosRef.current) {
+      return;
+    }
+
+    const deltaX = event.clientX - pointerDownPosRef.current.x;
+    const deltaY = event.clientY - pointerDownPosRef.current.y;
+    if (Math.hypot(deltaX, deltaY) > 5) {
+      isDraggingRef.current = true;
+    }
+
+    const currentMode = controller.getEditorModeService().getMode();
+    if (
+      currentMode === "TRANSLATE" &&
+      isDraggingRef.current &&
+      lastDragWorldPosRef.current &&
+      rendererRef.current &&
+      canvasRef.current
+    ) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const clickX = event.clientX - rect.left;
+      const clickY = event.clientY - rect.top;
+      const camera = rendererRef.current.getActiveCamera();
+      const gridPlane = controller
+        .getCameraStateService()
+        .getActiveStrategy()
+        .getGridPlane();
+      const targetPoint = controller.getCameraStateService().getTargetPoint();
+
+      const currentWorldPos = raycasterRef.current.unprojectToGridPlane(
+        clickX,
+        clickY,
+        camera,
+        gridPlane,
+        rect.width,
+        rect.height,
+        targetPoint
+      );
+
+      if (currentWorldPos) {
+        const translationDelta = currentWorldPos.subtract(
+          lastDragWorldPosRef.current
+        );
+        controller.translateSelectedVertices(translationDelta);
+        lastDragWorldPosRef.current = currentWorldPos;
+      }
+    }
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const wasDragging = isDraggingRef.current;
+    const clickedVertexInfo = clickedVertexOnDownRef.current;
+
+    pointerDownPosRef.current = null;
+    isDraggingRef.current = false;
+    lastDragWorldPosRef.current = null;
+    clickedVertexOnDownRef.current = null;
+
+    if (wasDragging) {
+      return;
+    }
+
+    // Tap / Click handling based on active UI Mode
+    if (!rendererRef.current || !canvasRef.current) {
+      return;
+    }
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+    const width = rect.width;
+    const height = rect.height;
+    const camera = rendererRef.current.getActiveCamera();
+    const currentModel = controller.getModelService().getCurrentModel();
+    const mode = controller.getEditorModeService().getMode();
+
+    if (mode === "TRANSLATE") {
+      if (clickedVertexInfo && clickedVertexInfo.wasSelected) {
+        controller.selectSingleVertex(clickedVertexInfo.index);
+      }
+      return;
+    }
+
+    if (mode === "DEFAULT") {
+      const nearestVertex = raycasterRef.current.findNearestVertex(
+        clickX,
+        clickY,
+        currentModel.vertices,
+        camera,
+        width,
+        height
+      );
+      if (nearestVertex !== null) {
+        controller.selectSingleVertex(nearestVertex);
+      } else {
+        controller.clearSelection();
+      }
+    } else if (mode === "MULTI_SELECT") {
+      const nearestVertex = raycasterRef.current.findNearestVertex(
+        clickX,
+        clickY,
+        currentModel.vertices,
+        camera,
+        width,
+        height
+      );
+      if (nearestVertex !== null) {
+        controller.toggleVertexSelection(nearestVertex);
+      }
+    } else if (mode === "INSERT") {
+      const nearestEdge = raycasterRef.current.findNearestEdge(
+        clickX,
+        clickY,
+        currentModel.getWireframeEdges(),
+        currentModel.vertices,
+        camera,
+        width,
+        height
+      );
+      if (nearestEdge) {
+        controller.insertVertexOnEdge(nearestEdge[0], nearestEdge[1]);
+      } else {
+        const isOrthographic = controller.getCameraStateService().isOrthographic();
+        if (!isOrthographic) {
+          controller.getStateNotifier().notify(
+            "ERROR_OCCURRED",
+            "Switch to an Orthographic view"
+          );
+        } else {
+          const gridPlane = controller
+            .getCameraStateService()
+            .getActiveStrategy()
+            .getGridPlane();
+          const targetPoint = controller.getCameraStateService().getTargetPoint();
+          const worldPos = raycasterRef.current.unprojectToGridPlane(
+            clickX,
+            clickY,
+            camera,
+            gridPlane,
+            width,
+            height,
+            targetPoint
+          );
+          if (worldPos) {
+            controller.addVertexAtPosition(worldPos);
+          }
+        }
+      }
+    } else if (mode === "FILL") {
+      const nearestVertex = raycasterRef.current.findNearestVertex(
+        clickX,
+        clickY,
+        currentModel.vertices,
+        camera,
+        width,
+        height
+      );
+      if (nearestVertex !== null) {
+        const activeVertex = controller
+          .getSelectionService()
+          .getActiveVertex();
+        if (activeVertex !== null && activeVertex !== nearestVertex) {
+          controller.connectVertices(activeVertex, nearestVertex);
+        } else {
+          controller.selectSingleVertex(nearestVertex);
+        }
+      }
+    }
   };
 
   return (
@@ -147,23 +462,22 @@ export const ViewportCanvas: React.FC = () => {
         touchAction: "none",
       }}
     >
-      <Canvas
-        orthographic={isOrthographic}
-        camera={
-          isOrthographic
-            ? { position: [0, 0, 10], zoom: 1, near: 0.1, far: 1000 }
-            : { position: [5, 5, 5], fov: 45, near: 0.1, far: 1000 }
-        }
-        gl={{ antialias: true }}
-      >
-        <ambientLight intensity={0.8} />
-        <directionalLight position={[10, 20, 15]} intensity={1.2} />
-        <directionalLight position={[-10, -10, -10]} intensity={0.4} />
-
-        <CameraSynchronizer />
-        <GridPlane gridPlane={gridPlane} isOrthographic={isOrthographic} />
-        <MeshViewer meshGeometry={currentModel} renderMode={renderMode} />
-      </Canvas>
+      <canvas
+        ref={canvasRef}
+        data-testid="viewport-canvas"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "block",
+          cursor:
+            controller.getEditorModeService().getMode() === "TRANSLATE"
+              ? "grab"
+              : "crosshair",
+        }}
+      />
     </div>
   );
 };

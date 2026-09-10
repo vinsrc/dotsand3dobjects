@@ -9,6 +9,10 @@ describe("AppBootstrapper", () => {
     expect(appComponents.modelService).toBeDefined();
     expect(appComponents.cameraStateService).toBeDefined();
     expect(appComponents.renderModeService).toBeDefined();
+    expect(appComponents.editorModeService).toBeDefined();
+    expect(appComponents.selectionService).toBeDefined();
+    expect(appComponents.geometryEditorService).toBeDefined();
+    expect(appComponents.undoRedoService).toBeDefined();
     expect(appComponents.stateNotifier).toBeDefined();
 
     expect(appComponents.modelService.getCurrentModel().isEmpty()).toBe(false);

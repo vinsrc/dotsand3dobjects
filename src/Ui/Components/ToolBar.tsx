@@ -1,13 +1,25 @@
 import React, { useRef } from "react";
 import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
+import { UiMode } from "../../Application/Services/EditorModeService/EditorModeService";
 
 export const ToolBar: React.FC = () => {
   const controller = useAppController();
-  useApplicationState(["RENDER_MODE_CHANGED", "MODEL_CHANGED"]);
+  useApplicationState([
+    "RENDER_MODE_CHANGED",
+    "MODEL_CHANGED",
+    "MODE_CHANGED",
+    "AUTO_CONNECT_CHANGED",
+    "SELECTION_CHANGED",
+    "UNDO_REDO_STATE_CHANGED",
+  ]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isWireframe = controller.getRenderModeService().isWireframe();
+  const currentMode = controller.getEditorModeService().getMode();
+  const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
+  const canUndo = controller.canUndo();
+  const canRedo = controller.canRedo();
 
   const handleLoadClick = () => {
     if (fileInputRef.current) {
@@ -52,6 +64,63 @@ export const ToolBar: React.FC = () => {
     controller.toggleRenderMode();
   };
 
+  const handleCenterObject = () => {
+    controller.centerObject();
+  };
+
+  const handleUndo = () => {
+    controller.undo();
+  };
+
+  const handleRedo = () => {
+    controller.redo();
+  };
+
+  const handleClearSelection = () => {
+    controller.clearSelection();
+  };
+
+  const handleDeleteVertex = () => {
+    controller.deleteSelectedVertices();
+  };
+
+  const handleEnterMode = (mode: UiMode) => {
+    if (currentMode === mode) {
+      controller.finishMode();
+    } else {
+      controller.enterMode(mode);
+    }
+  };
+
+  const handleToggleAutoConnect = () => {
+    controller.toggleAutoConnect();
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    padding: "6px 12px",
+    backgroundColor: "#ffffff",
+    border: "1px solid #999999",
+    borderRadius: "4px",
+    fontSize: "13px",
+    fontWeight: 500,
+    cursor: "pointer",
+    color: "#333333",
+    whiteSpace: "nowrap",
+  };
+
+  const activeModeButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: "#2196f3",
+    color: "#ffffff",
+    borderColor: "#1976d2",
+  };
+
+  const disabledButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    opacity: 0.5,
+    cursor: "not-allowed",
+  };
+
   return (
     <header
       data-testid="toolbar"
@@ -62,12 +131,14 @@ export const ToolBar: React.FC = () => {
         height: "48px",
         backgroundColor: "#e0e0e0",
         borderBottom: "1px solid #c0c0c0",
-        padding: "0 16px",
+        padding: "0 12px",
         boxSizing: "border-box",
         userSelect: "none",
+        overflowX: "auto",
+        gap: "12px",
       }}
     >
-      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
         <input
           ref={fileInputRef}
           type="file"
@@ -78,32 +149,14 @@ export const ToolBar: React.FC = () => {
         <button
           data-testid="load-obj-button"
           onClick={handleLoadClick}
-          style={{
-            padding: "6px 14px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #999999",
-            borderRadius: "4px",
-            fontSize: "14px",
-            fontWeight: 500,
-            cursor: "pointer",
-            color: "#333333",
-          }}
+          style={buttonStyle}
         >
           Load OBJ
         </button>
         <button
           data-testid="export-obj-button"
           onClick={handleExportClick}
-          style={{
-            padding: "6px 14px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #999999",
-            borderRadius: "4px",
-            fontSize: "14px",
-            fontWeight: 500,
-            cursor: "pointer",
-            color: "#333333",
-          }}
+          style={buttonStyle}
         >
           Export OBJ
         </button>
@@ -111,29 +164,105 @@ export const ToolBar: React.FC = () => {
           data-testid="toggle-view-button"
           onClick={handleToggleRenderMode}
           style={{
-            padding: "6px 14px",
+            ...buttonStyle,
             backgroundColor: isWireframe ? "#333333" : "#ffffff",
             color: isWireframe ? "#ffffff" : "#333333",
-            border: "1px solid #999999",
-            borderRadius: "4px",
-            fontSize: "14px",
-            fontWeight: 500,
-            cursor: "pointer",
           }}
         >
           {isWireframe ? "Wireframe View" : "Shaded View"}
         </button>
+        <button
+          data-testid="center-object-button"
+          onClick={handleCenterObject}
+          style={buttonStyle}
+        >
+          Center Object
+        </button>
+        <button
+          data-testid="undo-button"
+          onClick={handleUndo}
+          disabled={!canUndo}
+          style={canUndo ? buttonStyle : disabledButtonStyle}
+        >
+          Undo
+        </button>
+        <button
+          data-testid="redo-button"
+          onClick={handleRedo}
+          disabled={!canRedo}
+          style={canRedo ? buttonStyle : disabledButtonStyle}
+        >
+          Redo
+        </button>
+        <button
+          data-testid="clear-selection-button"
+          onClick={handleClearSelection}
+          style={buttonStyle}
+        >
+          Clear Selection
+        </button>
+        <button
+          data-testid="delete-vertex-button"
+          onClick={handleDeleteVertex}
+          style={buttonStyle}
+        >
+          Delete Vertex
+        </button>
       </div>
 
-      <div
-        style={{
-          fontSize: "15px",
-          fontWeight: 600,
-          color: "#555555",
-          letterSpacing: "0.5px",
-        }}
-      >
-        Tool Bar
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <button
+          data-testid="mode-multi-select-button"
+          onClick={() => handleEnterMode("MULTI_SELECT")}
+          style={
+            currentMode === "MULTI_SELECT" ? activeModeButtonStyle : buttonStyle
+          }
+        >
+          Multi Select Mode
+        </button>
+
+        <button
+          data-testid="mode-translate-button"
+          onClick={() => handleEnterMode("TRANSLATE")}
+          style={
+            currentMode === "TRANSLATE" ? activeModeButtonStyle : buttonStyle
+          }
+        >
+          Translate Mode
+        </button>
+
+        <button
+          data-testid="mode-insert-button"
+          onClick={() => handleEnterMode("INSERT")}
+          style={
+            currentMode === "INSERT" ? activeModeButtonStyle : buttonStyle
+          }
+        >
+          Insert Mode
+        </button>
+
+        {currentMode === "INSERT" && (
+          <button
+            data-testid="auto-connect-toggle-button"
+            onClick={handleToggleAutoConnect}
+            style={{
+              ...buttonStyle,
+              backgroundColor: isAutoConnect ? "#4caf50" : "#ffffff",
+              color: isAutoConnect ? "#ffffff" : "#333333",
+              borderColor: isAutoConnect ? "#388e3c" : "#999999",
+            }}
+          >
+            {isAutoConnect ? "Auto Connect: ON" : "Auto Connect: OFF"}
+          </button>
+        )}
+
+        <button
+          data-testid="mode-fill-button"
+          onClick={() => handleEnterMode("FILL")}
+          style={currentMode === "FILL" ? activeModeButtonStyle : buttonStyle}
+        >
+          Fill Mode
+        </button>
       </div>
     </header>
   );

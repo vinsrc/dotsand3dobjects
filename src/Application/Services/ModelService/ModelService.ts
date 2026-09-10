@@ -38,7 +38,7 @@ export class ModelService {
   public loadFromObj(fileContent: string, fileName?: string): void {
     try {
       const parsedGeometry = this.objParser.parse(fileContent, fileName);
-      this.currentModel = parsedGeometry;
+      this.currentModel = parsedGeometry.fitToDimension(2.0);
       this.stateNotifier.notify("MODEL_CHANGED", this.currentModel);
     } catch (parseError) {
       const errorMessage =

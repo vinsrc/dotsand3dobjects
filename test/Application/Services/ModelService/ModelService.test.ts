@@ -68,6 +68,39 @@ describe("ModelService", () => {
     expect(modelListener).toHaveBeenCalled();
   });
 
+  it("should auto scale and center loaded OBJ models to fit standard 2.0 dimension", () => {
+    const notifier = new ApplicationStateNotifier();
+    const service = new ModelService(
+      modelFactory,
+      objParser,
+      objExporter,
+      notifier
+    );
+
+    // Large off-center cube from (100, 200, 300) to (200, 300, 400), size = 100
+    const largeObjContent = `
+      v 100 200 300
+      v 200 200 300
+      v 200 300 300
+      v 100 300 300
+      f 1 2 3 4
+    `;
+
+    service.loadFromObj(largeObjContent, "large.obj");
+    const loadedModel = service.getCurrentModel();
+
+    const centerPoint = loadedModel.calculateCenter();
+    expect(centerPoint.coordinateX).toBeCloseTo(0, 4);
+    expect(centerPoint.coordinateY).toBeCloseTo(0, 4);
+    expect(centerPoint.coordinateZ).toBeCloseTo(0, 4);
+
+    const boundingBox = loadedModel.calculateBoundingBox();
+    const extentX = boundingBox.maximum.coordinateX - boundingBox.minimum.coordinateX;
+    const extentY = boundingBox.maximum.coordinateY - boundingBox.minimum.coordinateY;
+    expect(extentX).toBeCloseTo(2.0, 4);
+    expect(extentY).toBeCloseTo(2.0, 4);
+  });
+
   it("should notify ERROR_OCCURRED with 'Unsupported error' when non-obj file is provided", () => {
     const notifier = new ApplicationStateNotifier();
     const errorListener = vi.fn();

@@ -4,14 +4,17 @@ import { Face3D } from "./Face3D";
 export class MeshGeometry {
   public readonly vertices: readonly Vector3D[];
   public readonly faces: readonly Face3D[];
+  public readonly explicitEdges: readonly [number, number][];
   private readonly wireframeEdges: readonly [number, number][];
 
   public constructor(
     vertices: readonly Vector3D[],
-    faces: readonly Face3D[]
+    faces: readonly Face3D[] = [],
+    explicitEdges: readonly [number, number][] = []
   ) {
     this.vertices = [...vertices];
     this.faces = [...faces];
+    this.explicitEdges = [...explicitEdges];
     this.wireframeEdges = this.buildUniqueEdges();
   }
 
@@ -98,6 +101,50 @@ export class MeshGeometry {
     return maximumDistance > 0 ? maximumDistance : 1;
   }
 
+  public translate(offsetVector: Vector3D): MeshGeometry {
+    const translatedVertices = this.vertices.map((currentVertex) =>
+      currentVertex.add(offsetVector)
+    );
+    return new MeshGeometry(translatedVertices, this.faces, this.explicitEdges);
+  }
+
+  public scale(scalarFactor: number): MeshGeometry {
+    const scaledVertices = this.vertices.map((currentVertex) =>
+      currentVertex.scaleBy(scalarFactor)
+    );
+    return new MeshGeometry(scaledVertices, this.faces, this.explicitEdges);
+  }
+
+  public fitToDimension(targetMaxDimension: number = 2.0): MeshGeometry {
+    if (this.vertices.length === 0) {
+      return this;
+    }
+
+    const boundingBox = this.calculateBoundingBox();
+    const extentX =
+      boundingBox.maximum.coordinateX - boundingBox.minimum.coordinateX;
+    const extentY =
+      boundingBox.maximum.coordinateY - boundingBox.minimum.coordinateY;
+    const extentZ =
+      boundingBox.maximum.coordinateZ - boundingBox.minimum.coordinateZ;
+    const currentMaxDimension = Math.max(extentX, extentY, extentZ);
+
+    const centerPoint = this.calculateCenter();
+    const centeringOffset = new Vector3D(
+      -centerPoint.coordinateX,
+      -centerPoint.coordinateY,
+      -centerPoint.coordinateZ
+    );
+    const centeredGeometry = this.translate(centeringOffset);
+
+    if (currentMaxDimension > 0.000001) {
+      const scalingFactor = targetMaxDimension / currentMaxDimension;
+      return centeredGeometry.scale(scalingFactor);
+    }
+
+    return centeredGeometry;
+  }
+
   private buildUniqueEdges(): readonly [number, number][] {
     const edgeKeySet = new Set<string>();
     const uniqueEdgeList: [number, number][] = [];
@@ -127,6 +174,25 @@ export class MeshGeometry {
             edgeKeySet.add(edgeIdentifier);
             uniqueEdgeList.push([lowerIndex, higherIndex]);
           }
+        }
+      }
+    }
+
+    for (const [startVertexIndex, endVertexIndex] of this.explicitEdges) {
+      if (
+        startVertexIndex >= 0 &&
+        startVertexIndex < this.vertices.length &&
+        endVertexIndex >= 0 &&
+        endVertexIndex < this.vertices.length &&
+        startVertexIndex !== endVertexIndex
+      ) {
+        const lowerIndex = Math.min(startVertexIndex, endVertexIndex);
+        const higherIndex = Math.max(startVertexIndex, endVertexIndex);
+        const edgeIdentifier = `${lowerIndex}_${higherIndex}`;
+
+        if (!edgeKeySet.has(edgeIdentifier)) {
+          edgeKeySet.add(edgeIdentifier);
+          uniqueEdgeList.push([lowerIndex, higherIndex]);
         }
       }
     }

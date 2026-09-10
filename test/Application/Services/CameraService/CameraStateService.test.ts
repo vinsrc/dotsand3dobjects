@@ -64,4 +64,29 @@ describe("CameraStateService", () => {
     cameraService.fitToRadius(10);
     expect(cameraService.getCameraDistance()).toBe(25);
   });
+
+  it("should pan target point along camera right and up directions", () => {
+    const factory = new OrthographicViewStrategyFactory();
+    const cameraService = new CameraStateService(factory);
+
+    // Switch to orthographic +Z view (viewDirection = [0, 0, 1], up = [0, 1, 0], right = [-1, 0, 0])
+    cameraService.setOrthographicAxis("+Z");
+    cameraService.setTargetPoint(new Vector3D(0, 0, 0));
+
+    cameraService.pan(2, 3);
+    const updatedTarget = cameraService.getTargetPoint();
+    expect(updatedTarget.coordinateX).toBeCloseTo(-2, 5);
+    expect(updatedTarget.coordinateY).toBeCloseTo(3, 5);
+    expect(updatedTarget.coordinateZ).toBeCloseTo(0, 5);
+  });
+
+  it("should center on specified point", () => {
+    const factory = new OrthographicViewStrategyFactory();
+    const cameraService = new CameraStateService(factory);
+
+    cameraService.centerOn(new Vector3D(15, -20, 5));
+    expect(cameraService.getTargetPoint().coordinateX).toBe(15);
+    expect(cameraService.getTargetPoint().coordinateY).toBe(-20);
+    expect(cameraService.getTargetPoint().coordinateZ).toBe(5);
+  });
 });

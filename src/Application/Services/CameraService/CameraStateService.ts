@@ -100,4 +100,23 @@ export class CameraStateService {
     const safeRadius = Math.max(1, boundingRadius);
     this.cameraDistance = safeRadius * 2.5;
   }
+
+  public pan(deltaRight: number, deltaUp: number): void {
+    const activeStrategy = this.getActiveStrategy();
+    const viewDirection = activeStrategy.getViewDirection();
+    const upDirection = activeStrategy.getUpDirection();
+
+    const rightVector = viewDirection
+      .calculateCrossProduct(upDirection)
+      .normalize();
+
+    const rightOffset = rightVector.scaleBy(deltaRight);
+    const upOffset = upDirection.scaleBy(deltaUp);
+
+    this.targetPoint = this.targetPoint.add(rightOffset).add(upOffset);
+  }
+
+  public centerOn(newCenterPoint: Vector3D): void {
+    this.targetPoint = newCenterPoint;
+  }
 }

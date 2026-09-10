@@ -85,4 +85,19 @@ describe("ObjParser", () => {
     expect(mesh.getVertexCount()).toBe(1);
     expect(mesh.getFaceCount()).toBe(0);
   });
+
+  it("should parse line elements (l v1 v2) into explicit edges", () => {
+    const objData = `
+      v 0 0 0
+      v 1 0 0
+      v 1 1 0
+      l 1 2 3
+      l -3 -1
+    `;
+
+    const mesh = objParser.parse(objData);
+    expect(mesh.getVertexCount()).toBe(3);
+    expect(mesh.explicitEdges.length).toBe(3); // (0,1), (1,2) from l 1 2 3, and (0,2) from l -3 -1
+    expect(mesh.getWireframeEdges().length).toBe(3);
+  });
 });

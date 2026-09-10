@@ -29,6 +29,7 @@ describe("OrthographicViewStrategy", () => {
     expect(strategy.getAxisLabel()).toBe("-X");
     expect(strategy.getGridPlane()).toBe("YZ");
     expect(strategy.getViewDirection().coordinateX).toBe(-1);
+    expect(strategy.getUpDirection().coordinateY).toBe(1);
   });
 
   it("should create PositiveYViewStrategy (+Y) with correct directions", () => {

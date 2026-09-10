@@ -62,4 +62,121 @@ describe("MeshGeometry", () => {
     // Edges should be: (0,1), (1,2), (0,2), (2,3), (0,3) -> 5 unique edges
     expect(uniqueEdges.length).toBe(5);
   });
+
+  it("should translate vertices by offset vector", () => {
+    const vertices = [
+      new Vector3D(1, 2, 3),
+      new Vector3D(4, 5, 6),
+    ];
+    const faces = [new Face3D([0, 1, 0])];
+    const mesh = new MeshGeometry(vertices, faces);
+
+    const translatedMesh = mesh.translate(new Vector3D(10, -5, 2));
+
+    expect(translatedMesh.vertices[0].coordinateX).toBe(11);
+    expect(translatedMesh.vertices[0].coordinateY).toBe(-3);
+    expect(translatedMesh.vertices[0].coordinateZ).toBe(5);
+
+    expect(translatedMesh.vertices[1].coordinateX).toBe(14);
+    expect(translatedMesh.vertices[1].coordinateY).toBe(0);
+    expect(translatedMesh.vertices[1].coordinateZ).toBe(8);
+
+    expect(translatedMesh.faces).toEqual(faces);
+  });
+
+  it("should scale vertices uniformly by scalar factor", () => {
+    const vertices = [
+      new Vector3D(2, 4, -6),
+      new Vector3D(0, 1, 3),
+    ];
+    const faces = [new Face3D([0, 1, 0])];
+    const mesh = new MeshGeometry(vertices, faces);
+
+    const scaledMesh = mesh.scale(2.5);
+
+    expect(scaledMesh.vertices[0].coordinateX).toBe(5);
+    expect(scaledMesh.vertices[0].coordinateY).toBe(10);
+    expect(scaledMesh.vertices[0].coordinateZ).toBe(-15);
+
+    expect(scaledMesh.vertices[1].coordinateX).toBe(0);
+    expect(scaledMesh.vertices[1].coordinateY).toBe(2.5);
+    expect(scaledMesh.vertices[1].coordinateZ).toBe(7.5);
+  });
+
+  it("should fit geometry to target dimension and center at origin", () => {
+    // A box from (10, 20, 30) to (50, 40, 30)
+    // Dimensions: X = 40, Y = 20, Z = 0. Max dimension = 40.
+    // Center: (30, 30, 30).
+    const vertices = [
+      new Vector3D(10, 20, 30),
+      new Vector3D(50, 20, 30),
+      new Vector3D(50, 40, 30),
+      new Vector3D(10, 40, 30),
+    ];
+    const faces = [new Face3D([0, 1, 2, 3])];
+    const mesh = new MeshGeometry(vertices, faces);
+
+    const fittedMesh = mesh.fitToDimension(2.0);
+
+    const newCenter = fittedMesh.calculateCenter();
+    expect(newCenter.coordinateX).toBeCloseTo(0, 5);
+    expect(newCenter.coordinateY).toBeCloseTo(0, 5);
+    expect(newCenter.coordinateZ).toBeCloseTo(0, 5);
+
+    const boundingBox = fittedMesh.calculateBoundingBox();
+    const extentX = boundingBox.maximum.coordinateX - boundingBox.minimum.coordinateX;
+    const extentY = boundingBox.maximum.coordinateY - boundingBox.minimum.coordinateY;
+    const extentZ = boundingBox.maximum.coordinateZ - boundingBox.minimum.coordinateZ;
+    const maxExtent = Math.max(extentX, extentY, extentZ);
+
+    expect(maxExtent).toBeCloseTo(2.0, 5);
+    expect(extentX).toBeCloseTo(2.0, 5);
+    expect(extentY).toBeCloseTo(1.0, 5);
+    expect(extentZ).toBeCloseTo(0, 5);
+  });
+
+  it("should handle empty geometry when fitToDimension is called", () => {
+    const emptyMesh = new MeshGeometry([], []);
+    const fittedEmpty = emptyMesh.fitToDimension(2.0);
+    expect(fittedEmpty.isEmpty()).toBe(true);
+  });
+
+  it("should handle point geometry with zero dimension gracefully", () => {
+    const singlePointMesh = new MeshGeometry(
+      [new Vector3D(5, 5, 5)],
+      []
+    );
+    const fittedPoint = singlePointMesh.fitToDimension(2.0);
+    expect(fittedPoint.vertices[0].coordinateX).toBeCloseTo(0, 5);
+    expect(fittedPoint.vertices[0].coordinateY).toBeCloseTo(0, 5);
+    expect(fittedPoint.vertices[0].coordinateZ).toBeCloseTo(0, 5);
+  });
+
+  it("should support explicit edges and combine them with face edges", () => {
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(1, 1, 0),
+      new Vector3D(0, 1, 0),
+      new Vector3D(2, 2, 2),
+    ];
+    const faces = [new Face3D([0, 1, 2])];
+    const explicitEdges: [number, number][] = [
+      [2, 3],
+      [3, 0],
+      [2, 4],
+      [0, 1],
+      [-1, 0],
+      [0, 0],
+    ];
+
+    const mesh = new MeshGeometry(vertices, faces, explicitEdges);
+    expect(mesh.explicitEdges).toEqual(explicitEdges);
+
+    const edges = mesh.getWireframeEdges();
+    expect(edges.length).toBe(6);
+
+    const translated = mesh.translate(new Vector3D(1, 1, 1));
+    expect(translated.explicitEdges).toEqual(explicitEdges);
+  });
 });

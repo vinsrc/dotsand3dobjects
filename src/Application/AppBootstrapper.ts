@@ -6,6 +6,10 @@ import { ModelService } from "./Services/ModelService/ModelService";
 import { OrthographicViewStrategyFactory } from "./Services/CameraService/OrthographicViewStrategy";
 import { CameraStateService } from "./Services/CameraService/CameraStateService";
 import { RenderModeService } from "./Services/RenderModeService/RenderModeService";
+import { EditorModeService } from "./Services/EditorModeService/EditorModeService";
+import { SelectionService } from "./Services/SelectionService/SelectionService";
+import { GeometryEditorService } from "./Services/GeometryEditorService/GeometryEditorService";
+import { UndoRedoService } from "./Services/UndoRedoService/UndoRedoService";
 import { AppController } from "./Controllers/AppController";
 
 export class AppBootstrapper {
@@ -14,6 +18,10 @@ export class AppBootstrapper {
     modelService: ModelService;
     cameraStateService: CameraStateService;
     renderModeService: RenderModeService;
+    editorModeService: EditorModeService;
+    selectionService: SelectionService;
+    geometryEditorService: GeometryEditorService;
+    undoRedoService: UndoRedoService;
     stateNotifier: ApplicationStateNotifier;
   } {
     const modelFactory = new ModelFactory();
@@ -32,10 +40,22 @@ export class AppBootstrapper {
     const cameraStateService = new CameraStateService(orthographicViewFactory);
     const renderModeService = new RenderModeService("FLAT_SHADED");
 
+    const editorModeService = new EditorModeService(stateNotifier);
+    const selectionService = new SelectionService(stateNotifier);
+    const geometryEditorService = new GeometryEditorService(
+      modelService,
+      selectionService
+    );
+    const undoRedoService = new UndoRedoService(stateNotifier);
+
     const appController = new AppController(
       modelService,
       cameraStateService,
       renderModeService,
+      editorModeService,
+      selectionService,
+      geometryEditorService,
+      undoRedoService,
       stateNotifier
     );
 
@@ -44,6 +64,10 @@ export class AppBootstrapper {
       modelService,
       cameraStateService,
       renderModeService,
+      editorModeService,
+      selectionService,
+      geometryEditorService,
+      undoRedoService,
       stateNotifier,
     };
   }

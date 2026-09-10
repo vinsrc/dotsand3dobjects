@@ -24,6 +24,7 @@ export class ObjParser {
 
     const parsedVertices: Vector3D[] = [];
     const parsedFaces: Face3D[] = [];
+    const parsedEdges: [number, number][] = [];
     const lines = objFileContent.split(/\r?\n/);
 
     for (const rawLine of lines) {
@@ -85,9 +86,48 @@ export class ObjParser {
         if (faceVertexIndices.length >= 3) {
           parsedFaces.push(new Face3D(faceVertexIndices));
         }
+      } else if (commandType === "l") {
+        const lineVertexIndices: number[] = [];
+        const totalVertexCount = parsedVertices.length;
+
+        for (
+          let tokenIndex = 1;
+          tokenIndex < tokens.length;
+          tokenIndex += 1
+        ) {
+          const currentToken = tokens[tokenIndex];
+          if (!currentToken) {
+            continue;
+          }
+
+          const parsedIndex = parseInt(currentToken.split("/")[0] ?? "", 10);
+          if (!Number.isNaN(parsedIndex)) {
+            const zeroBasedIndex =
+              parsedIndex > 0
+                ? parsedIndex - 1
+                : totalVertexCount + parsedIndex;
+            lineVertexIndices.push(zeroBasedIndex);
+          }
+        }
+
+        for (
+          let lineIndex = 0;
+          lineIndex < lineVertexIndices.length - 1;
+          lineIndex += 1
+        ) {
+          const startIndex = lineVertexIndices[lineIndex];
+          const endIndex = lineVertexIndices[lineIndex + 1];
+          if (startIndex !== undefined && endIndex !== undefined) {
+            parsedEdges.push([startIndex, endIndex]);
+          }
+        }
       }
     }
 
-    return this.modelFactory.createFromRawData(parsedVertices, parsedFaces);
+    return this.modelFactory.createFromRawData(
+      parsedVertices,
+      parsedFaces,
+      parsedEdges
+    );
   }
 }

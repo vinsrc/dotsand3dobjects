@@ -15,7 +15,7 @@ Any orthographic view has grid of 1 unit. It should provide Zoom in and out func
 
 # Tool bar buttons:
 
-In the tool bar, First button : load a  Wavefront OBJ format 3d file. 
+In the tool bar, First button : load a  Wavefront OBJ format 3d file. Auto scale the model to fit the view when initialy loaded using load obj button.
 Second button : export current model as a Wavefront OBJ format 3d file. 
 Third button : Toggle wireframe view or shaded view
     Wireframe view shows the wireframe of the 3d model.

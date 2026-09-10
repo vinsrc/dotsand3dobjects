@@ -5,13 +5,13 @@ For example, the translation of vertices is allowed only in orthographic views. 
 
 # Delivery Workflow
 
-Read @docs/workflows.md 
+Read @docs/workflows/main-workflow.md for getting the workflow references used in this file.
 
 # Tech Stack:
 
 Offline web app that can be bundled into a single HTML file.
 React JS
-Three JS - Use React Three Fiber
+Three JS (Direct Three.js for 3D Viewport)
 Typescript with strict typing.
 Vitest for unit testing.
 Playwright for Functional testing.
@@ -64,7 +64,6 @@ variable names should reflect their purpose, dont name them with single letters.
 
 Write unit tests for all application layer classes. 
 Overall 80% code coverage in application layer. but 100% code coverage for functions that define behaviors in classes. 
-
 
 Follow the Main Delivery Workflow to deliver the product.
 

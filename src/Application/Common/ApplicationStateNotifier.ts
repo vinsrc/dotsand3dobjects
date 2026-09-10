@@ -2,7 +2,11 @@ export type StateEventType =
   | "MODEL_CHANGED"
   | "VIEW_CHANGED"
   | "RENDER_MODE_CHANGED"
-  | "ERROR_OCCURRED";
+  | "ERROR_OCCURRED"
+  | "MODE_CHANGED"
+  | "SELECTION_CHANGED"
+  | "AUTO_CONNECT_CHANGED"
+  | "UNDO_REDO_STATE_CHANGED";
 
 export type StateListenerCallback = (payload?: unknown) => void;
 export type UnsubscribeCallback = () => void;

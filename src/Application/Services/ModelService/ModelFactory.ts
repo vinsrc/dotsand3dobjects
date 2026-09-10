@@ -5,9 +5,10 @@ import { MeshGeometry } from "./MeshGeometry";
 export class ModelFactory {
   public createFromRawData(
     vertices: readonly Vector3D[],
-    faces: readonly Face3D[]
+    faces: readonly Face3D[] = [],
+    explicitEdges: readonly [number, number][] = []
   ): MeshGeometry {
-    return new MeshGeometry(vertices, faces);
+    return new MeshGeometry(vertices, faces, explicitEdges);
   }
 
   public createStarterCube(cubeSize: number = 2): MeshGeometry {

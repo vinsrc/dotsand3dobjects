@@ -22,4 +22,20 @@ describe("ObjExporter", () => {
     expect(exportedText).toContain("v 0.000000 1.000000 0.000000");
     expect(exportedText).toContain("f 1 2 3");
   });
+
+  it("should export standalone edges not in faces as line elements", () => {
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(2, 0, 0),
+    ];
+    const explicitEdges: [number, number][] = [[0, 1], [1, 2]];
+    const mesh = new MeshGeometry(vertices, [], explicitEdges);
+
+    const exporter = new ObjExporter();
+    const exportedText = exporter.export(mesh);
+
+    expect(exportedText).toContain("l 1 2");
+    expect(exportedText).toContain("l 2 3");
+  });
 });
