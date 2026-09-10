@@ -262,4 +262,110 @@ describe("GeometryEditorService", () => {
     expect(selectionService.getSelectedIndices()).toEqual([1]);
     expect(selectionService.getActiveVertex()).toBe(1);
   });
+
+  it("should create a triangle face from 3 selected vertices and clear selection", () => {
+    const { modelService, selectionService, editorService } = setupService();
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(0, 1, 0),
+    ];
+    modelService.setCurrentModel(new MeshGeometry(vertices, []));
+    selectionService.restoreSelection([0, 1, 2], 2);
+
+    const createdFace = editorService.createFaceFromSelection([0, 1, 2]);
+    expect(createdFace).not.toBeNull();
+    expect(createdFace?.isTriangle()).toBe(true);
+    expect(createdFace?.vertexIndices).toEqual([0, 1, 2]);
+
+    const updatedModel = modelService.getCurrentModel();
+    expect(updatedModel.faces.length).toBe(1);
+    expect(selectionService.getSelectedIndices()).toEqual([]);
+  });
+
+  it("should create a quad face from 4 selected vertices and clear selection", () => {
+    const { modelService, selectionService, editorService } = setupService();
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(1, 1, 0),
+      new Vector3D(0, 1, 0),
+    ];
+    modelService.setCurrentModel(new MeshGeometry(vertices, []));
+    selectionService.restoreSelection([0, 1, 2, 3], 3);
+
+    const createdFace = editorService.createFaceFromSelection([0, 1, 2, 3]);
+    expect(createdFace).not.toBeNull();
+    expect(createdFace?.isQuad()).toBe(true);
+    expect(createdFace?.vertexIndices).toEqual([0, 1, 2, 3]);
+
+    const updatedModel = modelService.getCurrentModel();
+    expect(updatedModel.faces.length).toBe(1);
+    expect(selectionService.getSelectedIndices()).toEqual([]);
+  });
+
+  it("should sort 4 selected vertices to prevent bowtie quad triangulation", () => {
+    const { modelService, editorService } = setupService();
+    const vertices = [
+      new Vector3D(0, 0, 0), // 0: bottom-left
+      new Vector3D(1, 0, 0), // 1: bottom-right
+      new Vector3D(1, 1, 0), // 2: top-right
+      new Vector3D(0, 1, 0), // 3: top-left
+    ];
+    modelService.setCurrentModel(new MeshGeometry(vertices, []));
+
+    // Selection order has crossed diagonal: 0, 2, 1, 3
+    const createdFace = editorService.createFaceFromSelection([0, 2, 1, 3]);
+    expect(createdFace).not.toBeNull();
+    // Winding order should be cyclic around perimeter: 0, 3, 2, 1 or 0, 1, 2, 3
+    expect(createdFace?.vertexIndices).toEqual([0, 3, 2, 1]);
+  });
+
+  it("should reject face creation when vertex count is less than 3 or greater than 4", () => {
+    const { modelService, editorService } = setupService();
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(1, 1, 0),
+      new Vector3D(0, 1, 0),
+      new Vector3D(0, 0, 1),
+    ];
+    modelService.setCurrentModel(new MeshGeometry(vertices, []));
+
+    expect(editorService.createFaceFromSelection([0, 1])).toBeNull();
+    expect(editorService.createFaceFromSelection([0, 1, 2, 3, 4])).toBeNull();
+    expect(modelService.getCurrentModel().faces.length).toBe(0);
+  });
+
+  it("should reject face creation when out of bounds or duplicate indices are passed", () => {
+    const { modelService, editorService } = setupService();
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(1, 1, 0),
+    ];
+    modelService.setCurrentModel(new MeshGeometry(vertices, []));
+
+    expect(editorService.createFaceFromSelection([-1, 0, 1])).toBeNull();
+    expect(editorService.createFaceFromSelection([0, 1, 10])).toBeNull();
+    expect(editorService.createFaceFromSelection([0, 1, 1])).toBeNull();
+    expect(modelService.getCurrentModel().faces.length).toBe(0);
+  });
+
+  it("should not add duplicate face when face with same vertices already exists, returning existing face and clearing selection", () => {
+    const { modelService, selectionService, editorService } = setupService();
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(1, 1, 0),
+    ];
+    const initialFace = new Face3D([0, 1, 2]);
+    modelService.setCurrentModel(new MeshGeometry(vertices, [initialFace]));
+    selectionService.restoreSelection([2, 0, 1], 1);
+
+    const duplicateFace = editorService.createFaceFromSelection([2, 0, 1]);
+    expect(duplicateFace).toBe(initialFace);
+    expect(modelService.getCurrentModel().faces.length).toBe(1);
+    expect(selectionService.getSelectedIndices()).toEqual([]);
+  });
 });

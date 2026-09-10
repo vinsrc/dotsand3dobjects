@@ -3,10 +3,6 @@ The goal of the application is to provide a very basic hard surface 3d modelling
 
 For example, the translation of vertices is allowed only in orthographic views. this stops the user from making translation errors into another axis. 
 
-# Delivery Workflow
-
-Read @docs/workflows/main-workflow.md for getting the workflow references used in this file.
-
 # Tech Stack:
 
 Offline web app that can be bundled into a single HTML file.
@@ -65,5 +61,11 @@ variable names should reflect their purpose, dont name them with single letters.
 Write unit tests for all application layer classes. 
 Overall 80% code coverage in application layer. but 100% code coverage for functions that define behaviors in classes. 
 
-Follow the Main Delivery Workflow to deliver the product.
+# Rules:
+
+Dont fetch git repository or push to git repository ever.
+
+# Iteration Delivery :
+
+Read  @docs/workflows/iteration-workflow.md and Follow the Iteration Delivery Workflow to deliver the iteration backlog.
 

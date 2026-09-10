@@ -355,4 +355,46 @@ describe("AppController", () => {
     appController.clearSelection();
     expect(undoRedoService.canUndo()).toBe(false);
   });
+
+  it("should create face when 3 vertices are selected and support undo/redo", () => {
+    const { appController, modelService, selectionService, undoRedoService } =
+      createController();
+    const initialFaceCount = modelService.getCurrentModel().getFaceCount();
+
+    // Select 3 vertices (e.g. vertices 0, 1, 2 from cube)
+    selectionService.restoreSelection([0, 1, 2], 2);
+    expect(appController.createFaceFromSelectedVertices()).toBe(true);
+
+    expect(modelService.getCurrentModel().getFaceCount()).toBe(
+      initialFaceCount + 1
+    );
+    expect(selectionService.getSelectedIndices()).toEqual([]);
+    expect(undoRedoService.canUndo()).toBe(true);
+
+    // Undo face creation
+    appController.undo();
+    expect(modelService.getCurrentModel().getFaceCount()).toBe(initialFaceCount);
+    expect(selectionService.getSelectedIndices()).toEqual([0, 1, 2]);
+
+    // Redo face creation
+    appController.redo();
+    expect(modelService.getCurrentModel().getFaceCount()).toBe(
+      initialFaceCount + 1
+    );
+    expect(selectionService.getSelectedIndices()).toEqual([]);
+  });
+
+  it("should return false when createFaceFromSelectedVertices called with invalid selection count", () => {
+    const { appController, modelService, selectionService } =
+      createController();
+    const initialFaceCount = modelService.getCurrentModel().getFaceCount();
+
+    selectionService.restoreSelection([0, 1], 1);
+    expect(appController.createFaceFromSelectedVertices()).toBe(false);
+    expect(modelService.getCurrentModel().getFaceCount()).toBe(initialFaceCount);
+
+    selectionService.restoreSelection([0, 1, 2, 3, 4], 4);
+    expect(appController.createFaceFromSelectedVertices()).toBe(false);
+    expect(modelService.getCurrentModel().getFaceCount()).toBe(initialFaceCount);
+  });
 });

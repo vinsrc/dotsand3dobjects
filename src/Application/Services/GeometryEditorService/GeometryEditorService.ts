@@ -110,18 +110,20 @@ export class GeometryEditorService {
       const count = indices.length;
       const newIndices: number[] = [];
 
-      for (let i = 0; i < count; i += 1) {
-        const next = (i + 1) % count;
-        const currentIdx = indices[i];
-        const nextIdx = indices[next];
+      for (let loopIndex = 0; loopIndex < count; loopIndex += 1) {
+        const nextLoopIndex = (loopIndex + 1) % count;
+        const currentVertexIndex = indices[loopIndex];
+        const nextVertexIndex = indices[nextLoopIndex];
 
-        if (currentIdx !== undefined) {
-          newIndices.push(currentIdx);
+        if (currentVertexIndex !== undefined) {
+          newIndices.push(currentVertexIndex);
         }
 
         if (
-          (currentIdx === startVertexIndex && nextIdx === endVertexIndex) ||
-          (currentIdx === endVertexIndex && nextIdx === startVertexIndex)
+          (currentVertexIndex === startVertexIndex &&
+            nextVertexIndex === endVertexIndex) ||
+          (currentVertexIndex === endVertexIndex &&
+            nextVertexIndex === startVertexIndex)
         ) {
           newIndices.push(newVertexIndex);
         }
@@ -135,23 +137,23 @@ export class GeometryEditorService {
     const higher = Math.max(startVertexIndex, endVertexIndex);
     const updatedExplicitEdges: [number, number][] = [];
 
-    for (const [v1, v2] of currentModel.explicitEdges) {
-      const curLower = Math.min(v1, v2);
-      const curHigher = Math.max(v1, v2);
+    for (const [firstEdgeVertex, secondEdgeVertex] of currentModel.explicitEdges) {
+      const curLower = Math.min(firstEdgeVertex, secondEdgeVertex);
+      const curHigher = Math.max(firstEdgeVertex, secondEdgeVertex);
       if (curLower === lower && curHigher === higher) {
         // Replace with two split edges
         updatedExplicitEdges.push([startVertexIndex, newVertexIndex]);
         updatedExplicitEdges.push([newVertexIndex, endVertexIndex]);
       } else {
-        updatedExplicitEdges.push([v1, v2]);
+        updatedExplicitEdges.push([firstEdgeVertex, secondEdgeVertex]);
       }
     }
 
     // Always ensure the new edges exist
     const hasFirstSplit = updatedExplicitEdges.some(
-      ([v1, v2]) =>
-        (v1 === startVertexIndex && v2 === newVertexIndex) ||
-        (v1 === newVertexIndex && v2 === startVertexIndex)
+      ([firstEdgeVertex, secondEdgeVertex]) =>
+        (firstEdgeVertex === startVertexIndex && secondEdgeVertex === newVertexIndex) ||
+        (firstEdgeVertex === newVertexIndex && secondEdgeVertex === startVertexIndex)
     );
     if (!hasFirstSplit) {
       updatedExplicitEdges.push([startVertexIndex, newVertexIndex]);
@@ -190,7 +192,11 @@ export class GeometryEditorService {
 
     const alreadyExists = currentModel
       .getWireframeEdges()
-      .some(([v1, v2]) => Math.min(v1, v2) === lower && Math.max(v1, v2) === higher);
+      .some(
+        ([firstEdgeVertex, secondEdgeVertex]) =>
+          Math.min(firstEdgeVertex, secondEdgeVertex) === lower &&
+          Math.max(firstEdgeVertex, secondEdgeVertex) === higher
+      );
 
     if (!alreadyExists) {
       const updatedExplicitEdges: [number, number][] = [
@@ -231,28 +237,28 @@ export class GeometryEditorService {
     const preservedEdgesFromDeletedFaces: [number, number][] = [];
 
     for (const currentFace of currentModel.faces) {
-      const hasDeletedVertex = currentFace.vertexIndices.some((idx) =>
-        selectedSet.has(idx)
+      const hasDeletedVertex = currentFace.vertexIndices.some((vertexIndex) =>
+        selectedSet.has(vertexIndex)
       );
       if (!hasDeletedVertex) {
         const remappedIndices = currentFace.vertexIndices.map(
-          (idx) => oldToNewMap.get(idx)!
+          (vertexIndex) => oldToNewMap.get(vertexIndex)!
         );
         updatedFaces.push(new Face3D(remappedIndices));
       } else {
         const count = currentFace.vertexIndices.length;
-        for (let i = 0; i < count; i += 1) {
-          const u = currentFace.vertexIndices[i];
-          const v = currentFace.vertexIndices[(i + 1) % count];
+        for (let edgeIndex = 0; edgeIndex < count; edgeIndex += 1) {
+          const firstVertex = currentFace.vertexIndices[edgeIndex];
+          const secondVertex = currentFace.vertexIndices[(edgeIndex + 1) % count];
           if (
-            u !== undefined &&
-            v !== undefined &&
-            !selectedSet.has(u) &&
-            !selectedSet.has(v)
+            firstVertex !== undefined &&
+            secondVertex !== undefined &&
+            !selectedSet.has(firstVertex) &&
+            !selectedSet.has(secondVertex)
           ) {
             preservedEdgesFromDeletedFaces.push([
-              oldToNewMap.get(u)!,
-              oldToNewMap.get(v)!,
+              oldToNewMap.get(firstVertex)!,
+              oldToNewMap.get(secondVertex)!,
             ]);
           }
         }
@@ -260,11 +266,11 @@ export class GeometryEditorService {
     }
 
     const updatedExplicitEdges: [number, number][] = [];
-    for (const [u, v] of currentModel.explicitEdges) {
-      if (!selectedSet.has(u) && !selectedSet.has(v)) {
-        const newU = oldToNewMap.get(u)!;
-        const newV = oldToNewMap.get(v)!;
-        updatedExplicitEdges.push([newU, newV]);
+    for (const [startVertex, endVertex] of currentModel.explicitEdges) {
+      if (!selectedSet.has(startVertex) && !selectedSet.has(endVertex)) {
+        const remappedStart = oldToNewMap.get(startVertex)!;
+        const remappedEnd = oldToNewMap.get(endVertex)!;
+        updatedExplicitEdges.push([remappedStart, remappedEnd]);
       }
     }
 
@@ -280,5 +286,167 @@ export class GeometryEditorService {
 
     this.modelService.setCurrentModel(updatedModel);
     this.selectionService.clearSelection();
+  }
+
+  public createFaceFromSelection(
+    vertexIndices: readonly number[]
+  ): Face3D | null {
+    if (vertexIndices.length !== 3 && vertexIndices.length !== 4) {
+      return null;
+    }
+
+    const currentModel = this.modelService.getCurrentModel();
+    const totalVertices = currentModel.vertices.length;
+
+    for (const vertexIndex of vertexIndices) {
+      if (vertexIndex < 0 || vertexIndex >= totalVertices) {
+        return null;
+      }
+    }
+
+    const uniqueIndices = Array.from(new Set(vertexIndices));
+    if (uniqueIndices.length !== vertexIndices.length) {
+      return null;
+    }
+
+    const selectedSet = new Set(vertexIndices);
+    const existingFace = currentModel.faces.find((candidateFace) => {
+      if (candidateFace.vertexIndices.length !== vertexIndices.length) {
+        return false;
+      }
+      return candidateFace.vertexIndices.every((faceVertexIndex) =>
+        selectedSet.has(faceVertexIndex)
+      );
+    });
+
+    if (existingFace) {
+      this.selectionService.clearSelection();
+      return existingFace;
+    }
+
+    const orderedIndices =
+      vertexIndices.length === 4
+        ? this.orderQuadVertices(vertexIndices, currentModel.vertices)
+        : [...vertexIndices];
+
+    const createdFace = new Face3D(orderedIndices);
+    const updatedFaces = [...currentModel.faces, createdFace];
+    const updatedModel = new MeshGeometry(
+      currentModel.vertices,
+      updatedFaces,
+      currentModel.explicitEdges
+    );
+
+    this.modelService.setCurrentModel(updatedModel);
+    this.selectionService.clearSelection();
+
+    return createdFace;
+  }
+
+  private orderQuadVertices(
+    vertexIndices: readonly number[],
+    allVertices: readonly Vector3D[]
+  ): number[] {
+    const firstVertex = allVertices[vertexIndices[0] as number];
+    const secondVertex = allVertices[vertexIndices[1] as number];
+    const thirdVertex = allVertices[vertexIndices[2] as number];
+    const fourthVertex = allVertices[vertexIndices[3] as number];
+
+    if (!firstVertex || !secondVertex || !thirdVertex || !fourthVertex) {
+      return [...vertexIndices];
+    }
+
+    const centroid = new Vector3D(
+      (firstVertex.coordinateX +
+        secondVertex.coordinateX +
+        thirdVertex.coordinateX +
+        fourthVertex.coordinateX) /
+        4,
+      (firstVertex.coordinateY +
+        secondVertex.coordinateY +
+        thirdVertex.coordinateY +
+        fourthVertex.coordinateY) /
+        4,
+      (firstVertex.coordinateZ +
+        secondVertex.coordinateZ +
+        thirdVertex.coordinateZ +
+        fourthVertex.coordinateZ) /
+        4
+    );
+
+    const diagonalOne = thirdVertex.subtract(firstVertex);
+    const diagonalTwo = fourthVertex.subtract(secondVertex);
+    let planeNormal = diagonalOne.calculateCrossProduct(diagonalTwo);
+
+    if (planeNormal.calculateMagnitude() < 0.000001) {
+      const edgeOne = secondVertex.subtract(firstVertex);
+      const edgeTwo = thirdVertex.subtract(firstVertex);
+      planeNormal = edgeOne.calculateCrossProduct(edgeTwo);
+    }
+
+    if (planeNormal.calculateMagnitude() < 0.000001) {
+      return [...vertexIndices];
+    }
+
+    const normalizedNormal = planeNormal.normalize();
+
+    let referenceBasisU = firstVertex.subtract(centroid);
+    if (referenceBasisU.calculateMagnitude() < 0.000001) {
+      referenceBasisU = new Vector3D(1, 0, 0).calculateCrossProduct(
+        normalizedNormal
+      );
+      if (referenceBasisU.calculateMagnitude() < 0.000001) {
+        referenceBasisU = new Vector3D(0, 1, 0).calculateCrossProduct(
+          normalizedNormal
+        );
+      }
+    }
+    const normalizedBasisU = referenceBasisU.normalize();
+    const normalizedBasisV = normalizedNormal
+      .calculateCrossProduct(normalizedBasisU)
+      .normalize();
+
+    const angularVertices = vertexIndices.map((vertexIndex) => {
+      const currentPos = allVertices[vertexIndex] as Vector3D;
+      const offsetFromCenter = currentPos.subtract(centroid);
+      const coordinateU =
+        offsetFromCenter.calculateDotProduct(normalizedBasisU);
+      const coordinateV =
+        offsetFromCenter.calculateDotProduct(normalizedBasisV);
+      const angularValue = Math.atan2(coordinateV, coordinateU);
+      return { vertexIndex, angularValue };
+    });
+
+    angularVertices.sort(
+      (firstItem, secondItem) =>
+        firstItem.angularValue - secondItem.angularValue
+    );
+
+    const sortedIndices = angularVertices.map((item) => item.vertexIndex);
+
+    const initialIndex = vertexIndices[0] as number;
+    const startIndexInSorted = sortedIndices.indexOf(initialIndex);
+    const rotatedIndices: number[] = [];
+    for (
+      let cycleOffset = 0;
+      cycleOffset < sortedIndices.length;
+      cycleOffset += 1
+    ) {
+      const mappedIndex =
+        (startIndexInSorted + cycleOffset) % sortedIndices.length;
+      rotatedIndices.push(sortedIndices[mappedIndex] as number);
+    }
+
+    const secondSelected = vertexIndices[1] as number;
+    if (rotatedIndices[3] === secondSelected) {
+      return [
+        rotatedIndices[0] as number,
+        rotatedIndices[3] as number,
+        rotatedIndices[2] as number,
+        rotatedIndices[1] as number,
+      ];
+    }
+
+    return rotatedIndices;
   }
 }

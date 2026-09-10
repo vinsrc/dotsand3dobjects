@@ -20,6 +20,15 @@ export const ToolBar: React.FC = () => {
   const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
   const canUndo = controller.canUndo();
   const canRedo = controller.canRedo();
+  const selectedVertexCount = controller
+    .getSelectionService()
+    .getSelectedIndices().length;
+  const canFillFace =
+    selectedVertexCount === 3 || selectedVertexCount === 4;
+
+  const handleFaceFill = () => {
+    controller.createFaceFromSelectedVertices();
+  };
 
   const handleLoadClick = () => {
     if (fileInputRef.current) {
@@ -263,6 +272,17 @@ export const ToolBar: React.FC = () => {
         >
           Fill Mode
         </button>
+
+        {currentMode === "FILL" && (
+          <button
+            data-testid="face-fill-button"
+            onClick={handleFaceFill}
+            disabled={!canFillFace}
+            style={canFillFace ? buttonStyle : disabledButtonStyle}
+          >
+            Face Fill
+          </button>
+        )}
       </div>
     </header>
   );

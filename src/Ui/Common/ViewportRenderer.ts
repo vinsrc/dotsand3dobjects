@@ -3,6 +3,7 @@ import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeomet
 import { RenderMode } from "../../Application/Services/RenderModeService/RenderModeService";
 import { CameraStateService } from "../../Application/Services/CameraService/CameraStateService";
 import { GridPlaneType } from "../../Application/Services/CameraService/ViewStrategy";
+import { AXIS_COLORS } from "./AxisColors";
 
 export class ViewportRenderer {
   private readonly canvasElement: HTMLCanvasElement;
@@ -16,6 +17,7 @@ export class ViewportRenderer {
   private vertexPoints: THREE.Points;
   private selectedPoints: THREE.Points;
   private gridHelperInstance: THREE.GridHelper | null = null;
+  private axisLinesInstance: THREE.LineSegments | null = null;
   private isOrthographicViewActive: boolean = false;
   private isRendererDisposed: boolean = false;
 
@@ -97,6 +99,13 @@ export class ViewportRenderer {
 
     this.setupLighting();
     this.setupGridHelper();
+    this.setupAxesHelper();
+    (this.canvasElement as unknown as { __viewportRenderer?: ViewportRenderer }).__viewportRenderer = this;
+    (window as unknown as { THREE?: typeof THREE }).THREE = THREE;
+  }
+
+  public getAxisLines(): THREE.LineSegments | null {
+    return this.axisLinesInstance;
   }
 
   public render(): void {
@@ -333,6 +342,12 @@ export class ViewportRenderer {
       }
     }
 
+    if (this.axisLinesInstance) {
+      this.axisLinesInstance.geometry.dispose();
+      (this.axisLinesInstance.material as THREE.Material).dispose();
+      this.axisLinesInstance = null;
+    }
+
     this.webGlRenderer.dispose();
   }
 
@@ -367,6 +382,79 @@ export class ViewportRenderer {
     this.gridHelperInstance.position.set(0, 0, 0);
     this.gridHelperInstance.visible = false;
     this.sceneInstance.add(this.gridHelperInstance);
+  }
+
+  private setupAxesHelper(): void {
+    const axisExtent = 100;
+    const linePositions: number[] = [
+      // X axis: positive ray (0 to axisExtent)
+      0, 0, 0, axisExtent, 0, 0,
+      // X axis: negative ray (-axisExtent to 0)
+      -axisExtent, 0, 0, 0, 0, 0,
+
+      // Y axis: positive ray (0 to axisExtent)
+      0, 0, 0, 0, axisExtent, 0,
+      // Y axis: negative ray (-axisExtent to 0)
+      0, -axisExtent, 0, 0, 0, 0,
+
+      // Z axis: positive ray (0 to axisExtent)
+      0, 0, 0, 0, 0, axisExtent,
+      // Z axis: negative ray (-axisExtent to 0)
+      0, 0, -axisExtent, 0, 0, 0,
+    ];
+
+    const positiveColorX = new THREE.Color(AXIS_COLORS.positiveX);
+    const negativeColorX = new THREE.Color(AXIS_COLORS.negativeX);
+    const positiveColorY = new THREE.Color(AXIS_COLORS.positiveY);
+    const negativeColorY = new THREE.Color(AXIS_COLORS.negativeY);
+    const positiveColorZ = new THREE.Color(AXIS_COLORS.positiveZ);
+    const negativeColorZ = new THREE.Color(AXIS_COLORS.negativeZ);
+
+    const lineColors: number[] = [
+      // X+ ray
+      positiveColorX.r, positiveColorX.g, positiveColorX.b,
+      positiveColorX.r, positiveColorX.g, positiveColorX.b,
+      // X- ray
+      negativeColorX.r, negativeColorX.g, negativeColorX.b,
+      negativeColorX.r, negativeColorX.g, negativeColorX.b,
+
+      // Y+ ray
+      positiveColorY.r, positiveColorY.g, positiveColorY.b,
+      positiveColorY.r, positiveColorY.g, positiveColorY.b,
+      // Y- ray
+      negativeColorY.r, negativeColorY.g, negativeColorY.b,
+      negativeColorY.r, negativeColorY.g, negativeColorY.b,
+
+      // Z+ ray
+      positiveColorZ.r, positiveColorZ.g, positiveColorZ.b,
+      positiveColorZ.r, positiveColorZ.g, positiveColorZ.b,
+      // Z- ray
+      negativeColorZ.r, negativeColorZ.g, negativeColorZ.b,
+      negativeColorZ.r, negativeColorZ.g, negativeColorZ.b,
+    ];
+
+    const axisBufferGeometry = new THREE.BufferGeometry();
+    axisBufferGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(linePositions, 3)
+    );
+    axisBufferGeometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(lineColors, 3)
+    );
+
+    const axisLineMaterial = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+    });
+
+    this.axisLinesInstance = new THREE.LineSegments(
+      axisBufferGeometry,
+      axisLineMaterial
+    );
+    this.axisLinesInstance.renderOrder = 1;
+    this.sceneInstance.add(this.axisLinesInstance);
   }
 
   private buildSurfaceGeometry(

@@ -3,6 +3,7 @@ import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
 import { OrthographicAxis } from "../../Application/Services/CameraService/OrthographicViewStrategy";
 import { Vector3D } from "../../Application/Common/Vector3D";
+import { AXIS_COLOR_STRINGS } from "../Common/AxisColors";
 
 interface AxisDefinition {
   readonly axisId: OrthographicAxis;
@@ -17,42 +18,42 @@ const AXIS_DEFINITIONS: AxisDefinition[] = [
     axisId: "+X",
     label: "X",
     direction: new Vector3D(1, 0, 0),
-    color: "#e53935", // Red
+    color: AXIS_COLOR_STRINGS.positiveX,
     isNegative: false,
   },
   {
     axisId: "-X",
     label: "-X",
     direction: new Vector3D(-1, 0, 0),
-    color: "#ffcdd2",
+    color: AXIS_COLOR_STRINGS.negativeX,
     isNegative: true,
   },
   {
     axisId: "+Y",
     label: "Y",
     direction: new Vector3D(0, 1, 0),
-    color: "#43a047", // Green
+    color: AXIS_COLOR_STRINGS.positiveY,
     isNegative: false,
   },
   {
     axisId: "-Y",
     label: "-Y",
     direction: new Vector3D(0, -1, 0),
-    color: "#c8e6c9",
+    color: AXIS_COLOR_STRINGS.negativeY,
     isNegative: true,
   },
   {
     axisId: "+Z",
     label: "Z",
     direction: new Vector3D(0, 0, 1),
-    color: "#1e88e5", // Blue
+    color: AXIS_COLOR_STRINGS.positiveZ,
     isNegative: false,
   },
   {
     axisId: "-Z",
     label: "-Z",
     direction: new Vector3D(0, 0, -1),
-    color: "#bbdefb",
+    color: AXIS_COLOR_STRINGS.negativeZ,
     isNegative: true,
   },
 ];

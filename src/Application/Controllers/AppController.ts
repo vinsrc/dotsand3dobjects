@@ -271,4 +271,16 @@ export class AppController {
       secondVertexIndex
     );
   }
+
+  public createFaceFromSelectedVertices(): boolean {
+    const selectedIndices = this.selectionService.getSelectedIndices();
+    if (selectedIndices.length !== 3 && selectedIndices.length !== 4) {
+      return false;
+    }
+
+    this.recordSnapshot();
+    const createdFace =
+      this.geometryEditorService.createFaceFromSelection(selectedIndices);
+    return createdFace !== null;
+  }
 }
