@@ -87,6 +87,14 @@ export class MeshGeometry {
     );
   }
 
+  public calculateFaceCenter(faceIndex: number): Vector3D {
+    const targetFace = this.faces[faceIndex];
+    if (!targetFace) {
+      return this.calculateCenter();
+    }
+    return targetFace.calculateCenter(this.vertices);
+  }
+
   public calculateBoundingRadius(): number {
     const centerPoint = this.calculateCenter();
     let maximumDistance = 0;
@@ -198,5 +206,35 @@ export class MeshGeometry {
     }
 
     return uniqueEdgeList;
+  }
+
+  public assignMaterialToFaces(
+    faceIndices: readonly number[],
+    materialId: string | null
+  ): MeshGeometry {
+    const targetFaceSet = new Set(faceIndices);
+    const updatedFaces = this.faces.map((face, index) => {
+      if (targetFaceSet.has(index)) {
+        return face.withMaterialId(materialId);
+      }
+      return face;
+    });
+
+    return new MeshGeometry(this.vertices, updatedFaces, this.explicitEdges);
+  }
+
+  public reverseFaceWinding(faceIndex: number): MeshGeometry {
+    if (faceIndex < 0 || faceIndex >= this.faces.length) {
+      return this;
+    }
+
+    const updatedFaces = this.faces.map((face, index) => {
+      if (index === faceIndex) {
+        return face.withReversedVertices();
+      }
+      return face;
+    });
+
+    return new MeshGeometry(this.vertices, updatedFaces, this.explicitEdges);
   }
 }

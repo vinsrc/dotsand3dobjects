@@ -13,6 +13,7 @@ import { ObjParser } from "../../../src/Application/Services/ModelService/ObjPar
 import { ObjExporter } from "../../../src/Application/Services/ModelService/ObjExporter";
 import { OrthographicViewStrategyFactory } from "../../../src/Application/Services/CameraService/OrthographicViewStrategy";
 import { Vector3D } from "../../../src/Application/Common/Vector3D";
+import { MaterialService } from "../../../src/Application/Services/MaterialService/MaterialService";
 
 describe("AppController", () => {
   const createController = () => {
@@ -39,6 +40,7 @@ describe("AppController", () => {
       selectionService
     );
     const undoRedoService = new UndoRedoService(stateNotifier);
+    const materialService = new MaterialService(stateNotifier);
 
     const appController = new AppController(
       modelService,
@@ -48,7 +50,8 @@ describe("AppController", () => {
       selectionService,
       geometryEditorService,
       undoRedoService,
-      stateNotifier
+      stateNotifier,
+      materialService
     );
 
     return {
@@ -60,6 +63,7 @@ describe("AppController", () => {
       selectionService,
       geometryEditorService,
       undoRedoService,
+      materialService,
       stateNotifier,
     };
   };
@@ -74,6 +78,7 @@ describe("AppController", () => {
       selectionService,
       geometryEditorService,
       undoRedoService,
+      materialService,
       stateNotifier,
     } = createController();
 
@@ -84,6 +89,7 @@ describe("AppController", () => {
     expect(appController.getSelectionService()).toBe(selectionService);
     expect(appController.getGeometryEditorService()).toBe(geometryEditorService);
     expect(appController.getUndoRedoService()).toBe(undoRedoService);
+    expect(appController.getMaterialService()).toBe(materialService);
     expect(appController.getStateNotifier()).toBe(stateNotifier);
   });
 
@@ -527,7 +533,7 @@ describe("AppController", () => {
     expect(selectionService.getSelectedIndices()).toEqual([]);
   });
 
-  it("should return false when createFaceFromSelectedVertices called with invalid selection count", () => {
+  it("should return false when createFaceFromSelectedVertices called with less than 3 vertices", () => {
     const { appController, modelService, selectionService } =
       createController();
     const initialFaceCount = modelService.getCurrentModel().getFaceCount();
@@ -536,8 +542,349 @@ describe("AppController", () => {
     expect(appController.createFaceFromSelectedVertices()).toBe(false);
     expect(modelService.getCurrentModel().getFaceCount()).toBe(initialFaceCount);
 
-    selectionService.restoreSelection([0, 1, 2, 3, 4], 4);
+    selectionService.clearSelection();
     expect(appController.createFaceFromSelectedVertices()).toBe(false);
     expect(modelService.getCurrentModel().getFaceCount()).toBe(initialFaceCount);
   });
+
+  it("should create face when 5 vertices are selected", () => {
+    const { appController, modelService, selectionService } =
+      createController();
+    const initialFaceCount = modelService.getCurrentModel().getFaceCount();
+
+    selectionService.restoreSelection([0, 1, 2, 3, 4], 4);
+    expect(appController.createFaceFromSelectedVertices()).toBe(true);
+    expect(modelService.getCurrentModel().getFaceCount()).toBe(
+      initialFaceCount + 1
+    );
+  });
+
+  it("should switch to closest orthographic view and notify VIEW_CHANGED", () => {
+    const { appController, stateNotifier } = createController();
+    const viewListener = vi.fn();
+    stateNotifier.subscribe("VIEW_CHANGED", viewListener);
+
+    appController.rotateCamera(0.5, 0.2);
+    expect(viewListener).toHaveBeenCalledTimes(1);
+
+    const closestAxis = appController.switchToClosestOrthographicView();
+    expect(viewListener).toHaveBeenCalledTimes(2);
+    expect(appController.getCameraStateService().isOrthographic()).toBe(true);
+    expect(
+      appController.getCameraStateService().getActiveStrategy().getAxisLabel()
+    ).toBe(closestAxis);
+  });
+
+  it("should select face and vertices, and support getSelectedFaceIndex", () => {
+    const { appController, modelService, selectionService } = createController();
+    expect(appController.getSelectedFaceIndex()).toBeNull();
+
+    // Select first face of default cube
+    const cube = modelService.getCurrentModel();
+    const face0 = cube.faces[0];
+    appController.selectFace(0);
+
+    expect(appController.getSelectedFaceIndex()).toBe(0);
+    expect(selectionService.getSelectedIndices()).toEqual(face0.vertexIndices);
+
+    // Invalid face index is safely ignored
+    appController.selectFace(999);
+    expect(appController.getSelectedFaceIndex()).toBe(0);
+  });
+
+  it("should set face orthographic view and notify VIEW_CHANGED", () => {
+    const { appController, stateNotifier } = createController();
+    const viewListener = vi.fn();
+    stateNotifier.subscribe("VIEW_CHANGED", viewListener);
+
+    appController.setFaceOrthographicView(0);
+    expect(viewListener).toHaveBeenCalledTimes(1);
+    expect(appController.getCameraStateService().isOrthographic()).toBe(true);
+    expect(
+      appController.getCameraStateService().getActiveStrategy().getAxisLabel()
+    ).toBe("Face 0");
+
+    // Invalid face index is safely ignored
+    appController.setFaceOrthographicView(999);
+    expect(viewListener).toHaveBeenCalledTimes(1);
+  });
+
+  it("should manage material library operations and assignment to faces", () => {
+    const { appController, materialService, modelService, selectionService } =
+      createController();
+
+    expect(appController.isMaterialLibraryPanelOpen()).toBe(false);
+    appController.toggleMaterialLibraryPanel();
+    expect(appController.isMaterialLibraryPanelOpen()).toBe(true);
+
+    const createdMat = appController.createMaterial();
+    expect(createdMat.name).toBe("Material 1");
+    expect(materialService.getMaterials().length).toBe(1);
+    expect(materialService.getSelectedMaterialId()).toBe(createdMat.id);
+
+    // Update material
+    const updatedMat = createdMat.withBaseColor("#ff0000");
+    appController.updateMaterial(updatedMat);
+    expect(materialService.getSelectedMaterial()?.baseColor).toBe("#ff0000");
+
+    // Select material
+    appController.selectMaterial(null);
+    expect(materialService.getSelectedMaterialId()).toBeNull();
+    appController.selectMaterial(createdMat.id);
+    expect(materialService.getSelectedMaterialId()).toBe(createdMat.id);
+
+    // Select face auto-opens panel and assigns material
+    materialService.setPanelOpen(false);
+    appController.selectFace(0);
+    expect(appController.isMaterialLibraryPanelOpen()).toBe(true);
+
+    appController.assignMaterialToSelectedFaces(createdMat.id);
+    const updatedCube = modelService.getCurrentModel();
+    expect(updatedCube.faces[0].materialId).toBe(createdMat.id);
+
+    // Export MTL file
+    const mtlOutput = appController.exportMtlFile();
+    expect(mtlOutput).toContain("newmtl Material_1");
+    expect(mtlOutput).toContain("Kd 1.000000 0.000000 0.000000");
+
+    // Multi-select mode toggles face selection
+    appController.enterMode("MULTI_SELECT");
+    appController.selectFace(1);
+    expect(appController.getSelectedFaceIndices()).toContain(0);
+    expect(appController.getSelectedFaceIndices()).toContain(1);
+
+    // Assign to both selected faces
+    const secondMat = appController.createMaterial();
+    appController.assignMaterialToSelectedFaces(secondMat.id);
+    const multiMatCube = modelService.getCurrentModel();
+    expect(multiMatCube.faces[0].materialId).toBe(secondMat.id);
+    expect(multiMatCube.faces[1].materialId).toBe(secondMat.id);
+
+    // Delete material
+    const deleteResult = appController.deleteMaterial(createdMat.id);
+    expect(deleteResult).toBe(true);
+    expect(materialService.getMaterials().length).toBe(1);
+
+    // Assigning with no face selected safely returns
+    appController.clearSelection();
+    appController.assignMaterialToSelectedFaces(secondMat.id);
+  });
+
+  it("should support loadModelFromFile with both OBJ and MTL content", () => {
+    const { appController, modelService, materialService } = createController();
+
+    const mtlContent = `
+      newmtl GlossyBlue
+      Kd 0.0 0.0 1.0
+      Pr 0.1
+      Pm 0.2
+      map_Bump normal.png
+    `;
+
+    const objContent = `
+      v 0 0 0
+      v 1 0 0
+      v 1 1 0
+      v 0 1 0
+      usemtl GlossyBlue
+      f 1 2 3
+      usemtl UnlistedMat
+      f 1 3 4
+    `;
+
+    appController.loadModelFromFile("mesh.obj", objContent, mtlContent);
+
+    const materials = materialService.getMaterials();
+    expect(materials.length).toBeGreaterThanOrEqual(2);
+
+    const glossyMat = materials.find((m) => m.name === "GlossyBlue");
+    expect(glossyMat).toBeDefined();
+    expect(glossyMat?.extraProperties).toContain("map_Bump normal.png");
+
+    const currentModel = modelService.getCurrentModel();
+    expect(currentModel.faces[0]?.materialId).toBe(glossyMat?.id);
+
+    const unlistedMat = materials.find((m) => m.name === "UnlistedMat");
+    expect(unlistedMat).toBeDefined();
+    expect(currentModel.faces[1]?.materialId).toBe(unlistedMat?.id);
+  });
+
+  it("should support standalone loadMaterialsFromFile", () => {
+    const { appController, materialService, modelService, stateNotifier } = createController();
+
+    const mtlContent = `
+      newmtl StandaloneMaterial
+      Kd 0.5 0.5 0.5
+      Pr 0.7
+      norm normal.png
+    `;
+
+    appController.loadMaterialsFromFile("materials.mtl", mtlContent);
+
+    const materials = materialService.getMaterials();
+    const loadedMat = materials.find((m) => m.name === "StandaloneMaterial");
+    expect(loadedMat).toBeDefined();
+    expect(loadedMat?.roughness).toBeCloseTo(0.7);
+    expect(loadedMat?.extraProperties).toContain("norm normal.png");
+
+    // Test updating existing material
+    const updateMtl = `
+      newmtl StandaloneMaterial
+      Kd 1.0 0.0 0.0
+      Pr 0.2
+    `;
+    appController.loadMaterialsFromFile("materials.mtl", updateMtl);
+    const updatedMat = materialService.getMaterials().find((m) => m.name === "StandaloneMaterial");
+    expect(updatedMat?.roughness).toBeCloseTo(0.2);
+
+    // Test error handling in loadMaterialsFromFile
+    const errorListener = vi.fn();
+    stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+    vi.spyOn(modelService, "parseMtl").mockImplementationOnce(() => {
+      throw new Error("Parse error");
+    });
+    appController.loadMaterialsFromFile("bad.mtl", "invalid");
+    expect(errorListener).toHaveBeenCalledWith("Failed to load materials");
+  });
+
+  it("should initialize translationInitialModel if not already set during translateSelectedVertices", () => {
+    const { appController, modelService, selectionService } = createController();
+    appController.selectOrthographicView("+Z");
+    appController.enterMode("TRANSLATE");
+    selectionService.selectSingle(0);
+
+    const initX = modelService.getCurrentModel().vertices[0]?.coordinateX ?? 0;
+    appController.translateSelectedVertices(new Vector3D(1, 0, 0));
+    expect(modelService.getCurrentModel().vertices[0]?.coordinateX).toBeCloseTo(initX + 1);
+  });
+
+  it("should manage UI customization and synchronize material library docking", () => {
+    const { appController, materialService } = createController();
+    const customizationService = appController.getUiCustomizationService();
+
+    expect(customizationService.getSideToolBarDock()).toBe("right");
+    expect(customizationService.getMaterialLibraryDock()).toBe("right");
+
+    appController.saveUiCustomization("left", "left");
+    expect(customizationService.getSideToolBarDock()).toBe("left");
+    expect(customizationService.getMaterialLibraryDock()).toBe("left");
+    expect(materialService.getDockSide()).toBe("left");
+
+    appController.setMaterialLibraryDockSide("right");
+    expect(materialService.getDockSide()).toBe("right");
+    expect(customizationService.getMaterialLibraryDock()).toBe("right");
+  });
+
+  it("should re-order face vertices using setFaceFront in face orthographic view and support undo/redo", () => {
+    const { appController, modelService, cameraStateService } = createController();
+
+    // Not in face orthographic view returns false
+    expect(appController.isFaceOrthographicView()).toBe(false);
+    expect(appController.setFaceFront()).toBe(false);
+
+    // Enter face orthographic view on Face 1 (Front: [4, 5, 6, 7])
+    appController.setFaceOrthographicView(1);
+    expect(appController.isFaceOrthographicView()).toBe(true);
+
+    const initialFace1 = modelService.getCurrentModel().faces[1];
+    expect(initialFace1?.vertexIndices).toEqual([4, 5, 6, 7]);
+
+    // Set face front re-orders vertices
+    const result = appController.setFaceFront();
+    expect(result).toBe(true);
+
+    const updatedFace1 = modelService.getCurrentModel().faces[1];
+    expect(updatedFace1?.vertexIndices).toEqual([7, 6, 5, 4]);
+
+    // Undo reverts back to [4, 5, 6, 7]
+    appController.undo();
+    expect(modelService.getCurrentModel().faces[1]?.vertexIndices).toEqual([4, 5, 6, 7]);
+
+    // Redo re-applies [7, 6, 5, 4]
+    appController.redo();
+    expect(modelService.getCurrentModel().faces[1]?.vertexIndices).toEqual([7, 6, 5, 4]);
+
+    // When face index becomes invalid or target face is absent
+    vi.spyOn(cameraStateService, "getActiveFaceIndex").mockReturnValueOnce(999);
+    expect(appController.setFaceFront()).toBe(false);
+
+    vi.spyOn(cameraStateService, "getActiveFaceIndex").mockReturnValueOnce(null);
+    expect(appController.setFaceFront()).toBe(false);
+  });
+
+  it("should return isAutoConnectEnabled status correctly", () => {
+    const { appController } = createController();
+    expect(appController.isAutoConnectEnabled()).toBe(false);
+    appController.toggleAutoConnect();
+    expect(appController.isAutoConnectEnabled()).toBe(true);
+    appController.toggleAutoConnect();
+    expect(appController.isAutoConnectEnabled()).toBe(false);
+  });
+
+  it("should auto-connect two selected vertices when entering FILL mode and support undo/redo", () => {
+    const { appController, modelService, selectionService } = createController();
+
+    // Select two vertices (0 and 6) which do not share an edge in the starter cube
+    selectionService.restoreSelection([0, 6], 6);
+    expect(selectionService.getSelectedIndices()).toEqual([0, 6]);
+
+    const initialEdges = modelService.getCurrentModel().explicitEdges;
+    expect(initialEdges).toHaveLength(0);
+
+    // Enter FILL mode -> should automatically connect vertex 0 and 6
+    const success = appController.enterMode("FILL");
+    expect(success).toBe(true);
+
+    const updatedModel = modelService.getCurrentModel();
+    const hasEdge = updatedModel.explicitEdges.some(
+      ([a, b]) => (a === 0 && b === 6) || (a === 6 && b === 0)
+    );
+    expect(hasEdge).toBe(true);
+    expect(selectionService.getActiveVertex()).toBe(6);
+
+    // Undo should remove the edge
+    appController.undo();
+    expect(modelService.getCurrentModel().explicitEdges).toHaveLength(0);
+
+    // Redo should restore the edge
+    appController.redo();
+    expect(modelService.getCurrentModel().explicitEdges).toHaveLength(1);
+  });
+
+  it("should auto-connect two selected vertices when active vertex is first in array", () => {
+    const { appController, modelService, selectionService } = createController();
+
+    // Select two vertices (0 and 6) with 0 as active
+    selectionService.restoreSelection([0, 6], 0);
+    expect(selectionService.getSelectedIndices()).toEqual([0, 6]);
+
+    const success = appController.enterMode("FILL");
+    expect(success).toBe(true);
+
+    const hasEdge = modelService.getCurrentModel().explicitEdges.some(
+      ([a, b]) => (a === 0 && b === 6) || (a === 6 && b === 0)
+    );
+    expect(hasEdge).toBe(true);
+    expect(selectionService.getActiveVertex()).toBe(0);
+  });
+
+  it("should not create edges when entering other modes or entering FILL with other selection counts", () => {
+    const { appController, modelService, selectionService } = createController();
+
+    // Enter INSERT with 2 vertices selected
+    selectionService.restoreSelection([0, 6], 6);
+    appController.enterMode("INSERT");
+    expect(modelService.getCurrentModel().explicitEdges).toHaveLength(0);
+
+    // Enter FILL with 1 vertex selected
+    selectionService.restoreSelection([0], 0);
+    appController.enterMode("FILL");
+    expect(modelService.getCurrentModel().explicitEdges).toHaveLength(0);
+
+    // Enter FILL with 3 vertices selected
+    selectionService.restoreSelection([0, 1, 2], 2);
+    appController.enterMode("FILL");
+    expect(modelService.getCurrentModel().explicitEdges).toHaveLength(0);
+  });
 });
+

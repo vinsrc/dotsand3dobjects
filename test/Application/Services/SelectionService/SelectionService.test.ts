@@ -27,6 +27,8 @@ describe("SelectionService", () => {
     expect(listener).toHaveBeenCalledWith({
       selectedIndices: [3],
       activeVertexIndex: 3,
+      selectedFaceIndex: null,
+      selectedFaceIndices: [],
     });
 
     // Selecting another single vertex replaces previous
@@ -132,5 +134,65 @@ describe("SelectionService", () => {
     service.toggleSelect(1);
     expect(service.getActiveVertex()).toBe(2);
     expect(service.getSelectedIndices()).toEqual([2]);
+  });
+
+  it("should select face, update selectedFaceIndex and its vertex indices", () => {
+    const notifier = new ApplicationStateNotifier();
+    const listener = vi.fn();
+    notifier.subscribe("SELECTION_CHANGED", listener);
+
+    const service = new SelectionService(notifier);
+    expect(service.getSelectedFaceIndex()).toBeNull();
+
+    service.selectFace(2, [0, 1, 2]);
+    expect(service.getSelectedFaceIndex()).toBe(2);
+    expect(service.getSelectedIndices()).toEqual([0, 1, 2]);
+    expect(service.getActiveVertex()).toBe(0);
+    expect(listener).toHaveBeenCalledWith({
+      selectedIndices: [0, 1, 2],
+      activeVertexIndex: 0,
+      selectedFaceIndex: 2,
+      selectedFaceIndices: [2],
+    });
+
+    // Selecting single vertex clears face selection
+    service.selectSingle(1);
+    expect(service.getSelectedFaceIndex()).toBeNull();
+
+    // Selecting face and then selecting same face deselects it
+    service.selectFace(1, [3, 4, 5]);
+    expect(service.getSelectedFaceIndex()).toBe(1);
+    service.selectFace(1, [3, 4, 5]);
+    expect(service.getSelectedFaceIndex()).toBeNull();
+    expect(service.getSelectedIndices()).toEqual([]);
+
+    // Selecting face and then clearing selection clears face selection
+    service.selectFace(1, [3, 4, 5]);
+    expect(service.getSelectedFaceIndex()).toBe(1);
+    service.clearSelection();
+    expect(service.getSelectedFaceIndex()).toBeNull();
+  });
+
+  it("should toggle face selection in multi-select mode", () => {
+    const notifier = new ApplicationStateNotifier();
+    const service = new SelectionService(notifier);
+
+    service.toggleFaceSelection(0, [0, 1, 2]);
+    expect(service.getSelectedFaceIndices()).toEqual([0]);
+    expect(service.getSelectedFaceIndex()).toBe(0);
+
+    service.toggleFaceSelection(1, [3, 4, 5]);
+    expect(service.getSelectedFaceIndices()).toEqual([0, 1]);
+    expect(service.getSelectedFaceIndex()).toBe(1);
+
+    // Toggling face 1 again removes it
+    service.toggleFaceSelection(1, [3, 4, 5]);
+    expect(service.getSelectedFaceIndices()).toEqual([0]);
+    expect(service.getSelectedFaceIndex()).toBe(0);
+
+    // Toggling face 0 removes it, making selection empty
+    service.toggleFaceSelection(0, [0, 1, 2]);
+    expect(service.getSelectedFaceIndices()).toEqual([]);
+    expect(service.getSelectedFaceIndex()).toBeNull();
   });
 });

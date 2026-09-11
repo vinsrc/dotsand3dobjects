@@ -384,7 +384,7 @@ export class GeometryEditorService {
   public createFaceFromSelection(
     vertexIndices: readonly number[]
   ): Face3D | null {
-    if (vertexIndices.length !== 3 && vertexIndices.length !== 4) {
+    if (vertexIndices.length < 3) {
       return null;
     }
 

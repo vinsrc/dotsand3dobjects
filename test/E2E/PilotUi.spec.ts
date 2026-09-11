@@ -10,8 +10,11 @@ test.describe("WireframeVibe3D Pilot Functional Tests", () => {
     page,
   }) => {
     await expect(page.getByTestId("toolbar")).toBeVisible();
+    await expect(page.getByTestId("file-menu-button")).toBeVisible();
+    await page.getByTestId("file-menu-button").click();
     await expect(page.getByTestId("load-obj-button")).toBeVisible();
     await expect(page.getByTestId("export-obj-button")).toBeVisible();
+    await page.getByTestId("file-menu-button").click();
     await expect(page.getByTestId("toggle-view-button")).toBeVisible();
     await expect(page.getByTestId("3d-axis-gizmo")).toBeVisible();
   });
@@ -21,6 +24,7 @@ test.describe("WireframeVibe3D Pilot Functional Tests", () => {
   }) => {
     // Test 1 (Part 2) of pilot.tests.spec.md
     const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByTestId("file-menu-button").click();
     await page.getByTestId("load-obj-button").click();
     const fileChooser = await fileChooserPromise;
 
@@ -48,6 +52,7 @@ test.describe("WireframeVibe3D Pilot Functional Tests", () => {
   }) => {
     // Test 1 (Part 1) of pilot.tests.spec.md
     const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByTestId("file-menu-button").click();
     await page.getByTestId("load-obj-button").click();
     const fileChooser = await fileChooserPromise;
 
@@ -82,6 +87,7 @@ test.describe("WireframeVibe3D Pilot Functional Tests", () => {
     page,
   }) => {
     const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByTestId("file-menu-button").click();
     await page.getByTestId("load-obj-button").click();
     const fileChooser = await fileChooserPromise;
 
@@ -167,6 +173,7 @@ test.describe("WireframeVibe3D Pilot Functional Tests", () => {
     page,
   }) => {
     const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("file-menu-button").click();
     await page.getByTestId("export-obj-button").click();
     const download = await downloadPromise;
 

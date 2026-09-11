@@ -5,9 +5,12 @@ import {
   OrthographicViewStrategyFactory,
 } from "./OrthographicViewStrategy";
 import { PerspectiveViewStrategy } from "./PerspectiveViewStrategy";
+import { OrthographicViewSelector } from "./OrthographicViewSelector";
+import { FaceOrthographicViewStrategy } from "./FaceOrthographicViewStrategy";
 
 export class CameraStateService {
   private readonly strategyFactory: OrthographicViewStrategyFactory;
+  private readonly viewSelector: OrthographicViewSelector;
   private currentStrategy: IViewStrategy;
   private cameraDistance: number;
   private targetPoint: Vector3D;
@@ -16,9 +19,11 @@ export class CameraStateService {
 
   public constructor(
     strategyFactory: OrthographicViewStrategyFactory,
+    viewSelector: OrthographicViewSelector = new OrthographicViewSelector(),
     initialStrategy?: IViewStrategy
   ) {
     this.strategyFactory = strategyFactory;
+    this.viewSelector = viewSelector;
     this.azimuthRadians = Math.PI / 4;
     this.elevationRadians = Math.PI / 6;
     this.currentStrategy =
@@ -37,6 +42,17 @@ export class CameraStateService {
 
   public isOrthographic(): boolean {
     return this.currentStrategy.isOrthographic();
+  }
+
+  public isFaceOrthographicView(): boolean {
+    return this.currentStrategy instanceof FaceOrthographicViewStrategy;
+  }
+
+  public getActiveFaceIndex(): number | null {
+    if (this.currentStrategy instanceof FaceOrthographicViewStrategy) {
+      return this.currentStrategy.getFaceIndex();
+    }
+    return null;
   }
 
   public getCameraDistance(): number {
@@ -84,6 +100,36 @@ export class CameraStateService {
         this.azimuthRadians = Math.PI;
         this.elevationRadians = 0;
         break;
+    }
+  }
+
+  public switchToClosestOrthographicView(): OrthographicAxis {
+    const currentDirection = this.currentStrategy.getViewDirection();
+    const closestAxis = this.viewSelector.findClosestAxis(currentDirection);
+    this.setOrthographicAxis(closestAxis);
+    return closestAxis;
+  }
+
+  public setFaceOrthographicView(
+    faceIndex: number,
+    faceNormal: Vector3D,
+    faceCenter?: Vector3D
+  ): void {
+    const strategy = new FaceOrthographicViewStrategy(faceIndex, faceNormal);
+    this.currentStrategy = strategy;
+    if (faceCenter) {
+      this.targetPoint = faceCenter;
+    }
+    const normal = strategy.getViewDirection();
+    this.elevationRadians = Math.asin(
+      Math.max(-1, Math.min(1, normal.coordinateY))
+    );
+    const cosElevation = Math.cos(this.elevationRadians);
+    if (Math.abs(cosElevation) > 0.001) {
+      this.azimuthRadians = Math.atan2(
+        normal.coordinateX,
+        normal.coordinateZ
+      );
     }
   }
 

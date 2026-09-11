@@ -1,32 +1,42 @@
 import React, { useRef } from "react";
 import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
-import { UiMode } from "../../Application/Services/EditorModeService/EditorModeService";
+import { FileMenu } from "./FileMenu";
 
-export const ToolBar: React.FC = () => {
+export interface ToolBarProps {
+  onOpenHelp?: () => void;
+  onOpenCustomizeUi?: () => void;
+}
+
+export const ToolBar: React.FC<ToolBarProps> = ({
+  onOpenHelp,
+  onOpenCustomizeUi,
+}) => {
   const controller = useAppController();
   useApplicationState([
     "RENDER_MODE_CHANGED",
-    "MODEL_CHANGED",
     "MODE_CHANGED",
     "AUTO_CONNECT_CHANGED",
-    "GRID_SNAP_CHANGED",
     "SELECTION_CHANGED",
-    "UNDO_REDO_STATE_CHANGED",
+    "MATERIAL_PANEL_CHANGED",
+    "VIEW_CHANGED",
   ]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mtlFileInputRef = useRef<HTMLInputElement>(null);
   const isWireframe = controller.getRenderModeService().isWireframe();
+  const isMaterialPanelOpen = controller.isMaterialLibraryPanelOpen();
+  const isFaceOrthographic = controller.isFaceOrthographicView();
   const currentMode = controller.getEditorModeService().getMode();
   const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
-  const isGridSnap = controller.isGridSnapEnabled();
-  const canUndo = controller.canUndo();
-  const canRedo = controller.canRedo();
   const selectedVertexCount = controller
     .getSelectionService()
     .getSelectedIndices().length;
-  const canFillFace =
-    selectedVertexCount === 3 || selectedVertexCount === 4;
+  const canFillFace = selectedVertexCount >= 3;
+
+  const handleSetFront = () => {
+    controller.setFaceFront();
+  };
 
   const handleFaceFill = () => {
     controller.createFaceFromSelectedVertices();
@@ -39,21 +49,79 @@ export const ToolBar: React.FC = () => {
     }
   };
 
+  const handleLoadMtlClick = () => {
+    if (mtlFileInputRef.current) {
+      mtlFileInputRef.current.value = "";
+      mtlFileInputRef.current.click();
+    }
+  };
+
   const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = event.target.files;
     if (!selectedFiles || selectedFiles.length === 0) {
       return;
     }
 
+    const fileList = Array.from(selectedFiles);
+    const objFile = fileList.find((file) =>
+      file.name.toLowerCase().endsWith(".obj")
+    );
+    const mtlFile = fileList.find((file) =>
+      file.name.toLowerCase().endsWith(".mtl")
+    );
+
+    if (objFile && mtlFile) {
+      const objReader = new FileReader();
+      objReader.onload = () => {
+        const objString = objReader.result as string;
+        const mtlReader = new FileReader();
+        mtlReader.onload = () => {
+          const mtlString = mtlReader.result as string;
+          controller.loadModelFromFile(objFile.name, objString, mtlString);
+        };
+        mtlReader.readAsText(mtlFile);
+      };
+      objReader.readAsText(objFile);
+    } else if (objFile) {
+      const objReader = new FileReader();
+      objReader.onload = () => {
+        const objString = objReader.result as string;
+        controller.loadModelFromFile(objFile.name, objString);
+      };
+      objReader.readAsText(objFile);
+    } else if (mtlFile) {
+      const mtlReader = new FileReader();
+      mtlReader.onload = () => {
+        const mtlString = mtlReader.result as string;
+        controller.loadMaterialsFromFile(mtlFile.name, mtlString);
+      };
+      mtlReader.readAsText(mtlFile);
+    } else if (fileList.length > 0) {
+      const fallbackFile = fileList[0];
+      const fallbackReader = new FileReader();
+      fallbackReader.onload = () => {
+        const fallbackString = fallbackReader.result as string;
+        controller.loadModelFromFile(fallbackFile.name, fallbackString);
+      };
+      fallbackReader.readAsText(fallbackFile);
+    }
+  };
+
+  const handleMtlFileSelected = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const selectedFiles = event.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) {
+      return;
+    }
     const targetFile = selectedFiles[0];
     if (!targetFile) {
       return;
     }
-
     const fileReader = new FileReader();
     fileReader.onload = () => {
       const fileContentString = fileReader.result as string;
-      controller.loadModelFromFile(targetFile.name, fileContentString);
+      controller.loadMaterialsFromFile(targetFile.name, fileContentString);
     };
     fileReader.readAsText(targetFile);
   };
@@ -69,46 +137,28 @@ export const ToolBar: React.FC = () => {
     anchorElement.click();
     document.body.removeChild(anchorElement);
     URL.revokeObjectURL(downloadUrl);
+
+    const materials = controller.getMaterialService().getMaterials();
+    if (materials.length > 0) {
+      const mtlContent = controller.exportMtlFile();
+      const mtlBlob = new Blob([mtlContent], { type: "text/plain" });
+      const mtlDownloadUrl = URL.createObjectURL(mtlBlob);
+      const mtlAnchorElement = document.createElement("a");
+      mtlAnchorElement.href = mtlDownloadUrl;
+      mtlAnchorElement.download = "model.mtl";
+      document.body.appendChild(mtlAnchorElement);
+      mtlAnchorElement.click();
+      document.body.removeChild(mtlAnchorElement);
+      URL.revokeObjectURL(mtlDownloadUrl);
+    }
   };
 
   const handleToggleRenderMode = () => {
     controller.toggleRenderMode();
   };
 
-  const handleCenterObject = () => {
-    controller.centerObject();
-  };
-
-  const handleUndo = () => {
-    controller.undo();
-  };
-
-  const handleRedo = () => {
-    controller.redo();
-  };
-
-  const handleClearSelection = () => {
-    controller.clearSelection();
-  };
-
-  const handleDeleteVertex = () => {
-    controller.deleteSelectedVertices();
-  };
-
-  const handleEnterMode = (mode: UiMode) => {
-    if (currentMode === mode) {
-      controller.finishMode();
-    } else {
-      controller.enterMode(mode);
-    }
-  };
-
   const handleToggleAutoConnect = () => {
     controller.toggleAutoConnect();
-  };
-
-  const handleToggleGridSnap = () => {
-    controller.toggleGridSnap();
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -123,13 +173,6 @@ export const ToolBar: React.FC = () => {
     whiteSpace: "nowrap",
   };
 
-  const activeModeButtonStyle: React.CSSProperties = {
-    ...buttonStyle,
-    backgroundColor: "#2196f3",
-    color: "#ffffff",
-    borderColor: "#1976d2",
-  };
-
   const disabledButtonStyle: React.CSSProperties = {
     ...buttonStyle,
     opacity: 0.5,
@@ -140,6 +183,8 @@ export const ToolBar: React.FC = () => {
     <header
       data-testid="toolbar"
       style={{
+        position: "relative",
+        zIndex: 100,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -149,7 +194,7 @@ export const ToolBar: React.FC = () => {
         padding: "0 12px",
         boxSizing: "border-box",
         userSelect: "none",
-        overflowX: "auto",
+        overflow: "visible",
         gap: "12px",
       }}
     >
@@ -157,24 +202,26 @@ export const ToolBar: React.FC = () => {
         <input
           ref={fileInputRef}
           type="file"
+          multiple
+          accept=".obj,.mtl"
           data-testid="file-input"
           style={{ display: "none" }}
           onChange={handleFileSelected}
         />
-        <button
-          data-testid="load-obj-button"
-          onClick={handleLoadClick}
-          style={buttonStyle}
-        >
-          Load OBJ
-        </button>
-        <button
-          data-testid="export-obj-button"
-          onClick={handleExportClick}
-          style={buttonStyle}
-        >
-          Export OBJ
-        </button>
+        <input
+          ref={mtlFileInputRef}
+          type="file"
+          accept=".mtl"
+          data-testid="mtl-file-input"
+          style={{ display: "none" }}
+          onChange={handleMtlFileSelected}
+        />
+        <FileMenu
+          onLoadClick={handleLoadClick}
+          onLoadMtlClick={handleLoadMtlClick}
+          onExportClick={handleExportClick}
+          onCustomizeUiClick={onOpenCustomizeUi}
+        />
         <button
           data-testid="toggle-view-button"
           onClick={handleToggleRenderMode}
@@ -187,75 +234,61 @@ export const ToolBar: React.FC = () => {
           {isWireframe ? "Wireframe View" : "Shaded View"}
         </button>
         <button
-          data-testid="center-object-button"
-          onClick={handleCenterObject}
-          style={buttonStyle}
+          data-testid="material-library-button"
+          onClick={() => controller.toggleMaterialLibraryPanel()}
+          title="Material Library"
+          style={{
+            ...buttonStyle,
+            backgroundColor: isMaterialPanelOpen ? "#2196f3" : "#ffffff",
+            color: isMaterialPanelOpen ? "#ffffff" : "#333333",
+            borderColor: isMaterialPanelOpen ? "#1976d2" : "#999999",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
         >
-          Center Object
+          <span>🎨</span>
+          <span>Material Library</span>
         </button>
-        <button
-          data-testid="undo-button"
-          onClick={handleUndo}
-          disabled={!canUndo}
-          style={canUndo ? buttonStyle : disabledButtonStyle}
-        >
-          Undo
-        </button>
-        <button
-          data-testid="redo-button"
-          onClick={handleRedo}
-          disabled={!canRedo}
-          style={canRedo ? buttonStyle : disabledButtonStyle}
-        >
-          Redo
-        </button>
-        <button
-          data-testid="clear-selection-button"
-          onClick={handleClearSelection}
-          style={buttonStyle}
-        >
-          Clear Selection
-        </button>
-        <button
-          data-testid="delete-vertex-button"
-          onClick={handleDeleteVertex}
-          style={buttonStyle}
-        >
-          Delete Vertex
-        </button>
+        {onOpenHelp && (
+          <button
+            data-testid="help-button"
+            onClick={onOpenHelp}
+            title="Help & User Guide"
+            style={{
+              ...buttonStyle,
+              padding: "6px 10px",
+              fontWeight: 700,
+            }}
+          >
+            ? Help
+          </button>
+        )}
+        {isFaceOrthographic && (
+          <button
+            data-testid="set-front-button"
+            onClick={handleSetFront}
+            title="Set current view as front side of face"
+            style={{
+              ...buttonStyle,
+              backgroundColor: "#ffffff",
+              color: "#333333",
+            }}
+          >
+            Set Front
+          </button>
+        )}
       </div>
 
-      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-        <button
-          data-testid="mode-multi-select-button"
-          onClick={() => handleEnterMode("MULTI_SELECT")}
-          style={
-            currentMode === "MULTI_SELECT" ? activeModeButtonStyle : buttonStyle
-          }
-        >
-          Multi Select Mode
-        </button>
-
-        <button
-          data-testid="mode-translate-button"
-          onClick={() => handleEnterMode("TRANSLATE")}
-          style={
-            currentMode === "TRANSLATE" ? activeModeButtonStyle : buttonStyle
-          }
-        >
-          Translate Mode
-        </button>
-
-        <button
-          data-testid="mode-insert-button"
-          onClick={() => handleEnterMode("INSERT")}
-          style={
-            currentMode === "INSERT" ? activeModeButtonStyle : buttonStyle
-          }
-        >
-          Insert Mode
-        </button>
-
+      <div
+        data-testid="mode-specific-buttons"
+        style={{
+          display: "flex",
+          gap: "8px",
+          alignItems: "center",
+          justifyContent: "flex-end",
+        }}
+      >
         {currentMode === "INSERT" && (
           <button
             data-testid="auto-connect-toggle-button"
@@ -271,14 +304,6 @@ export const ToolBar: React.FC = () => {
           </button>
         )}
 
-        <button
-          data-testid="mode-fill-button"
-          onClick={() => handleEnterMode("FILL")}
-          style={currentMode === "FILL" ? activeModeButtonStyle : buttonStyle}
-        >
-          Fill Mode
-        </button>
-
         {currentMode === "FILL" && (
           <button
             data-testid="face-fill-button"
@@ -289,19 +314,6 @@ export const ToolBar: React.FC = () => {
             Face Fill
           </button>
         )}
-
-        <button
-          data-testid="grid-snap-toggle-button"
-          onClick={handleToggleGridSnap}
-          style={{
-            ...buttonStyle,
-            backgroundColor: isGridSnap ? "#4caf50" : "#ffffff",
-            color: isGridSnap ? "#ffffff" : "#333333",
-            borderColor: isGridSnap ? "#388e3c" : "#999999",
-          }}
-        >
-          {isGridSnap ? "Grid Snap: ON" : "Grid Snap: OFF"}
-        </button>
       </div>
     </header>
   );

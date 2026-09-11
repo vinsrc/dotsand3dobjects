@@ -2,6 +2,7 @@ import { Vector3D } from "../../Common/Vector3D";
 import { Face3D } from "./Face3D";
 import { MeshGeometry } from "./MeshGeometry";
 import { ModelFactory } from "./ModelFactory";
+import { Material3D } from "../MaterialService/Material3D";
 
 export class ObjParser {
   private readonly modelFactory: ModelFactory;
@@ -17,14 +18,29 @@ export class ObjParser {
     }
   }
 
-  public parse(objFileContent: string, fileName?: string): MeshGeometry {
+  public parse(
+    objFileContent: string,
+    fileName?: string,
+    materials?: readonly Material3D[]
+  ): MeshGeometry {
     if (fileName !== undefined) {
       this.validateFileName(fileName);
+    }
+
+    const materialNameToIdMap = new Map<string, string>();
+    if (materials) {
+      for (const material of materials) {
+        materialNameToIdMap.set(material.name, material.id);
+        const sanitizedName = material.name.replace(/\s+/g, "_");
+        materialNameToIdMap.set(sanitizedName, material.id);
+        materialNameToIdMap.set(material.id, material.id);
+      }
     }
 
     const parsedVertices: Vector3D[] = [];
     const parsedFaces: Face3D[] = [];
     const parsedEdges: [number, number][] = [];
+    let activeMaterialId: string | null = null;
     const lines = objFileContent.split(/\r?\n/);
 
     for (const rawLine of lines) {
@@ -34,9 +50,16 @@ export class ObjParser {
       }
 
       const tokens = trimmedLine.split(/\s+/);
-      const commandType = tokens[0];
+      const commandType = tokens[0]?.toLowerCase();
 
-      if (commandType === "v") {
+      if (commandType === "usemtl") {
+        const materialName = trimmedLine.substring("usemtl".length).trim();
+        if (materialName.length > 0 && materialName.toLowerCase() !== "default") {
+          activeMaterialId = materialNameToIdMap.get(materialName) ?? materialName;
+        } else {
+          activeMaterialId = null;
+        }
+      } else if (commandType === "v") {
         const coordinateX = parseFloat(tokens[1] ?? "0");
         const coordinateY = parseFloat(tokens[2] ?? "0");
         const coordinateZ = parseFloat(tokens[3] ?? "0");
@@ -84,7 +107,7 @@ export class ObjParser {
         }
 
         if (faceVertexIndices.length >= 3) {
-          parsedFaces.push(new Face3D(faceVertexIndices));
+          parsedFaces.push(new Face3D(faceVertexIndices, activeMaterialId));
         }
       } else if (commandType === "l") {
         const lineVertexIndices: number[] = [];

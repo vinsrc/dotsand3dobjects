@@ -100,4 +100,39 @@ describe("ObjParser", () => {
     expect(mesh.explicitEdges.length).toBe(3); // (0,1), (1,2) from l 1 2 3, and (0,2) from l -3 -1
     expect(mesh.getWireframeEdges().length).toBe(3);
   });
+
+  it("should parse usemtl statements and assign materialId to faces", () => {
+    const objData = `
+      v 0 0 0
+      v 1 0 0
+      v 1 1 0
+      v 0 1 0
+      usemtl WoodFloor
+      f 1 2 3
+      usemtl BrickWall
+      f 1 3 4
+    `;
+
+    const mesh = objParser.parse(objData);
+    expect(mesh.faces[0]?.materialId).toBe("WoodFloor");
+    expect(mesh.faces[1]?.materialId).toBe("BrickWall");
+  });
+
+  it("should match usemtl statements against provided Material3D list and use material id", () => {
+    const objData = `
+      v 0 0 0
+      v 1 0 0
+      v 1 1 0
+      usemtl Shiny_Gold
+      f 1 2 3
+    `;
+
+    const mockMaterial = {
+      id: "mat_unique_123",
+      name: "Shiny Gold",
+    } as any;
+
+    const mesh = objParser.parse(objData, "model.obj", [mockMaterial]);
+    expect(mesh.faces[0]?.materialId).toBe("mat_unique_123");
+  });
 });

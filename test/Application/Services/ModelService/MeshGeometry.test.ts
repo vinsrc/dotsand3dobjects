@@ -179,4 +179,41 @@ describe("MeshGeometry", () => {
     const translated = mesh.translate(new Vector3D(1, 1, 1));
     expect(translated.explicitEdges).toEqual(explicitEdges);
   });
+
+  it("should calculate face center or fallback to mesh center", () => {
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(2, 0, 0),
+      new Vector3D(2, 2, 0),
+    ];
+    const faces = [new Face3D([0, 1, 2])];
+    const mesh = new MeshGeometry(vertices, faces);
+
+    const faceCenter = mesh.calculateFaceCenter(0);
+    expect(faceCenter.coordinateX).toBeCloseTo(4 / 3);
+    expect(faceCenter.coordinateY).toBeCloseTo(2 / 3);
+    expect(faceCenter.coordinateZ).toBe(0);
+
+    // Non-existent face index falls back to mesh center
+    const fallbackCenter = mesh.calculateFaceCenter(99);
+    expect(fallbackCenter).toEqual(mesh.calculateCenter());
+  });
+
+  it("should reverse face winding order for specified face index", () => {
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(1, 1, 0),
+      new Vector3D(0, 1, 0),
+    ];
+    const faces = [new Face3D([0, 1, 2, 3])];
+    const mesh = new MeshGeometry(vertices, faces);
+
+    const reversedMesh = mesh.reverseFaceWinding(0);
+    expect(reversedMesh.faces[0]?.vertexIndices).toEqual([3, 2, 1, 0]);
+
+    // Out of bounds faceIndex returns same mesh
+    expect(mesh.reverseFaceWinding(-1)).toBe(mesh);
+    expect(mesh.reverseFaceWinding(99)).toBe(mesh);
+  });
 });

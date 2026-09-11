@@ -152,4 +152,53 @@ describe("ModelService", () => {
     service.resetToStarterModel();
     expect(service.getCurrentModel().isEmpty()).toBe(false);
   });
+
+  it("should parse MTL content via parseMtl", () => {
+    const notifier = new ApplicationStateNotifier();
+    const service = new ModelService(
+      modelFactory,
+      objParser,
+      objExporter,
+      notifier
+    );
+
+    const mtlContent = `
+      newmtl Silver
+      Kd 0.75 0.75 0.75
+      Pr 0.2
+      Pm 0.9
+    `;
+
+    const materials = service.parseMtl(mtlContent);
+    expect(materials).toHaveLength(1);
+    expect(materials[0]?.name).toBe("Silver");
+  });
+
+  it("should load OBJ with materials and assign material id to faces", () => {
+    const notifier = new ApplicationStateNotifier();
+    const service = new ModelService(
+      modelFactory,
+      objParser,
+      objExporter,
+      notifier
+    );
+
+    const objContent = `
+      v 0 0 0
+      v 1 0 0
+      v 0 1 0
+      usemtl Bronze
+      f 1 2 3
+    `;
+
+    const mockMaterials = service.parseMtl(`
+      newmtl Bronze
+      Kd 0.8 0.5 0.2
+    `);
+
+    service.loadFromObj(objContent, "model.obj", mockMaterials);
+    const loadedModel = service.getCurrentModel();
+    expect(loadedModel.getFaceCount()).toBe(1);
+    expect(loadedModel.faces[0]?.materialId).toBe(mockMaterials[0]?.id);
+  });
 });

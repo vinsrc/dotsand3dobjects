@@ -365,8 +365,12 @@ describe("GeometryEditorService", () => {
     modelService.setCurrentModel(new MeshGeometry(vertices, []));
 
     expect(editorService.createFaceFromSelection([0, 1])).toBeNull();
-    expect(editorService.createFaceFromSelection([0, 1, 2, 3, 4])).toBeNull();
+    expect(editorService.createFaceFromSelection([])).toBeNull();
     expect(modelService.getCurrentModel().faces.length).toBe(0);
+
+    const fiveVertexFace = editorService.createFaceFromSelection([0, 1, 2, 3, 4]);
+    expect(fiveVertexFace).not.toBeNull();
+    expect(modelService.getCurrentModel().faces.length).toBe(1);
   });
 
   it("should reject face creation when out of bounds or duplicate indices are passed", () => {

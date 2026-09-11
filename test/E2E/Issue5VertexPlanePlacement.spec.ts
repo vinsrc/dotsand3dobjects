@@ -13,7 +13,9 @@ test.describe("WireframeVibe3D Issue #5 Vertex Plane Placement Functional Tests"
     await page.getByTestId("gizmo-axis-+Z").click();
 
     // Ensure no vertex is selected
-    await page.getByTestId("clear-selection-button").click();
+    if (await page.getByTestId("clear-selection-button").isEnabled()) {
+      await page.getByTestId("clear-selection-button").click();
+    }
 
     // Enter Insert Mode
     const insertModeButton = page.getByTestId("mode-insert-button");

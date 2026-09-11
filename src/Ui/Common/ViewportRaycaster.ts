@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { Vector3D } from "../../Application/Common/Vector3D";
+import { Face3D } from "../../Application/Services/ModelService/Face3D";
+import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeometry";
 import { GridPlaneType } from "../../Application/Services/CameraService/ViewStrategy";
 
 export class ViewportRaycaster {
@@ -130,6 +132,103 @@ export class ViewportRaycaster {
     }
 
     return closestEdge;
+  }
+
+  public findNearestFace(
+    screenX: number,
+    screenY: number,
+    meshGeometry: MeshGeometry,
+    activeCamera: THREE.Camera,
+    viewportWidth: number,
+    viewportHeight: number
+  ): number | null {
+    const faces = meshGeometry.faces;
+    const vertices = meshGeometry.vertices;
+    if (
+      faces.length === 0 ||
+      vertices.length === 0 ||
+      viewportWidth <= 0 ||
+      viewportHeight <= 0
+    ) {
+      return null;
+    }
+
+    const ndcX = (screenX / viewportWidth) * 2 - 1;
+    const ndcY = -(screenY / viewportHeight) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), activeCamera);
+
+    let closestFaceIndex: number | null = null;
+    let closestDistance = Infinity;
+
+    const triangleVectorA = new THREE.Vector3();
+    const triangleVectorB = new THREE.Vector3();
+    const triangleVectorC = new THREE.Vector3();
+    const intersectionPoint = new THREE.Vector3();
+
+    for (let faceIndex = 0; faceIndex < faces.length; faceIndex += 1) {
+      const face = faces[faceIndex];
+      if (!face) {
+        continue;
+      }
+
+      const triangles = face.triangulate();
+      for (const triangle of triangles) {
+        const indexA = triangle.vertexIndices[0];
+        const indexB = triangle.vertexIndices[1];
+        const indexC = triangle.vertexIndices[2];
+        if (
+          indexA === undefined ||
+          indexB === undefined ||
+          indexC === undefined
+        ) {
+          continue;
+        }
+
+        const vertexA = vertices[indexA];
+        const vertexB = vertices[indexB];
+        const vertexC = vertices[indexC];
+        if (!vertexA || !vertexB || !vertexC) {
+          continue;
+        }
+
+        triangleVectorA.set(
+          vertexA.coordinateX,
+          vertexA.coordinateY,
+          vertexA.coordinateZ
+        );
+        triangleVectorB.set(
+          vertexB.coordinateX,
+          vertexB.coordinateY,
+          vertexB.coordinateZ
+        );
+        triangleVectorC.set(
+          vertexC.coordinateX,
+          vertexC.coordinateY,
+          vertexC.coordinateZ
+        );
+
+        const hit = raycaster.ray.intersectTriangle(
+          triangleVectorA,
+          triangleVectorB,
+          triangleVectorC,
+          false,
+          intersectionPoint
+        );
+
+        if (hit) {
+          const distanceToCamera =
+            raycaster.ray.origin.distanceTo(intersectionPoint);
+          if (distanceToCamera < closestDistance) {
+            closestDistance = distanceToCamera;
+            closestFaceIndex = faceIndex;
+          }
+        }
+      }
+    }
+
+    return closestFaceIndex;
   }
 
   public unprojectToGridPlane(

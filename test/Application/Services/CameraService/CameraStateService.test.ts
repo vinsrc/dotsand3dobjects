@@ -116,4 +116,60 @@ describe("CameraStateService", () => {
     expect(cameraService.getTargetPoint().coordinateY).toBe(-20);
     expect(cameraService.getTargetPoint().coordinateZ).toBe(5);
   });
+
+  it("should switch to closest orthographic view based on current view direction", () => {
+    const factory = new OrthographicViewStrategyFactory();
+    const cameraService = new CameraStateService(factory);
+
+    // Initial perspective view: azimuth = PI/4 (45 deg), elevation = PI/6 (30 deg)
+    // viewDirection is primarily +X and +Z
+    const closestAxis = cameraService.switchToClosestOrthographicView();
+    expect(cameraService.isOrthographic()).toBe(true);
+    expect(["+X", "+Z"]).toContain(closestAxis);
+
+    // Orbit towards +X: azimuth = PI/2, elevation = 0
+    cameraService.orbit(0, 0); // switches to perspective
+    cameraService.setOrthographicAxis("+X");
+    cameraService.orbit(0.05, 0.02); // close to +X in perspective
+    expect(cameraService.isOrthographic()).toBe(false);
+    expect(cameraService.switchToClosestOrthographicView()).toBe("+X");
+    expect(cameraService.isOrthographic()).toBe(true);
+    expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("+X");
+
+    // Orbit towards +Y (high elevation)
+    cameraService.orbit(0, Math.PI / 3);
+    expect(cameraService.switchToClosestOrthographicView()).toBe("+Y");
+    expect(cameraService.isOrthographic()).toBe(true);
+    expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("+Y");
+
+    // Orbit towards -Y (negative elevation)
+    cameraService.orbit(0, -Math.PI * 0.8);
+    expect(cameraService.switchToClosestOrthographicView()).toBe("-Y");
+    expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("-Y");
+
+    // When already in orthographic -Y, calling switch keeps it in -Y
+    expect(cameraService.switchToClosestOrthographicView()).toBe("-Y");
+  });
+
+  it("should set face orthographic view and update target point if provided", () => {
+    const factory = new OrthographicViewStrategyFactory();
+    const cameraService = new CameraStateService(factory);
+
+    cameraService.setFaceOrthographicView(
+      3,
+      new Vector3D(0, 0, 1),
+      new Vector3D(5, 5, 0)
+    );
+
+    expect(cameraService.isOrthographic()).toBe(true);
+    expect(cameraService.isFaceOrthographicView()).toBe(true);
+    expect(cameraService.getActiveFaceIndex()).toBe(3);
+    expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("Face 3");
+    expect(cameraService.getTargetPoint()).toEqual(new Vector3D(5, 5, 0));
+
+    // When switched to standard orthographic axis
+    cameraService.setOrthographicAxis("+Z");
+    expect(cameraService.isFaceOrthographicView()).toBe(false);
+    expect(cameraService.getActiveFaceIndex()).toBeNull();
+  });
 });

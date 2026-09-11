@@ -31,7 +31,9 @@ test.describe("WireframeVibe3D Issue #6 Grid Snap as Option Functional Tests", (
     await expect(gridSnapButton).toHaveText("Grid Snap: ON");
 
     // Clear selection
-    await page.getByTestId("clear-selection-button").click();
+    if (await page.getByTestId("clear-selection-button").isEnabled()) {
+      await page.getByTestId("clear-selection-button").click();
+    }
 
     // Enter Insert Mode
     const insertModeButton = page.getByTestId("mode-insert-button");
@@ -80,7 +82,9 @@ test.describe("WireframeVibe3D Issue #6 Grid Snap as Option Functional Tests", (
     await expect(gridSnapButton).toHaveText("Grid Snap: OFF");
 
     // Clear selection
-    await page.getByTestId("clear-selection-button").click();
+    if (await page.getByTestId("clear-selection-button").isEnabled()) {
+      await page.getByTestId("clear-selection-button").click();
+    }
 
     // Enter Insert Mode
     const insertModeButton = page.getByTestId("mode-insert-button");

@@ -1,0 +1,202 @@
+import React from "react";
+import { useAppController } from "../Common/AppContext";
+import { useApplicationState } from "../Common/UseApplicationState";
+import { UiMode } from "../../Application/Services/EditorModeService/EditorModeService";
+
+export const SideToolBar: React.FC = () => {
+  const controller = useAppController();
+  useApplicationState([
+    "MODEL_CHANGED",
+    "MODE_CHANGED",
+    "GRID_SNAP_CHANGED",
+    "SELECTION_CHANGED",
+    "UNDO_REDO_STATE_CHANGED",
+    "UI_CUSTOMIZATION_CHANGED",
+  ]);
+
+  const dockSide = controller.getUiCustomizationService().getSideToolBarDock();
+  const currentMode = controller.getEditorModeService().getMode();
+  const isGridSnap = controller.isGridSnapEnabled();
+  const canUndo = controller.canUndo();
+  const canRedo = controller.canRedo();
+  const selectedVertexCount = controller
+    .getSelectionService()
+    .getSelectedIndices().length;
+
+  const hasSelectedVertex = selectedVertexCount > 0;
+
+  const handleCenterObject = () => {
+    controller.centerObject();
+  };
+
+  const handleUndo = () => {
+    controller.undo();
+  };
+
+  const handleRedo = () => {
+    controller.redo();
+  };
+
+  const handleClearSelection = () => {
+    controller.clearSelection();
+  };
+
+  const handleDeleteVertex = () => {
+    controller.deleteSelectedVertices();
+  };
+
+  const handleEnterMode = (mode: UiMode) => {
+    if (currentMode === mode) {
+      controller.finishMode();
+    } else {
+      controller.enterMode(mode);
+    }
+  };
+
+  const handleToggleGridSnap = () => {
+    controller.toggleGridSnap();
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    padding: "8px 12px",
+    backgroundColor: "#ffffff",
+    border: "1px solid #999999",
+    borderRadius: "4px",
+    fontSize: "13px",
+    fontWeight: 500,
+    cursor: "pointer",
+    color: "#333333",
+    whiteSpace: "nowrap",
+    width: "100%",
+    textAlign: "center",
+    boxSizing: "border-box",
+  };
+
+  const activeModeButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: "#2196f3",
+    color: "#ffffff",
+    borderColor: "#1976d2",
+  };
+
+  const disabledButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    opacity: 0.5,
+    cursor: "not-allowed",
+  };
+
+  return (
+    <aside
+      data-testid="side-toolbar"
+      style={{
+        width: "140px",
+        minWidth: "140px",
+        height: "100%",
+        backgroundColor: "#e0e0e0",
+        borderLeft: dockSide === "right" ? "1px solid #c0c0c0" : "none",
+        borderRight: dockSide === "left" ? "1px solid #c0c0c0" : "none",
+        display: "flex",
+        flexDirection: "column",
+        padding: "12px 8px",
+        gap: "8px",
+        boxSizing: "border-box",
+        overflowY: "auto",
+        userSelect: "none",
+        zIndex: 10,
+      }}
+    >
+      <button
+        data-testid="undo-button"
+        onClick={handleUndo}
+        disabled={!canUndo}
+        style={canUndo ? buttonStyle : disabledButtonStyle}
+      >
+        Undo
+      </button>
+
+      <button
+        data-testid="redo-button"
+        onClick={handleRedo}
+        disabled={!canRedo}
+        style={canRedo ? buttonStyle : disabledButtonStyle}
+      >
+        Redo
+      </button>
+
+      <button
+        data-testid="center-object-button"
+        onClick={handleCenterObject}
+        style={buttonStyle}
+      >
+        Center Object
+      </button>
+
+      <button
+        data-testid="mode-multi-select-button"
+        onClick={() => handleEnterMode("MULTI_SELECT")}
+        style={
+          currentMode === "MULTI_SELECT" ? activeModeButtonStyle : buttonStyle
+        }
+      >
+        Multi selection
+      </button>
+
+      <button
+        data-testid="clear-selection-button"
+        onClick={handleClearSelection}
+        disabled={!hasSelectedVertex}
+        style={hasSelectedVertex ? buttonStyle : disabledButtonStyle}
+      >
+        Clear selection
+      </button>
+
+      <button
+        data-testid="delete-vertex-button"
+        onClick={handleDeleteVertex}
+        disabled={!hasSelectedVertex}
+        style={hasSelectedVertex ? buttonStyle : disabledButtonStyle}
+      >
+        Delete vertex
+      </button>
+
+      <button
+        data-testid="mode-insert-button"
+        onClick={() => handleEnterMode("INSERT")}
+        style={currentMode === "INSERT" ? activeModeButtonStyle : buttonStyle}
+      >
+        Insert
+      </button>
+
+      <button
+        data-testid="mode-translate-button"
+        onClick={() => handleEnterMode("TRANSLATE")}
+        style={
+          currentMode === "TRANSLATE" ? activeModeButtonStyle : buttonStyle
+        }
+      >
+        Translate
+      </button>
+
+      <button
+        data-testid="mode-fill-button"
+        onClick={() => handleEnterMode("FILL")}
+        style={currentMode === "FILL" ? activeModeButtonStyle : buttonStyle}
+      >
+        Fill
+      </button>
+
+      <button
+        data-testid="grid-snap-toggle-button"
+        onClick={handleToggleGridSnap}
+        style={{
+          ...buttonStyle,
+          backgroundColor: isGridSnap ? "#4caf50" : "#ffffff",
+          color: isGridSnap ? "#ffffff" : "#333333",
+          borderColor: isGridSnap ? "#388e3c" : "#999999",
+        }}
+      >
+        {isGridSnap ? "Grid Snap: ON" : "Grid Snap: OFF"}
+      </button>
+    </aside>
+  );
+};
