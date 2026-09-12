@@ -1608,5 +1608,193 @@ describe("AppController", () => {
       expect(errorListener).toHaveBeenCalledWith("Switch to an Orthographic view");
     });
   });
+
+  describe("deleteSelectedFace", () => {
+    it("should return false if a decal is currently selected", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+      expect(appController.isDecalSelected()).toBe(true);
+
+      const result = appController.deleteSelectedFace();
+      expect(result).toBe(false);
+    });
+
+    it("should return false if no face is selected", () => {
+      const { appController } = createController();
+      appController.clearSelection();
+
+      const result = appController.deleteSelectedFace();
+      expect(result).toBe(false);
+    });
+
+    it("should notify ERROR_OCCURRED and return false if child decal plane exists on the face", () => {
+      const { appController, modelService, stateNotifier } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+
+      // Deselect decal and select face 0 again
+      appController.selectDecal(null);
+      appController.selectFace(0);
+      expect(appController.getSelectedFaceIndex()).toBe(0);
+      expect(appController.isDecalSelected()).toBe(false);
+
+      let errorMessage = "";
+      stateNotifier.subscribe("ERROR_OCCURRED", (msg) => {
+        errorMessage = msg;
+      });
+
+      const initialFaceCount = modelService.getCurrentModel().faces.length;
+      const result = appController.deleteSelectedFace();
+
+      expect(result).toBe(false);
+      expect(errorMessage).toBe(
+        "Decal plane should be deleted before deleting Face"
+      );
+      expect(modelService.getCurrentModel().faces.length).toBe(initialFaceCount);
+    });
+
+    it("should delete selected face, preserve edges, clear selection, and support undo/redo", () => {
+      const { appController, modelService } = createController();
+      // Cube model has 6 faces
+      const initialFaces = modelService.getCurrentModel().faces.length;
+      expect(initialFaces).toBe(6);
+
+      appController.selectFace(0);
+      expect(appController.getSelectedFaceIndex()).toBe(0);
+
+      const result = appController.deleteSelectedFace();
+      expect(result).toBe(true);
+
+      const updatedModel = modelService.getCurrentModel();
+      expect(updatedModel.faces.length).toBe(initialFaces - 1);
+      // Face 0 was quad with 4 edges, they should now be preserved in explicitEdges
+      expect(updatedModel.explicitEdges.length).toBeGreaterThanOrEqual(4);
+      expect(appController.getSelectedFaceIndex()).toBeNull();
+
+      // Undo deletion
+      appController.undo();
+      expect(modelService.getCurrentModel().faces.length).toBe(initialFaces);
+
+      // Redo deletion
+      appController.redo();
+      expect(modelService.getCurrentModel().faces.length).toBe(initialFaces - 1);
+    });
+
+    it("should remap decals on higher-indexed faces and reset camera if in face ortho view", () => {
+      const { appController, decalService, cameraStateService } = createController();
+      appController.selectOrthographicView("+Z");
+
+      // Add decal on face 2
+      appController.selectFace(2);
+      appController.addDecalPlaneToSelectedFace();
+      const decalFace2 = decalService.getSelectedDecal()!;
+      expect(decalFace2.parentFaceIndex).toBe(2);
+
+      // Select face 0 and enter face orthographic view
+      appController.selectDecal(null);
+      appController.selectFace(0);
+      appController.setFaceOrthographicView(0);
+      expect(cameraStateService.isFaceOrthographicView()).toBe(true);
+
+      const result = appController.deleteSelectedFace();
+      expect(result).toBe(true);
+
+      // Decal on old face 2 should now point to face 1
+      expect(decalService.getDecal(decalFace2.id)?.parentFaceIndex).toBe(1);
+
+      // Camera should have switched to closest orthographic view
+      expect(cameraStateService.isFaceOrthographicView()).toBe(false);
+      expect(cameraStateService.isOrthographic()).toBe(true);
+    });
+  });
+
+  describe("deleteSelectedEdges", () => {
+    it("should return false if a decal is selected", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+      expect(appController.isDecalSelected()).toBe(true);
+
+      const result = appController.deleteSelectedEdges();
+      expect(result).toBe(false);
+    });
+
+    it("should return false if no edges are selected", () => {
+      const { appController } = createController();
+      expect(appController.getSelectedEdges().length).toBe(0);
+
+      const result = appController.deleteSelectedEdges();
+      expect(result).toBe(false);
+    });
+
+    it("should notify ERROR_OCCURRED and return false if an edge is part of a face", () => {
+      const { appController, stateNotifier } = createController();
+      let errorMessage = "";
+      stateNotifier.subscribe("ERROR_OCCURRED", (msg) => {
+        errorMessage = msg;
+      });
+
+      // Cube face 0 has vertices [0, 1, 2, 3] -> edge [0, 1] is part of face 0
+      appController.selectEdge([0, 1]);
+      expect(appController.getSelectedEdges()).toEqual([[0, 1]]);
+
+      const result = appController.deleteSelectedEdges();
+      expect(result).toBe(false);
+      expect(errorMessage).toBe("Face should be deleted before deleting Edge");
+    });
+
+    it("should delete standalone explicit edge, leave vertices intact, clear selection, and support undo/redo", () => {
+      const { appController, modelService } = createController();
+
+      // First delete face 0 so its edges become explicit edges not owned by any face
+      // Note: Face 0 has edges [0,1], [1,2], [2,3], [3,0].
+      // Wait, in a cube, adjacent faces also share some edges.
+      // Let's create a standalone explicit edge by drawing edge between two unlinked vertices or setting explicitEdges directly.
+      const currentModel = modelService.getCurrentModel();
+      // Let's add an explicit edge [0, 6] (cross diagonal, not part of any cube face)
+      modelService.setCurrentModel({
+        ...currentModel,
+        explicitEdges: [[0, 6]],
+      });
+
+      appController.selectEdge([0, 6]);
+      expect(appController.getSelectedEdges()).toEqual([[0, 6]]);
+
+      const initialVertexCount = modelService.getCurrentModel().vertices.length;
+      const result = appController.deleteSelectedEdges();
+      expect(result).toBe(true);
+
+      // Explicit edge [0, 6] should be removed
+      const updatedModel = modelService.getCurrentModel();
+      expect(updatedModel.explicitEdges.some(([a, b]) => (a === 0 && b === 6) || (a === 6 && b === 0))).toBe(false);
+      // Vertices must remain intact
+      expect(updatedModel.vertices.length).toBe(initialVertexCount);
+      // Selection cleared
+      expect(appController.getSelectedEdges().length).toBe(0);
+
+      // Undo
+      appController.undo();
+      const undoneModel = modelService.getCurrentModel();
+      expect(undoneModel.explicitEdges.some(([a, b]) => (a === 0 && b === 6) || (a === 6 && b === 0))).toBe(true);
+
+      // Redo
+      appController.redo();
+      const redoneModel = modelService.getCurrentModel();
+      expect(redoneModel.explicitEdges.some(([a, b]) => (a === 0 && b === 6) || (a === 6 && b === 0))).toBe(false);
+    });
+
+    it("should support toggleEdgeSelection", () => {
+      const { appController } = createController();
+      appController.toggleEdgeSelection([1, 2]);
+      expect(appController.getSelectedEdges()).toEqual([[1, 2]]);
+
+      appController.toggleEdgeSelection([1, 2]);
+      expect(appController.getSelectedEdges()).toEqual([]);
+    });
+  });
 });
 

@@ -229,4 +229,17 @@ export class DecalPlane {
   public isChildOfFace(faceIndex: number): boolean {
     return this.parentFaceIndex === faceIndex;
   }
+
+  public withParentFaceIndex(newParentFaceIndex: number): DecalPlane {
+    return new DecalPlane(
+      this.id,
+      newParentFaceIndex,
+      this.center,
+      this.normal,
+      this.size,
+      this.rotationAngle,
+      this.vertices,
+      this.materialId
+    );
+  }
 }

@@ -430,4 +430,108 @@ describe("GeometryEditorService", () => {
       expect(editorService.getCoplanarVertexIndices(0, "NONE")).toEqual([0, 1]);
     });
   });
+
+  describe("deleteFace", () => {
+    it("should delete the face and preserve its edges in explicitEdges", () => {
+      const { modelService, editorService } = setupService();
+      const testVertices = [
+        new Vector3D(0, 0, 0),
+        new Vector3D(1, 0, 0),
+        new Vector3D(1, 1, 0),
+        new Vector3D(0, 1, 0),
+      ];
+      const face0 = new Face3D([0, 1, 2, 3]);
+      modelService.setCurrentModel(new MeshGeometry(testVertices, [face0], []));
+
+      const success = editorService.deleteFace(0);
+      expect(success).toBe(true);
+
+      const updatedModel = modelService.getCurrentModel();
+      expect(updatedModel.faces.length).toBe(0);
+      expect(updatedModel.explicitEdges).toEqual([
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [0, 3],
+      ]);
+      // Wireframe edges should still contain all 4 edges
+      expect(updatedModel.getWireframeEdges().length).toBe(4);
+    });
+
+    it("should return false for invalid face index", () => {
+      const { modelService, editorService } = setupService();
+      expect(editorService.deleteFace(-1)).toBe(false);
+      expect(editorService.deleteFace(999)).toBe(false);
+    });
+
+    it("should not duplicate existing explicit edges when preserving face edges", () => {
+      const { modelService, editorService } = setupService();
+      const testVertices = [
+        new Vector3D(0, 0, 0),
+        new Vector3D(1, 0, 0),
+        new Vector3D(0, 1, 0),
+      ];
+      const face0 = new Face3D([0, 1, 2]);
+      modelService.setCurrentModel(
+        new MeshGeometry(testVertices, [face0], [[0, 1]])
+      );
+
+      const success = editorService.deleteFace(0);
+      expect(success).toBe(true);
+
+      const updatedModel = modelService.getCurrentModel();
+      expect(updatedModel.faces.length).toBe(0);
+      expect(updatedModel.explicitEdges).toEqual([
+        [0, 1],
+        [1, 2],
+        [0, 2],
+      ]);
+    });
+  });
+
+  describe("deleteEdges", () => {
+    it("should delete specified explicit edges and leave vertices intact", () => {
+      const { modelService, editorService } = setupService();
+      const testVertices = [
+        new Vector3D(0, 0, 0),
+        new Vector3D(1, 0, 0),
+        new Vector3D(1, 1, 0),
+      ];
+      modelService.setCurrentModel(
+        new MeshGeometry(testVertices, [], [[0, 1], [1, 2]])
+      );
+
+      const success = editorService.deleteEdges([[0, 1]]);
+      expect(success).toBe(true);
+
+      const updatedModel = modelService.getCurrentModel();
+      expect(updatedModel.explicitEdges).toEqual([[1, 2]]);
+      expect(updatedModel.vertices.length).toBe(3);
+    });
+
+    it("should return false when deleting empty array of edges", () => {
+      const { editorService } = setupService();
+      expect(editorService.deleteEdges([])).toBe(false);
+    });
+
+    it("should delete multiple explicit edges at once", () => {
+      const { modelService, editorService } = setupService();
+      const testVertices = [
+        new Vector3D(0, 0, 0),
+        new Vector3D(1, 0, 0),
+        new Vector3D(1, 1, 0),
+        new Vector3D(0, 1, 0),
+      ];
+      modelService.setCurrentModel(
+        new MeshGeometry(testVertices, [], [[0, 1], [1, 2], [2, 3]])
+      );
+
+      const success = editorService.deleteEdges([[0, 1], [2, 3]]);
+      expect(success).toBe(true);
+
+      const updatedModel = modelService.getCurrentModel();
+      expect(updatedModel.explicitEdges).toEqual([[1, 2]]);
+      expect(updatedModel.vertices.length).toBe(4);
+    });
+  });
 });

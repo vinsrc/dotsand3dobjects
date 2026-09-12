@@ -8,6 +8,7 @@ export interface EditorStateSnapshot {
   readonly activeVertexIndex: number | null;
   readonly decals?: readonly DecalPlane[];
   readonly selectedDecalId?: string | null;
+  readonly selectedEdges?: readonly [number, number][];
 }
 
 export class UndoRedoService {

@@ -28,6 +28,10 @@ export const SideToolBar: React.FC = () => {
 
   const hasSelectedVertex = selectedVertexCount > 0;
   const canFillFace = selectedVertexCount >= 3;
+  const selectedFaceIndex = controller.getSelectedFaceIndex();
+  const hasSelectedFace = selectedFaceIndex !== null && !isDecalSelected;
+  const selectedEdgeCount = controller.getSelectedEdges().length;
+  const hasSelectedEdge = selectedEdgeCount > 0 && !isDecalSelected;
 
   const handleCenterObject = () => {
     controller.centerObject();
@@ -49,8 +53,16 @@ export const SideToolBar: React.FC = () => {
     controller.deleteSelectedVertices();
   };
 
+  const handleDeleteEdge = () => {
+    controller.deleteSelectedEdges();
+  };
+
   const handleFaceFill = () => {
     controller.createFaceFromSelectedVertices();
+  };
+
+  const handleDeleteFace = () => {
+    controller.deleteSelectedFace();
   };
 
   const handleEnterMode = (mode: UiMode) => {
@@ -143,12 +155,37 @@ export const SideToolBar: React.FC = () => {
       </button>
 
       <button
+        data-testid="grid-snap-toggle-button"
+        onClick={handleToggleGridSnap}
+        style={{
+          ...buttonStyle,
+          backgroundColor: isGridSnap ? ThemeColors.success : ThemeColors.widget,
+          color: isGridSnap ? "#ffffff" : ThemeColors.textPrimary,
+          borderColor: isGridSnap
+            ? ThemeColors.successBorder
+            : ThemeColors.borderStrong,
+        }}
+      >
+        {isGridSnap ? "Grid Snap: ON" : "Grid Snap: OFF"}
+      </button>
+
+      <button
         data-testid="center-object-button"
         onClick={handleCenterObject}
         disabled={isDecalSelected}
         style={!isDecalSelected ? buttonStyle : disabledButtonStyle}
       >
         Center Object
+      </button>
+
+      <button
+        data-testid="mode-transform-button"
+        onClick={() => handleEnterMode("TRANSFORM")}
+        style={
+          currentMode === "TRANSFORM" ? activeModeButtonStyle : buttonStyle
+        }
+      >
+        Transform
       </button>
 
       <button
@@ -164,8 +201,8 @@ export const SideToolBar: React.FC = () => {
       <button
         data-testid="clear-selection-button"
         onClick={handleClearSelection}
-        disabled={!hasSelectedVertex && !isDecalSelected}
-        style={hasSelectedVertex || isDecalSelected ? buttonStyle : disabledButtonStyle}
+        disabled={!hasSelectedVertex && !hasSelectedEdge && !hasSelectedFace && !isDecalSelected}
+        style={hasSelectedVertex || hasSelectedEdge || hasSelectedFace || isDecalSelected ? buttonStyle : disabledButtonStyle}
       >
         Clear selection
       </button>
@@ -177,6 +214,24 @@ export const SideToolBar: React.FC = () => {
         style={hasSelectedVertex && !isDecalSelected ? buttonStyle : disabledButtonStyle}
       >
         Delete vertex
+      </button>
+
+      <button
+        data-testid="delete-edge-button"
+        onClick={handleDeleteEdge}
+        disabled={!hasSelectedEdge}
+        style={hasSelectedEdge ? buttonStyle : disabledButtonStyle}
+      >
+        Delete Edge
+      </button>
+
+      <button
+        data-testid="face-delete-button"
+        onClick={handleDeleteFace}
+        disabled={!hasSelectedFace}
+        style={hasSelectedFace ? buttonStyle : disabledButtonStyle}
+      >
+        Delete Face
       </button>
 
       <button
@@ -210,16 +265,6 @@ export const SideToolBar: React.FC = () => {
       </button>
 
       <button
-        data-testid="mode-transform-button"
-        onClick={() => handleEnterMode("TRANSFORM")}
-        style={
-          currentMode === "TRANSFORM" ? activeModeButtonStyle : buttonStyle
-        }
-      >
-        Transform
-      </button>
-
-      <button
         data-testid="mode-fill-button"
         onClick={() => handleEnterMode("FILL")}
         disabled={isDecalSelected}
@@ -243,21 +288,6 @@ export const SideToolBar: React.FC = () => {
         }
       >
         Face Fill
-      </button>
-
-      <button
-        data-testid="grid-snap-toggle-button"
-        onClick={handleToggleGridSnap}
-        style={{
-          ...buttonStyle,
-          backgroundColor: isGridSnap ? ThemeColors.success : ThemeColors.widget,
-          color: isGridSnap ? "#ffffff" : ThemeColors.textPrimary,
-          borderColor: isGridSnap
-            ? ThemeColors.successBorder
-            : ThemeColors.borderStrong,
-        }}
-      >
-        {isGridSnap ? "Grid Snap: ON" : "Grid Snap: OFF"}
       </button>
     </aside>
   );

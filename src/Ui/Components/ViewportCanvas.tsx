@@ -202,7 +202,8 @@ export const ViewportCanvas: React.FC = () => {
       controller.getSelectionService().getSelectedIndices(),
       controller.getSelectionService().getActiveVertex(),
       controller.getSelectionService().getSelectedFaceIndices(),
-      controller.getVisibleVertexIndices()
+      controller.getVisibleVertexIndices(),
+      controller.getSelectedEdges()
     );
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -218,10 +219,11 @@ export const ViewportCanvas: React.FC = () => {
             measuredHeight,
             controller.getVisibleVertexIndices()
           );
+          renderOverlay();
         }
       }
     });
-    resizeObserver.observe(targetContainer);
+    resizeObserver.observe(containerRef.current);
 
     const unsubscribeModel = controller.getStateNotifier().subscribe(
       "MODEL_CHANGED",
@@ -285,11 +287,19 @@ export const ViewportCanvas: React.FC = () => {
             ? (payload as { selectedFaceIndices: readonly number[] })
                 .selectedFaceIndices
             : controller.getSelectionService().getSelectedFaceIndices();
+        const selectedEdges =
+          payload &&
+          typeof payload === "object" &&
+          "selectedEdges" in payload
+            ? (payload as { selectedEdges: readonly [number, number][] })
+                .selectedEdges
+            : controller.getSelectedEdges();
         viewportRenderer.updateSelection(
           controller.getSelectionService().getSelectedIndices(),
           controller.getSelectionService().getActiveVertex(),
           selectedFaceIndices,
-          controller.getVisibleVertexIndices()
+          controller.getVisibleVertexIndices(),
+          selectedEdges
         );
       }
     );
@@ -846,18 +856,32 @@ export const ViewportCanvas: React.FC = () => {
       if (nearestVertex !== null) {
         controller.selectSingleVertex(nearestVertex);
       } else {
-        const nearestFace = raycasterRef.current.findNearestFace(
+        const nearestEdge = raycasterRef.current.findNearestEdge(
           clickX,
           clickY,
-          currentModel,
+          currentModel.getWireframeEdges(),
+          currentModel.vertices,
           camera,
           width,
-          height
+          height,
+          15
         );
-        if (nearestFace !== null) {
-          controller.selectFace(nearestFace);
+        if (nearestEdge !== null) {
+          controller.selectEdge(nearestEdge);
         } else {
-          controller.clearSelection();
+          const nearestFace = raycasterRef.current.findNearestFace(
+            clickX,
+            clickY,
+            currentModel,
+            camera,
+            width,
+            height
+          );
+          if (nearestFace !== null) {
+            controller.selectFace(nearestFace);
+          } else {
+            controller.clearSelection();
+          }
         }
       }
     } else if (mode === "MULTI_SELECT") {
@@ -875,16 +899,30 @@ export const ViewportCanvas: React.FC = () => {
       if (nearestVertex !== null) {
         controller.toggleVertexSelection(nearestVertex);
       } else {
-        const nearestFace = raycasterRef.current.findNearestFace(
+        const nearestEdge = raycasterRef.current.findNearestEdge(
           clickX,
           clickY,
-          currentModel,
+          currentModel.getWireframeEdges(),
+          currentModel.vertices,
           camera,
           width,
-          height
+          height,
+          15
         );
-        if (nearestFace !== null) {
-          controller.selectFace(nearestFace);
+        if (nearestEdge !== null) {
+          controller.toggleEdgeSelection(nearestEdge);
+        } else {
+          const nearestFace = raycasterRef.current.findNearestFace(
+            clickX,
+            clickY,
+            currentModel,
+            camera,
+            width,
+            height
+          );
+          if (nearestFace !== null) {
+            controller.selectFace(nearestFace);
+          }
         }
       }
     } else if (mode === "INSERT") {

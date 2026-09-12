@@ -827,6 +827,7 @@ export class AppController {
       activeVertexIndex: this.selectionService.getActiveVertex(),
       decals: this.decalService.getDecals(),
       selectedDecalId: this.decalService.getSelectedDecalId(),
+      selectedEdges: this.selectionService.getSelectedEdges(),
     });
   }
 
@@ -837,13 +838,15 @@ export class AppController {
       activeVertexIndex: this.selectionService.getActiveVertex(),
       decals: this.decalService.getDecals(),
       selectedDecalId: this.decalService.getSelectedDecalId(),
+      selectedEdges: this.selectionService.getSelectedEdges(),
     };
     const previousSnapshot = this.undoRedoService.undo(currentSnapshot);
     if (previousSnapshot) {
       this.modelService.setCurrentModel(previousSnapshot.model);
       this.selectionService.restoreSelection(
         previousSnapshot.selectedIndices,
-        previousSnapshot.activeVertexIndex
+        previousSnapshot.activeVertexIndex,
+        previousSnapshot.selectedEdges
       );
       if (previousSnapshot.decals) {
         this.decalService.restoreState(
@@ -861,13 +864,15 @@ export class AppController {
       activeVertexIndex: this.selectionService.getActiveVertex(),
       decals: this.decalService.getDecals(),
       selectedDecalId: this.decalService.getSelectedDecalId(),
+      selectedEdges: this.selectionService.getSelectedEdges(),
     };
     const nextSnapshot = this.undoRedoService.redo(currentSnapshot);
     if (nextSnapshot) {
       this.modelService.setCurrentModel(nextSnapshot.model);
       this.selectionService.restoreSelection(
         nextSnapshot.selectedIndices,
-        nextSnapshot.activeVertexIndex
+        nextSnapshot.activeVertexIndex,
+        nextSnapshot.selectedEdges
       );
       if (nextSnapshot.decals) {
         this.decalService.restoreState(
@@ -907,7 +912,11 @@ export class AppController {
       this.recordSnapshot();
       this.decalService.selectDecal(null);
     }
-    if (this.selectionService.getSelectedIndices().length > 0) {
+    if (
+      this.selectionService.getSelectedIndices().length > 0 ||
+      this.selectionService.getSelectedFaceIndex() !== null ||
+      this.selectionService.getSelectedEdges().length > 0
+    ) {
       this.recordSnapshot();
       this.selectionService.clearSelection();
     }
@@ -922,6 +931,105 @@ export class AppController {
     }
     this.recordSnapshot();
     this.geometryEditorService.deleteSelectedVertices();
+  }
+
+  public deleteSelectedFace(): boolean {
+    if (this.decalService.isDecalSelected()) {
+      return false;
+    }
+    const targetFaceIndex = this.selectionService.getSelectedFaceIndex();
+    if (targetFaceIndex === null || targetFaceIndex < 0) {
+      return false;
+    }
+
+    const currentModel = this.modelService.getCurrentModel();
+    if (targetFaceIndex >= currentModel.faces.length) {
+      return false;
+    }
+
+    const childDecals = this.decalService.getDecalsForFace(targetFaceIndex);
+    if (childDecals.length > 0) {
+      this.stateNotifier.notify(
+        "ERROR_OCCURRED",
+        "Decal plane should be deleted before deleting Face"
+      );
+      return false;
+    }
+
+    this.recordSnapshot();
+    const success = this.geometryEditorService.deleteFace(targetFaceIndex);
+    if (success) {
+      this.decalService.remapFaceIndicesAfterFaceDeletion(targetFaceIndex);
+      if (
+        this.cameraStateService.isFaceOrthographicView() &&
+        this.cameraStateService.getActiveFaceIndex() === targetFaceIndex
+      ) {
+        this.switchToClosestOrthographicView();
+      }
+      this.selectionService.clearSelection();
+    }
+    return success;
+  }
+
+  public selectEdge(edge: [number, number]): void {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
+    this.recordSnapshot();
+    this.selectionService.selectEdge(edge);
+  }
+
+  public toggleEdgeSelection(edge: [number, number]): void {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
+    this.recordSnapshot();
+    this.selectionService.toggleEdgeSelection(edge);
+  }
+
+  public getSelectedEdges(): readonly [number, number][] {
+    return this.selectionService.getSelectedEdges();
+  }
+
+  public deleteSelectedEdges(): boolean {
+    if (this.decalService.isDecalSelected()) {
+      return false;
+    }
+    const selectedEdges = this.selectionService.getSelectedEdges();
+    if (selectedEdges.length === 0) {
+      return false;
+    }
+
+    const currentModel = this.modelService.getCurrentModel();
+    const isPartOfFace = selectedEdges.some((edge) => {
+      const [v1, v2] = edge;
+      return currentModel.faces.some((face) => {
+        const count = face.vertexIndices.length;
+        for (let i = 0; i < count; i += 1) {
+          const a = face.vertexIndices[i];
+          const b = face.vertexIndices[(i + 1) % count];
+          if ((a === v1 && b === v2) || (a === v2 && b === v1)) {
+            return true;
+          }
+        }
+        return false;
+      });
+    });
+
+    if (isPartOfFace) {
+      this.stateNotifier.notify(
+        "ERROR_OCCURRED",
+        "Face should be deleted before deleting Edge"
+      );
+      return false;
+    }
+
+    this.recordSnapshot();
+    const success = this.geometryEditorService.deleteEdges(selectedEdges);
+    if (success) {
+      this.selectionService.clearSelection();
+    }
+    return success;
   }
 
   public beginTranslation(): void {

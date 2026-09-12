@@ -4,6 +4,7 @@ export class SelectionService {
   private readonly stateNotifier: ApplicationStateNotifier;
   private readonly selectedIndicesSet: Set<number>;
   private readonly selectedFaceIndicesSet: Set<number>;
+  private readonly selectedEdgesSet: Set<string>;
   private selectedFaceIndex: number | null;
   private activeVertexIndex: number | null;
 
@@ -11,6 +12,7 @@ export class SelectionService {
     this.stateNotifier = stateNotifier;
     this.selectedIndicesSet = new Set();
     this.selectedFaceIndicesSet = new Set();
+    this.selectedEdgesSet = new Set();
     this.selectedFaceIndex = null;
     this.activeVertexIndex = null;
   }
@@ -27,6 +29,42 @@ export class SelectionService {
     return this.activeVertexIndex;
   }
 
+  public getSelectedEdges(): readonly [number, number][] {
+    return Array.from(this.selectedEdgesSet).map((key) => this.keyToEdge(key));
+  }
+
+  public isEdgeSelected(edge: [number, number]): boolean {
+    return this.selectedEdgesSet.has(this.edgeToKey(edge));
+  }
+
+  public selectEdge(edge: [number, number]): void {
+    const key = this.edgeToKey(edge);
+    if (this.selectedEdgesSet.has(key) && this.selectedEdgesSet.size === 1) {
+      this.clearSelection();
+      return;
+    }
+
+    this.selectedFaceIndex = null;
+    this.selectedFaceIndicesSet.clear();
+    this.selectedIndicesSet.clear();
+    this.activeVertexIndex = null;
+    this.selectedEdgesSet.clear();
+    this.selectedEdgesSet.add(key);
+    this.notifySelectionChange();
+  }
+
+  public toggleEdgeSelection(edge: [number, number]): void {
+    this.selectedFaceIndex = null;
+    this.selectedFaceIndicesSet.clear();
+    const key = this.edgeToKey(edge);
+    if (this.selectedEdgesSet.has(key)) {
+      this.selectedEdgesSet.delete(key);
+    } else {
+      this.selectedEdgesSet.add(key);
+    }
+    this.notifySelectionChange();
+  }
+
   public selectSingle(vertexIndex: number): void {
     if (
       this.selectedIndicesSet.has(vertexIndex) &&
@@ -38,6 +76,7 @@ export class SelectionService {
 
     this.selectedFaceIndex = null;
     this.selectedFaceIndicesSet.clear();
+    this.selectedEdgesSet.clear();
     this.selectedIndicesSet.clear();
     this.selectedIndicesSet.add(vertexIndex);
     this.activeVertexIndex = vertexIndex;
@@ -46,13 +85,20 @@ export class SelectionService {
 
   public restoreSelection(
     selectedIndices: readonly number[],
-    activeVertexIndex: number | null
+    activeVertexIndex: number | null,
+    selectedEdges?: readonly [number, number][]
   ): void {
     this.selectedFaceIndex = null;
     this.selectedFaceIndicesSet.clear();
+    this.selectedEdgesSet.clear();
     this.selectedIndicesSet.clear();
     for (const index of selectedIndices) {
       this.selectedIndicesSet.add(index);
+    }
+    if (selectedEdges) {
+      for (const edge of selectedEdges) {
+        this.selectedEdgesSet.add(this.edgeToKey(edge));
+      }
     }
     this.activeVertexIndex = activeVertexIndex;
     this.notifySelectionChange();
@@ -91,6 +137,7 @@ export class SelectionService {
     this.selectedFaceIndex = faceIndex;
     this.selectedFaceIndicesSet.clear();
     this.selectedFaceIndicesSet.add(faceIndex);
+    this.selectedEdgesSet.clear();
     this.selectedIndicesSet.clear();
     for (const index of faceVertexIndices) {
       this.selectedIndicesSet.add(index);
@@ -104,6 +151,7 @@ export class SelectionService {
     faceIndex: number,
     faceVertexIndices: readonly number[]
   ): void {
+    this.selectedEdgesSet.clear();
     if (this.selectedFaceIndicesSet.has(faceIndex)) {
       this.selectedFaceIndicesSet.delete(faceIndex);
       if (this.selectedFaceIndex === faceIndex) {
@@ -140,9 +188,21 @@ export class SelectionService {
   public clearSelection(): void {
     this.selectedFaceIndex = null;
     this.selectedFaceIndicesSet.clear();
+    this.selectedEdgesSet.clear();
     this.selectedIndicesSet.clear();
     this.activeVertexIndex = null;
     this.notifySelectionChange();
+  }
+
+  private edgeToKey(edge: [number, number]): string {
+    const lower = Math.min(edge[0], edge[1]);
+    const higher = Math.max(edge[0], edge[1]);
+    return `${lower}_${higher}`;
+  }
+
+  private keyToEdge(key: string): [number, number] {
+    const parts = key.split("_");
+    return [Number(parts[0]), Number(parts[1])];
   }
 
   private notifySelectionChange(): void {
@@ -151,6 +211,7 @@ export class SelectionService {
       activeVertexIndex: this.activeVertexIndex,
       selectedFaceIndex: this.selectedFaceIndex,
       selectedFaceIndices: this.getSelectedFaceIndices(),
+      selectedEdges: this.getSelectedEdges(),
     });
   }
 }

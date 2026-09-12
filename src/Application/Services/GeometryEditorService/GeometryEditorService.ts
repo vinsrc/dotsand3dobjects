@@ -360,6 +360,84 @@ export class GeometryEditorService {
     this.selectionService.clearSelection();
   }
 
+  public deleteFace(faceIndex: number): boolean {
+    const currentModel = this.modelService.getCurrentModel();
+    if (faceIndex < 0 || faceIndex >= currentModel.faces.length) {
+      return false;
+    }
+
+    const faceToDelete = currentModel.faces[faceIndex];
+    if (!faceToDelete) {
+      return false;
+    }
+
+    const updatedFaces = currentModel.faces.filter((_, index) => index !== faceIndex);
+
+    const existingEdgeSet = new Set<string>();
+    for (const [start, end] of currentModel.explicitEdges) {
+      const lower = Math.min(start, end);
+      const higher = Math.max(start, end);
+      existingEdgeSet.add(`${lower}_${higher}`);
+    }
+
+    const updatedExplicitEdges: [number, number][] = [...currentModel.explicitEdges];
+    const vertexIndices = faceToDelete.vertexIndices;
+    const count = vertexIndices.length;
+    for (let index = 0; index < count; index += 1) {
+      const firstVertex = vertexIndices[index];
+      const secondVertex = vertexIndices[(index + 1) % count];
+      if (firstVertex !== undefined && secondVertex !== undefined && firstVertex !== secondVertex) {
+        const lower = Math.min(firstVertex, secondVertex);
+        const higher = Math.max(firstVertex, secondVertex);
+        const key = `${lower}_${higher}`;
+        if (!existingEdgeSet.has(key)) {
+          existingEdgeSet.add(key);
+          updatedExplicitEdges.push([lower, higher]);
+        }
+      }
+    }
+
+    const updatedModel = new MeshGeometry(
+      currentModel.vertices,
+      updatedFaces,
+      updatedExplicitEdges
+    );
+
+    this.modelService.setCurrentModel(updatedModel);
+    return true;
+  }
+
+  public deleteEdges(edgesToDelete: readonly [number, number][]): boolean {
+    if (edgesToDelete.length === 0) {
+      return false;
+    }
+
+    const currentModel = this.modelService.getCurrentModel();
+    const deleteKeySet = new Set<string>();
+    for (const [start, end] of edgesToDelete) {
+      const lower = Math.min(start, end);
+      const higher = Math.max(start, end);
+      deleteKeySet.add(`${lower}_${higher}`);
+    }
+
+    const updatedExplicitEdges: [number, number][] = currentModel.explicitEdges.filter(
+      ([start, end]) => {
+        const lower = Math.min(start, end);
+        const higher = Math.max(start, end);
+        return !deleteKeySet.has(`${lower}_${higher}`);
+      }
+    );
+
+    const updatedModel = new MeshGeometry(
+      currentModel.vertices,
+      currentModel.faces,
+      updatedExplicitEdges
+    );
+
+    this.modelService.setCurrentModel(updatedModel);
+    return true;
+  }
+
   public createFaceFromSelection(
     vertexIndices: readonly number[]
   ): Face3D | null {

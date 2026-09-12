@@ -22,6 +22,9 @@ export class ViewportRenderer {
   private surfaceMesh: THREE.Mesh;
   private wireframeLines: LineSegments2;
   private readonly wireframeMaterial: LineMaterial;
+  private selectedEdgeLines: LineSegments2;
+  private readonly selectedEdgeMaterial: LineMaterial;
+  private currentSelectedEdges: readonly [number, number][] = [];
   private vertexPoints: THREE.Points;
   private inactiveVertexPoints: THREE.Points;
   private inactiveOutlineTexture: THREE.CanvasTexture | null = null;
@@ -114,6 +117,24 @@ export class ViewportRenderer {
     );
     this.wireframeLines.renderOrder = 2;
     this.sceneInstance.add(this.wireframeLines);
+
+    this.selectedEdgeMaterial = new LineMaterial({
+      color: 0xff6600,
+      linewidth: Math.max(initialEdgeLineWidth * 1.5, 3),
+      resolution: new THREE.Vector2(initialWidth, initialHeight),
+      depthTest: false,
+      transparent: false,
+      opacity: 1.0,
+    });
+    const initialSelectedEdgeGeometry = new LineSegmentsGeometry();
+    initialSelectedEdgeGeometry.setPositions([]);
+    this.selectedEdgeLines = new LineSegments2(
+      initialSelectedEdgeGeometry,
+      this.selectedEdgeMaterial
+    );
+    this.selectedEdgeLines.renderOrder = 996;
+    this.selectedEdgeLines.visible = false;
+    this.sceneInstance.add(this.selectedEdgeLines);
 
     this.vertexPoints = new THREE.Points(
       new THREE.BufferGeometry(),
@@ -253,6 +274,7 @@ export class ViewportRenderer {
     const previousInactiveGeometry = this.inactiveVertexPoints.geometry;
     const previousSelectedGeometry = this.selectedPoints.geometry;
     const previousSelectedFaceGeometry = this.selectedFaceMesh.geometry;
+    const previousSelectedEdgeGeometry = this.selectedEdgeLines.geometry;
 
     this.surfaceMesh.geometry = this.buildSurfaceGeometry(meshGeometry);
     this.wireframeLines.geometry = this.buildWireframeGeometry(meshGeometry);
@@ -272,6 +294,11 @@ export class ViewportRenderer {
       meshGeometry,
       this.currentSelectedFaceIndices
     );
+    this.selectedEdgeLines.geometry = this.buildSelectedEdgeGeometry(
+      meshGeometry,
+      this.currentSelectedEdges
+    );
+    this.selectedEdgeLines.visible = this.currentSelectedEdges.length > 0;
 
     previousSurfaceGeometry.dispose();
     previousWireframeGeometry.dispose();
@@ -279,6 +306,7 @@ export class ViewportRenderer {
     previousInactiveGeometry.dispose();
     previousSelectedGeometry.dispose();
     previousSelectedFaceGeometry.dispose();
+    previousSelectedEdgeGeometry.dispose();
 
     this.render();
   }
@@ -287,7 +315,8 @@ export class ViewportRenderer {
     selectedIndices: readonly number[],
     _activeIndex: number | null,
     selectedFaceIndexOrIndices: number | readonly number[] | null = null,
-    visibleIndices?: readonly number[] | null
+    visibleIndices?: readonly number[] | null,
+    selectedEdges?: readonly [number, number][]
   ): void {
     if (this.isRendererDisposed) {
       return;
@@ -295,6 +324,10 @@ export class ViewportRenderer {
 
     if (visibleIndices !== undefined) {
       this.currentVisibleVertexIndices = visibleIndices;
+    }
+
+    if (selectedEdges !== undefined) {
+      this.currentSelectedEdges = selectedEdges;
     }
 
     this.currentSelectedIndices = selectedIndices;
@@ -340,6 +373,14 @@ export class ViewportRenderer {
         this.currentSelectedFaceIndices
       );
       previousSelectedFaceGeometry.dispose();
+
+      const previousSelectedEdgeGeometry = this.selectedEdgeLines.geometry;
+      this.selectedEdgeLines.geometry = this.buildSelectedEdgeGeometry(
+        this.currentModelGeometry,
+        this.currentSelectedEdges
+      );
+      this.selectedEdgeLines.visible = this.currentSelectedEdges.length > 0;
+      previousSelectedEdgeGeometry.dispose();
 
       this.render();
     }
@@ -682,6 +723,7 @@ export class ViewportRenderer {
 
     this.webGlRenderer.setSize(viewportWidth, viewportHeight, false);
     this.wireframeMaterial.resolution.set(viewportWidth, viewportHeight);
+    this.selectedEdgeMaterial.resolution.set(viewportWidth, viewportHeight);
     this.render();
   }
 
@@ -717,6 +759,9 @@ export class ViewportRenderer {
 
     this.wireframeLines.geometry.dispose();
     this.wireframeMaterial.dispose();
+
+    this.selectedEdgeLines.geometry.dispose();
+    this.selectedEdgeMaterial.dispose();
 
     this.vertexPoints.geometry.dispose();
     (this.vertexPoints.material as THREE.Material).dispose();
@@ -1113,6 +1158,36 @@ export class ViewportRenderer {
     wireframeBufferGeometry.setPositions(wireframePositions);
 
     return wireframeBufferGeometry;
+  }
+
+  private buildSelectedEdgeGeometry(
+    meshGeometry: MeshGeometry,
+    selectedEdges: readonly [number, number][]
+  ): LineSegmentsGeometry {
+    const geometry = new LineSegmentsGeometry();
+    if (meshGeometry.isEmpty() || selectedEdges.length === 0) {
+      geometry.setPositions([]);
+      return geometry;
+    }
+
+    const positions: number[] = [];
+    for (const [startIndex, endIndex] of selectedEdges) {
+      const startVertex = meshGeometry.vertices[startIndex];
+      const endVertex = meshGeometry.vertices[endIndex];
+      if (startVertex && endVertex) {
+        positions.push(
+          startVertex.coordinateX,
+          startVertex.coordinateY,
+          startVertex.coordinateZ,
+          endVertex.coordinateX,
+          endVertex.coordinateY,
+          endVertex.coordinateZ
+        );
+      }
+    }
+
+    geometry.setPositions(positions);
+    return geometry;
   }
 
   private buildVertexPointsGeometry(

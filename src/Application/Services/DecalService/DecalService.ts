@@ -99,6 +99,22 @@ export class DecalService {
     }
   }
 
+  public remapFaceIndicesAfterFaceDeletion(deletedFaceIndex: number): void {
+    let changed = false;
+    for (const [id, decal] of Array.from(this.decalsMap.entries())) {
+      if (decal.parentFaceIndex > deletedFaceIndex) {
+        this.decalsMap.set(
+          id,
+          decal.withParentFaceIndex(decal.parentFaceIndex - 1)
+        );
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.notifyDecalsChanged();
+    }
+  }
+
   public assignMaterialToSelectedDecal(materialId: string | null): void {
     if (!this.selectedDecalId) {
       return;

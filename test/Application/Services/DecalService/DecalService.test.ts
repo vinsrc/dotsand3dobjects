@@ -145,4 +145,28 @@ describe("DecalService", () => {
     expect(service.getDecalsForFace(0).length).toBe(0);
     expect(service.getDecalsForFace(1).length).toBe(1);
   });
+
+  it("should remap decal face indices after face deletion", () => {
+    const stateNotifier = new ApplicationStateNotifier();
+    const service = new DecalService(stateNotifier);
+    const decal0 = service.createDecalOnFace(0, quadVertices);
+    const decal2 = service.createDecalOnFace(2, quadVertices);
+    const decal3 = service.createDecalOnFace(3, quadVertices);
+
+    const listener = vi.fn();
+    stateNotifier.subscribe("DECALS_CHANGED", listener);
+
+    // Deleting face 1 should shift decals on face 2 and 3 down by 1
+    service.remapFaceIndicesAfterFaceDeletion(1);
+
+    expect(service.getDecal(decal0.id)?.parentFaceIndex).toBe(0);
+    expect(service.getDecal(decal2.id)?.parentFaceIndex).toBe(1);
+    expect(service.getDecal(decal3.id)?.parentFaceIndex).toBe(2);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    // Remapping with an index higher than all parentFaceIndexes shouldn't change anything or notify
+    listener.mockClear();
+    service.remapFaceIndicesAfterFaceDeletion(10);
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

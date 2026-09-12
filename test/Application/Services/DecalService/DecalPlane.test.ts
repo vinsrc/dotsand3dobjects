@@ -109,4 +109,13 @@ describe("DecalPlane", () => {
     expect(scaledOrigin.size).toBeCloseTo(initialSize * 2, 4);
     expect(scaledOrigin.calculateCenter().coordinateZ).toBeCloseTo(initialCenter.coordinateZ * 2, 4);
   });
+
+  it("should support withParentFaceIndex immutably", () => {
+    const decal = DecalPlane.createFromFace("decal_1", 3, quadVertices);
+    const updated = decal.withParentFaceIndex(2);
+
+    expect(updated.parentFaceIndex).toBe(2);
+    expect(decal.parentFaceIndex).toBe(3);
+    expect(updated.id).toBe(decal.id);
+  });
 });
