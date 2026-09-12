@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { unzipSync } from "fflate";
+import { unzipSync, zipSync } from "fflate";
 import { AppController } from "../../../src/Application/Controllers/AppController";
 import { ModelService } from "../../../src/Application/Services/ModelService/ModelService";
 import { CameraStateService } from "../../../src/Application/Services/CameraService/CameraStateService";
@@ -15,6 +15,12 @@ import { ObjExporter } from "../../../src/Application/Services/ModelService/ObjE
 import { OrthographicViewStrategyFactory } from "../../../src/Application/Services/CameraService/OrthographicViewStrategy";
 import { Vector3D } from "../../../src/Application/Common/Vector3D";
 import { MaterialService } from "../../../src/Application/Services/MaterialService/MaterialService";
+import { GeometryTransformService } from "../../../src/Application/Services/GeometryTransformService/GeometryTransformService";
+import { UiCustomizationService } from "../../../src/Application/Services/UiCustomizationService/UiCustomizationService";
+import { DecalService } from "../../../src/Application/Services/DecalService/DecalService";
+import { ZipExportService } from "../../../src/Application/Services/ZipExportService/ZipExportService";
+import { ZipImportService } from "../../../src/Application/Services/ZipExportService/ZipImportService";
+import { DataUrlConverter } from "../../../src/Application/Common/DataUrlConverter";
 
 describe("AppController", () => {
   const createController = () => {
@@ -40,8 +46,18 @@ describe("AppController", () => {
       modelService,
       selectionService
     );
+    const geometryTransformService = new GeometryTransformService(
+      modelService,
+      selectionService,
+      geometryEditorService
+    );
     const undoRedoService = new UndoRedoService(stateNotifier);
     const materialService = new MaterialService(stateNotifier);
+    const uiCustomizationService = new UiCustomizationService(stateNotifier);
+    const decalService = new DecalService(stateNotifier);
+    const zipExportService = new ZipExportService();
+    const dataUrlConverter = new DataUrlConverter();
+    const zipImportService = new ZipImportService(dataUrlConverter);
 
     const appController = new AppController(
       modelService,
@@ -50,9 +66,15 @@ describe("AppController", () => {
       editorModeService,
       selectionService,
       geometryEditorService,
+      geometryTransformService,
       undoRedoService,
       stateNotifier,
-      materialService
+      materialService,
+      uiCustomizationService,
+      decalService,
+      zipExportService,
+      dataUrlConverter,
+      zipImportService
     );
 
     return {
@@ -63,8 +85,14 @@ describe("AppController", () => {
       editorModeService,
       selectionService,
       geometryEditorService,
+      geometryTransformService,
       undoRedoService,
       materialService,
+      uiCustomizationService,
+      decalService,
+      zipExportService,
+      dataUrlConverter,
+      zipImportService,
       stateNotifier,
     };
   };
@@ -78,6 +106,7 @@ describe("AppController", () => {
       editorModeService,
       selectionService,
       geometryEditorService,
+      geometryTransformService,
       undoRedoService,
       materialService,
       stateNotifier,
@@ -89,8 +118,10 @@ describe("AppController", () => {
     expect(appController.getEditorModeService()).toBe(editorModeService);
     expect(appController.getSelectionService()).toBe(selectionService);
     expect(appController.getGeometryEditorService()).toBe(geometryEditorService);
+    expect(appController.getGeometryTransformService()).toBe(geometryTransformService);
     expect(appController.getUndoRedoService()).toBe(undoRedoService);
     expect(appController.getMaterialService()).toBe(materialService);
+    expect(appController.getZipImportService()).toBeDefined();
     expect(appController.getStateNotifier()).toBe(stateNotifier);
   });
 
@@ -1352,6 +1383,156 @@ describe("AppController", () => {
       appController.rotateCamera(0.2, 0.3);
       expect(cameraStateService.isOrthographic()).toBe(false);
       expect(appController.isDecalSelected()).toBe(false);
+    });
+  });
+
+  describe("ZIP Import", () => {
+    it("should import zip archive containing obj, mtl, and images and restore materials, model, and decals", () => {
+      const { appController, materialService, modelService } = createController();
+
+      const encodeText = (t: string) => new TextEncoder().encode(t);
+      const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]);
+
+      const objContent = `
+        o MainModel
+        g MainModel
+        v 0 0 0
+        v 1 0 0
+        v 1 1 0
+        v 0 1 0
+        f 1 2 3 4
+
+        o Decal_test_decal
+        g Decal_test_decal
+        usemtl DecalMat
+        v 0.2 0.2 0.01
+        v 0.8 0.2 0.01
+        v 0.8 0.8 0.01
+        v 0.2 0.8 0.01
+        f 5/1 6/2 7/3 8/4
+      `;
+
+      const mtlContent = `
+        newmtl DecalMat
+        map_Kd logo.png
+      `;
+
+      const zipBytes = zipSync({
+        "model.obj": encodeText(objContent),
+        "model.mtl": encodeText(mtlContent),
+        "logo.png": pngBytes,
+      });
+
+      appController.importZip(zipBytes, "test_model.zip");
+
+      // Verify model was loaded
+      const model = modelService.getCurrentModel();
+      expect(model.getVertexCount()).toBe(4);
+      expect(model.getFaceCount()).toBe(1);
+
+      // Verify materials were loaded and linked to image data URL
+      const materials = materialService.getMaterials();
+      const decalMat = materials.find((m) => m.name === "DecalMat");
+      expect(decalMat).toBeDefined();
+      expect(decalMat?.imageUrl).toContain("data:image/png;base64,");
+
+      // Verify decals were restored
+      const decals = appController.getDecals();
+      expect(decals.length).toBe(1);
+      expect(decals[0]?.id).toBe("Decal_test_decal");
+      expect(decals[0]?.materialId).toBe(decalMat?.id);
+    });
+
+    it("should emit error notification when importing invalid zip", () => {
+      const { appController, stateNotifier } = createController();
+      const errorListener = vi.fn();
+      stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+
+      appController.importZip(new Uint8Array([0, 0, 0, 0]), "corrupt.zip");
+      expect(errorListener).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to extract ZIP archive")
+      );
+    });
+  });
+
+  describe("getVisibleVertexIndices", () => {
+    it("should return null when camera is in perspective mode", () => {
+      const { appController, cameraStateService } = createController();
+      expect(cameraStateService.isOrthographic()).toBe(false);
+      appController.selectSingleVertex(0);
+
+      expect(appController.getVisibleVertexIndices()).toBeNull();
+    });
+
+    it("should return null when camera is in orthographic mode but no vertex is selected", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.clearSelection();
+
+      expect(appController.getVisibleVertexIndices()).toBeNull();
+    });
+
+    it("should return coplanar vertex indices when camera is in orthographic mode and a vertex is selected", () => {
+      const { appController, modelService } = createController();
+      // Default cube has vertices at Z = -1 and Z = 1
+      appController.selectOrthographicView("+Z"); // Grid plane is XY, depth axis is Z
+
+      // Select vertex 0 (cube front face, Z = 1)
+      appController.selectSingleVertex(0);
+
+      const visible = appController.getVisibleVertexIndices();
+      expect(visible).not.toBeNull();
+      // Only vertices with Z matching vertex 0 should be returned (4 vertices of that face)
+      const currentModel = modelService.getCurrentModel();
+      const selectedZ = currentModel.vertices[0]?.coordinateZ;
+      for (const idx of visible!) {
+        expect(currentModel.vertices[idx]?.coordinateZ).toBeCloseTo(selectedZ!, 4);
+      }
+    });
+
+    it("should use selectedIndices if activeVertex is null but vertices are selected", () => {
+      const { appController, selectionService } = createController();
+      appController.selectOrthographicView("+Y"); // Grid plane is XZ, depth axis is Y
+
+      // Restore selection without active vertex index
+      selectionService.restoreSelection([0], null);
+
+      const visible = appController.getVisibleVertexIndices();
+      expect(visible).not.toBeNull();
+    });
+  });
+
+  describe("UI Customization", () => {
+    it("should get and set edge line width", () => {
+      const { appController } = createController();
+
+      expect(appController.getEdgeLineWidth()).toBe(2);
+
+      appController.setEdgeLineWidth(6);
+      expect(appController.getEdgeLineWidth()).toBe(6);
+    });
+
+    it("should save UI customization with edge line width", () => {
+      const { appController, uiCustomizationService, materialService } =
+        createController();
+
+      appController.saveUiCustomization("left", "left", 4);
+
+      expect(appController.getEdgeLineWidth()).toBe(4);
+      expect(uiCustomizationService.getSideToolBarDock()).toBe("left");
+      expect(uiCustomizationService.getMaterialLibraryDock()).toBe("left");
+      expect(materialService.getDockSide()).toBe("left");
+    });
+
+    it("should save UI customization preserving edge line width when omitted", () => {
+      const { appController, uiCustomizationService } = createController();
+
+      appController.setEdgeLineWidth(5);
+      appController.saveUiCustomization("left", "left");
+
+      expect(appController.getEdgeLineWidth()).toBe(5);
+      expect(uiCustomizationService.getSideToolBarDock()).toBe("left");
+      expect(uiCustomizationService.getMaterialLibraryDock()).toBe("left");
     });
   });
 });

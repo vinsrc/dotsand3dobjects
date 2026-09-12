@@ -32,11 +32,16 @@ describe("CameraStateService", () => {
     expect(cameraService.getAzimuth()).toBe(0);
     expect(cameraService.getElevation()).toBeCloseTo(Math.PI / 2 - 0.01, 5);
 
+    // Switching directly to -Y preserves the -Z up direction from +Y, setting azimuth to PI
     cameraService.setOrthographicAxis("-Y");
     expect(cameraService.isOrthographic()).toBe(true);
     expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("-Y");
-    expect(cameraService.getAzimuth()).toBe(0);
+    expect(cameraService.getAzimuth()).toBe(Math.PI);
     expect(cameraService.getElevation()).toBeCloseTo(-Math.PI / 2 + 0.01, 5);
+
+    // Explicit +Z up vector for -Y sets azimuth to 0
+    cameraService.setOrthographicAxis("-Y", new Vector3D(0, 0, 1));
+    expect(cameraService.getAzimuth()).toBe(0);
 
     cameraService.setOrthographicAxis("+Z");
     expect(cameraService.getAzimuth()).toBe(0);
@@ -172,4 +177,45 @@ describe("CameraStateService", () => {
     expect(cameraService.isFaceOrthographicView()).toBe(false);
     expect(cameraService.getActiveFaceIndex()).toBeNull();
   });
+
+  it("should preserve closest up direction when switching to +Y from rotated perspective view", () => {
+    const factory = new OrthographicViewStrategyFactory();
+    const cameraService = new CameraStateService(factory);
+
+    // Orbit to azimuth near PI (viewing from -Z towards +Z) with high elevation (looking down)
+    // From this perspective, +Z is pointing towards screen up.
+    cameraService.orbit(Math.PI * 0.75, Math.PI / 4);
+
+    // Switch to orthographic +Y view (e.g. via gizmo or double click)
+    cameraService.setOrthographicAxis("+Y");
+
+    // Camera up direction should be +Z, not flipped to -Z
+    expect(cameraService.getActiveStrategy().getUpDirection()).toEqual(
+      new Vector3D(0, 0, 1)
+    );
+    expect(cameraService.getAzimuth()).toBeCloseTo(Math.PI, 2);
+  });
+
+  it("should preserve closest up direction when double clicking / setting face orthographic view on XZ face", () => {
+    const factory = new OrthographicViewStrategyFactory();
+    const cameraService = new CameraStateService(factory);
+
+    // Orbit so that user is viewing upright with +Z up
+    cameraService.orbit(Math.PI * 0.75, Math.PI / 4);
+
+    // Double click horizontal face (normal = (0, 1, 0))
+    cameraService.setFaceOrthographicView(1, new Vector3D(0, 1, 0));
+
+    expect(cameraService.getActiveStrategy().getUpDirection()).toEqual(
+      new Vector3D(0, 0, 1)
+    );
+    expect(cameraService.getAzimuth()).toBeCloseTo(Math.PI, 2);
+
+    // Face pointing down along -Y
+    cameraService.setFaceOrthographicView(2, new Vector3D(0, -1, 0));
+    expect(cameraService.getActiveStrategy().getUpDirection()).toEqual(
+      new Vector3D(0, 0, 1)
+    );
+  });
 });
+

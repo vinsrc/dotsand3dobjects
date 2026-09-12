@@ -38,4 +38,20 @@ export class DataUrlConverter {
       return new TextEncoder().encode(textContent);
     }
   }
+
+  public toDataUrl(bytes: Uint8Array, mimeType: string = "image/png"): string {
+    let base64: string;
+    if (typeof Buffer !== "undefined") {
+      base64 = Buffer.from(bytes).toString("base64");
+    } else {
+      let binary = "";
+      const len = bytes.byteLength;
+      for (let index = 0; index < len; index += 8192) {
+        const chunk = bytes.subarray(index, Math.min(index + 8192, len));
+        binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+      }
+      base64 = btoa(binary);
+    }
+    return `data:${mimeType};base64,${base64}`;
+  }
 }

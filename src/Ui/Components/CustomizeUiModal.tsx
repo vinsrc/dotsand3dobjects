@@ -18,12 +18,14 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
   const [sideToolBarDock, setSideToolBarDock] = useState<DockSide>("right");
   const [materialLibraryDock, setMaterialLibraryDock] =
     useState<DockSide>("right");
+  const [edgeLineWidth, setEdgeLineWidth] = useState<number>(2);
 
   useEffect(() => {
     if (isOpen) {
       const settings = customizationService.getSettings();
       setSideToolBarDock(settings.sideToolBarDock);
       setMaterialLibraryDock(settings.materialLibraryDock);
+      setEdgeLineWidth(settings.edgeLineWidth ?? 2);
     }
   }, [isOpen, customizationService]);
 
@@ -45,7 +47,11 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
   };
 
   const handleSave = () => {
-    controller.saveUiCustomization(sideToolBarDock, materialLibraryDock);
+    controller.saveUiCustomization(
+      sideToolBarDock,
+      materialLibraryDock,
+      edgeLineWidth
+    );
     onClose();
   };
 
@@ -269,6 +275,62 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
                 onClick={() => setMaterialLibraryDock("right")}
               >
                 Right Side
+              </span>
+            </div>
+          </div>
+
+          {/* Edge Line Width Field */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "14px",
+                fontWeight: 600,
+                color: ThemeColors.textPrimary,
+              }}
+            >
+              Edge Line Width:
+            </span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <input
+                type="range"
+                min={1}
+                max={10}
+                step={1}
+                value={edgeLineWidth}
+                data-testid="edge-line-width-input"
+                onChange={(event) =>
+                  setEdgeLineWidth(Number(event.target.value))
+                }
+                style={{
+                  cursor: "pointer",
+                  width: "120px",
+                  accentColor: ThemeColors.accent,
+                }}
+                title={`Edge Line Width: ${edgeLineWidth}px`}
+              />
+              <span
+                data-testid="edge-line-width-value"
+                style={{
+                  fontSize: "13px",
+                  color: ThemeColors.textPrimary,
+                  minWidth: "30px",
+                  textAlign: "right",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {edgeLineWidth}px
               </span>
             </div>
           </div>

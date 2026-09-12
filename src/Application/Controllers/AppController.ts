@@ -23,8 +23,10 @@ import { DecalService } from "../Services/DecalService/DecalService";
 import { DecalPlane } from "../Services/DecalService/DecalPlane";
 import { ExportedImageFile } from "../Services/ModelService/ObjExporter";
 import { ZipExportService } from "../Services/ZipExportService/ZipExportService";
+import { ZipImportService } from "../Services/ZipExportService/ZipImportService";
 import { ZipFileEntry } from "../Services/ZipExportService/ZipFileEntry";
 import { DataUrlConverter } from "../Common/DataUrlConverter";
+import { GeometryTransformService } from "../Services/GeometryTransformService/GeometryTransformService";
 
 export class AppController {
   private readonly modelService: ModelService;
@@ -33,12 +35,14 @@ export class AppController {
   private readonly editorModeService: EditorModeService;
   private readonly selectionService: SelectionService;
   private readonly geometryEditorService: GeometryEditorService;
+  private readonly geometryTransformService: GeometryTransformService;
   private readonly undoRedoService: UndoRedoService;
   private readonly stateNotifier: ApplicationStateNotifier;
   private readonly materialService: MaterialService;
   private readonly uiCustomizationService: UiCustomizationService;
   private readonly decalService: DecalService;
   private readonly zipExportService: ZipExportService;
+  private readonly zipImportService: ZipImportService;
   private readonly dataUrlConverter: DataUrlConverter;
   private translationInitialModel: MeshGeometry | null = null;
   private rotationInitialModel: MeshGeometry | null = null;
@@ -55,13 +59,15 @@ export class AppController {
     editorModeService: EditorModeService,
     selectionService: SelectionService,
     geometryEditorService: GeometryEditorService,
+    geometryTransformService: GeometryTransformService,
     undoRedoService: UndoRedoService,
     stateNotifier: ApplicationStateNotifier,
     materialService: MaterialService,
-    uiCustomizationService?: UiCustomizationService,
-    decalService?: DecalService,
-    zipExportService?: ZipExportService,
-    dataUrlConverter?: DataUrlConverter
+    uiCustomizationService: UiCustomizationService,
+    decalService: DecalService,
+    zipExportService: ZipExportService,
+    dataUrlConverter: DataUrlConverter,
+    zipImportService: ZipImportService
   ) {
     this.modelService = modelService;
     this.cameraStateService = cameraStateService;
@@ -69,18 +75,23 @@ export class AppController {
     this.editorModeService = editorModeService;
     this.selectionService = selectionService;
     this.geometryEditorService = geometryEditorService;
+    this.geometryTransformService = geometryTransformService;
     this.undoRedoService = undoRedoService;
     this.stateNotifier = stateNotifier;
     this.materialService = materialService;
-    this.uiCustomizationService =
-      uiCustomizationService ?? new UiCustomizationService(stateNotifier);
-    this.decalService = decalService ?? new DecalService(stateNotifier);
-    this.zipExportService = zipExportService ?? new ZipExportService();
-    this.dataUrlConverter = dataUrlConverter ?? new DataUrlConverter();
+    this.uiCustomizationService = uiCustomizationService;
+    this.decalService = decalService;
+    this.zipExportService = zipExportService;
+    this.dataUrlConverter = dataUrlConverter;
+    this.zipImportService = zipImportService;
   }
 
   public getModelService(): ModelService {
     return this.modelService;
+  }
+
+  public getGeometryTransformService(): GeometryTransformService {
+    return this.geometryTransformService;
   }
 
   public getCameraStateService(): CameraStateService {
@@ -126,11 +137,17 @@ export class AppController {
         }
       }
 
-      this.modelService.loadFromObj(
+      const parsedResult = this.modelService.loadFromObj(
         fileContent,
         fileName,
         this.materialService.getMaterials()
       );
+
+      if (parsedResult.decals && parsedResult.decals.length > 0) {
+        this.decalService.restoreState(parsedResult.decals, null);
+      } else {
+        this.decalService.restoreState([], null);
+      }
 
       const currentModel = this.modelService.getCurrentModel();
       const existingMaterials = this.materialService.getMaterials();
@@ -272,6 +289,101 @@ export class AppController {
     return this.zipExportService.buildZip(zipEntries);
   }
 
+  public importZip(
+    zipData: Uint8Array | ArrayBuffer,
+    _fileName?: string
+  ): void {
+    try {
+      const buffer =
+        zipData instanceof Uint8Array ? zipData : new Uint8Array(zipData);
+      const extractedPackage = this.zipImportService.extract(buffer);
+
+      let loadedMaterials: Material3D[] = [];
+      if (extractedPackage.mtlContent) {
+        const parsed = this.modelService.parseMtl(extractedPackage.mtlContent);
+        loadedMaterials = parsed.map((mat) => {
+          const imageKey = mat.imageFileName ?? mat.imageUrl;
+          if (imageKey) {
+            const normalizedKey = imageKey.replace(/\\/g, "/");
+            const lastSlash = Math.max(normalizedKey.lastIndexOf("/"), -1);
+            const baseName = normalizedKey.substring(lastSlash + 1);
+            const foundImage =
+              extractedPackage.images.get(imageKey) ??
+              extractedPackage.images.get(normalizedKey) ??
+              extractedPackage.images.get(baseName) ??
+              extractedPackage.images.get(baseName.toLowerCase());
+            if (foundImage) {
+              return mat.withImage(foundImage.dataUrl, foundImage.fileName);
+            }
+          }
+          return mat;
+        });
+
+        if (loadedMaterials.length > 0) {
+          const firstId = loadedMaterials[0].id;
+          this.materialService.restoreMaterials(loadedMaterials, firstId);
+        }
+      }
+
+      const parsedResult = this.modelService.loadFromObj(
+        extractedPackage.objContent,
+        extractedPackage.objFileName,
+        this.materialService.getMaterials()
+      );
+
+      const currentModel = this.modelService.getCurrentModel();
+      const existingMaterials = this.materialService.getMaterials();
+      const existingIdSet = new Set(existingMaterials.map((m) => m.id));
+      const newlyDiscoveredMaterials: Material3D[] = [];
+
+      for (const face of currentModel.faces) {
+        if (face.materialId && !existingIdSet.has(face.materialId)) {
+          const placeholder = new Material3D({
+            id: face.materialId,
+            name: face.materialId,
+          });
+          existingIdSet.add(face.materialId);
+          newlyDiscoveredMaterials.push(placeholder);
+        }
+      }
+
+      if (newlyDiscoveredMaterials.length > 0) {
+        const combined = [...existingMaterials, ...newlyDiscoveredMaterials];
+        this.materialService.restoreMaterials(
+          combined,
+          this.materialService.getSelectedMaterialId() ?? combined[0].id
+        );
+      }
+
+      if (parsedResult.decals && parsedResult.decals.length > 0) {
+        this.decalService.restoreState(parsedResult.decals, null);
+      } else {
+        this.decalService.restoreState([], null);
+      }
+
+      const boundingRadius = this.modelService
+        .getCurrentModel()
+        .calculateBoundingRadius();
+      this.cameraStateService.fitToRadius(boundingRadius);
+      this.cameraStateService.setTargetPoint(
+        this.modelService.getCurrentModel().calculateCenter()
+      );
+      this.selectionService.clearSelection();
+      this.undoRedoService.clear();
+      this.stateNotifier.notify("VIEW_CHANGED");
+    } catch (caughtError) {
+      const errorMessage =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Failed to import ZIP archive";
+      this.stateNotifier.notify("ERROR_OCCURRED", errorMessage);
+    }
+  }
+
+  public getZipImportService(): ZipImportService {
+    return this.zipImportService;
+  }
+
   private shouldBundleImage(
     imageFile: ExportedImageFile,
     usedEntryNames: ReadonlySet<string>
@@ -334,13 +446,23 @@ export class AppController {
     return this.uiCustomizationService;
   }
 
+  public getEdgeLineWidth(): number {
+    return this.uiCustomizationService.getEdgeLineWidth();
+  }
+
+  public setEdgeLineWidth(lineWidth: number): void {
+    this.uiCustomizationService.setEdgeLineWidth(lineWidth);
+  }
+
   public saveUiCustomization(
     sideToolBarDock: DockSide,
-    materialLibraryDock: DockSide
+    materialLibraryDock: DockSide,
+    edgeLineWidth?: number
   ): void {
     this.uiCustomizationService.setCustomization(
       sideToolBarDock,
-      materialLibraryDock
+      materialLibraryDock,
+      edgeLineWidth
     );
     this.materialService.setDockSide(materialLibraryDock);
   }
@@ -843,7 +965,7 @@ export class AppController {
       .getGridPlane();
     const isSnapEnabled = this.editorModeService.isGridSnapEnabled();
 
-    this.geometryEditorService.applyTranslationFromInitial(
+    this.geometryTransformService.applyTranslationFromInitial(
       this.translationInitialModel,
       totalDragOffset,
       activeGridPlane,
@@ -905,7 +1027,7 @@ export class AppController {
     const viewDirection = activeStrategy.getViewDirection();
     const isSnapEnabled = this.editorModeService.isGridSnapEnabled();
 
-    this.geometryEditorService.applyRotationFromInitial(
+    this.geometryTransformService.applyRotationFromInitial(
       this.rotationInitialModel,
       angleRadians,
       activeGridPlane,
@@ -970,7 +1092,7 @@ export class AppController {
       this.scalingInitialDecals = this.decalService.getDecals();
     }
 
-    this.geometryEditorService.applyScaleFromInitial(
+    this.geometryTransformService.applyScaleFromInitial(
       this.scalingInitialModel,
       effectiveScale
     );
@@ -996,6 +1118,41 @@ export class AppController {
       }
     }
     return this.cameraStateService.getTargetPoint();
+  }
+
+  public getActivePlaneVertexIndices(): readonly number[] | null {
+    if (!this.cameraStateService.isOrthographic()) {
+      return null;
+    }
+
+    let activeVertexIndex = this.selectionService.getActiveVertex();
+    if (activeVertexIndex === null) {
+      const selectedIndices = this.selectionService.getSelectedIndices();
+      if (selectedIndices.length > 0) {
+        activeVertexIndex = selectedIndices[0] as number;
+      }
+    }
+
+    if (activeVertexIndex === null) {
+      return null;
+    }
+
+    const gridPlane = this.cameraStateService
+      .getActiveStrategy()
+      .getGridPlane();
+
+    if (gridPlane === "NONE") {
+      return null;
+    }
+
+    return this.geometryEditorService.getCoplanarVertexIndices(
+      activeVertexIndex,
+      gridPlane
+    );
+  }
+
+  public getVisibleVertexIndices(): readonly number[] | null {
+    return this.getActivePlaneVertexIndices();
   }
 
   public addVertexAtPosition(worldPosition: Vector3D): void {
@@ -1046,7 +1203,7 @@ export class AppController {
       );
     }
 
-    this.geometryEditorService.translateSelected(effectiveOffset);
+    this.geometryTransformService.translateSelected(effectiveOffset);
   }
 
   public insertVertexOnEdge(startVertexIndex: number, endVertexIndex: number): void {

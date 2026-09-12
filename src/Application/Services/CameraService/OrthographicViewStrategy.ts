@@ -4,12 +4,18 @@ import { GridPlaneType, IViewStrategy } from "./ViewStrategy";
 export type OrthographicAxis = "+X" | "-X" | "+Y" | "-Y" | "+Z" | "-Z";
 
 export class PositiveXViewStrategy implements IViewStrategy {
+  private readonly upDirection: Vector3D;
+
+  public constructor(upDirection: Vector3D = new Vector3D(0, 1, 0)) {
+    this.upDirection = upDirection;
+  }
+
   public getViewDirection(): Vector3D {
     return new Vector3D(1, 0, 0);
   }
 
   public getUpDirection(): Vector3D {
-    return new Vector3D(0, 1, 0);
+    return this.upDirection;
   }
 
   public isOrthographic(): boolean {
@@ -26,12 +32,18 @@ export class PositiveXViewStrategy implements IViewStrategy {
 }
 
 export class NegativeXViewStrategy implements IViewStrategy {
+  private readonly upDirection: Vector3D;
+
+  public constructor(upDirection: Vector3D = new Vector3D(0, 1, 0)) {
+    this.upDirection = upDirection;
+  }
+
   public getViewDirection(): Vector3D {
     return new Vector3D(-1, 0, 0);
   }
 
   public getUpDirection(): Vector3D {
-    return new Vector3D(0, 1, 0);
+    return this.upDirection;
   }
 
   public isOrthographic(): boolean {
@@ -48,12 +60,18 @@ export class NegativeXViewStrategy implements IViewStrategy {
 }
 
 export class PositiveYViewStrategy implements IViewStrategy {
+  private readonly upDirection: Vector3D;
+
+  public constructor(upDirection: Vector3D = new Vector3D(0, 0, -1)) {
+    this.upDirection = upDirection;
+  }
+
   public getViewDirection(): Vector3D {
     return new Vector3D(0, 1, 0);
   }
 
   public getUpDirection(): Vector3D {
-    return new Vector3D(0, 0, -1);
+    return this.upDirection;
   }
 
   public isOrthographic(): boolean {
@@ -70,12 +88,18 @@ export class PositiveYViewStrategy implements IViewStrategy {
 }
 
 export class NegativeYViewStrategy implements IViewStrategy {
+  private readonly upDirection: Vector3D;
+
+  public constructor(upDirection: Vector3D = new Vector3D(0, 0, 1)) {
+    this.upDirection = upDirection;
+  }
+
   public getViewDirection(): Vector3D {
     return new Vector3D(0, -1, 0);
   }
 
   public getUpDirection(): Vector3D {
-    return new Vector3D(0, 0, 1);
+    return this.upDirection;
   }
 
   public isOrthographic(): boolean {
@@ -92,12 +116,18 @@ export class NegativeYViewStrategy implements IViewStrategy {
 }
 
 export class PositiveZViewStrategy implements IViewStrategy {
+  private readonly upDirection: Vector3D;
+
+  public constructor(upDirection: Vector3D = new Vector3D(0, 1, 0)) {
+    this.upDirection = upDirection;
+  }
+
   public getViewDirection(): Vector3D {
     return new Vector3D(0, 0, 1);
   }
 
   public getUpDirection(): Vector3D {
-    return new Vector3D(0, 1, 0);
+    return this.upDirection;
   }
 
   public isOrthographic(): boolean {
@@ -114,12 +144,18 @@ export class PositiveZViewStrategy implements IViewStrategy {
 }
 
 export class NegativeZViewStrategy implements IViewStrategy {
+  private readonly upDirection: Vector3D;
+
+  public constructor(upDirection: Vector3D = new Vector3D(0, 1, 0)) {
+    this.upDirection = upDirection;
+  }
+
   public getViewDirection(): Vector3D {
     return new Vector3D(0, 0, -1);
   }
 
   public getUpDirection(): Vector3D {
-    return new Vector3D(0, 1, 0);
+    return this.upDirection;
   }
 
   public isOrthographic(): boolean {
@@ -136,20 +172,23 @@ export class NegativeZViewStrategy implements IViewStrategy {
 }
 
 export class OrthographicViewStrategyFactory {
-  public createStrategy(axisIdentifier: OrthographicAxis): IViewStrategy {
+  public createStrategy(
+    axisIdentifier: OrthographicAxis,
+    upDirection?: Vector3D
+  ): IViewStrategy {
     switch (axisIdentifier) {
       case "+X":
-        return new PositiveXViewStrategy();
+        return new PositiveXViewStrategy(upDirection);
       case "-X":
-        return new NegativeXViewStrategy();
+        return new NegativeXViewStrategy(upDirection);
       case "+Y":
-        return new PositiveYViewStrategy();
+        return new PositiveYViewStrategy(upDirection);
       case "-Y":
-        return new NegativeYViewStrategy();
+        return new NegativeYViewStrategy(upDirection);
       case "+Z":
-        return new PositiveZViewStrategy();
+        return new PositiveZViewStrategy(upDirection);
       case "-Z":
-        return new NegativeZViewStrategy();
+        return new NegativeZViewStrategy(upDirection);
     }
   }
 }

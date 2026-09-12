@@ -64,6 +64,9 @@ export class ObjExporter {
     const faceEdgeKeySet = new Set<string>();
     let activeMaterialId: string | null = null;
 
+    outputLines.push("o MainModel");
+    outputLines.push("g MainModel");
+
     for (const currentFace of meshGeometry.faces) {
       if (hasAssignedMaterials) {
         const faceMatId = currentFace.materialId;
@@ -117,6 +120,7 @@ export class ObjExporter {
         const v2 = startVertexIdx + 3;
         const v3 = startVertexIdx + 4;
 
+        outputLines.push(`o ${decal.id}`);
         outputLines.push(`g ${decal.id}`);
 
         if (hasAssignedMaterials) {

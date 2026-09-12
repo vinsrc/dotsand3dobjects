@@ -71,9 +71,19 @@ export class CameraStateService {
     return this.elevationRadians;
   }
 
-  public setOrthographicAxis(axisIdentifier: OrthographicAxis): void {
-    this.currentStrategy =
-      this.strategyFactory.createStrategy(axisIdentifier);
+  public setOrthographicAxis(
+    axisIdentifier: OrthographicAxis,
+    customUp?: Vector3D
+  ): void {
+    const currentUp = this.currentStrategy.getUpDirection();
+    const upDirection =
+      customUp ??
+      this.viewSelector.findClosestUpDirection(axisIdentifier, currentUp);
+
+    this.currentStrategy = this.strategyFactory.createStrategy(
+      axisIdentifier,
+      upDirection
+    );
 
     switch (axisIdentifier) {
       case "+X":
@@ -84,14 +94,24 @@ export class CameraStateService {
         this.azimuthRadians = -Math.PI / 2;
         this.elevationRadians = 0;
         break;
-      case "+Y":
-        this.azimuthRadians = 0;
+      case "+Y": {
+        const rawAzimuth = Math.atan2(
+          -upDirection.coordinateX,
+          -upDirection.coordinateZ
+        );
+        this.azimuthRadians = this.normalizeAzimuth(rawAzimuth);
         this.elevationRadians = Math.PI / 2 - 0.01;
         break;
-      case "-Y":
-        this.azimuthRadians = 0;
+      }
+      case "-Y": {
+        const rawAzimuth = Math.atan2(
+          upDirection.coordinateX,
+          upDirection.coordinateZ
+        );
+        this.azimuthRadians = this.normalizeAzimuth(rawAzimuth);
         this.elevationRadians = -Math.PI / 2 + 0.01;
         break;
+      }
       case "+Z":
         this.azimuthRadians = 0;
         this.elevationRadians = 0;
@@ -113,9 +133,19 @@ export class CameraStateService {
   public setFaceOrthographicView(
     faceIndex: number,
     faceNormal: Vector3D,
-    faceCenter?: Vector3D
+    faceCenter?: Vector3D,
+    customUp?: Vector3D
   ): void {
-    const strategy = new FaceOrthographicViewStrategy(faceIndex, faceNormal);
+    const currentUp = this.currentStrategy.getUpDirection();
+    const bestUpDirection =
+      customUp ??
+      this.viewSelector.findClosestFaceUpDirection(faceNormal, currentUp);
+
+    const strategy = new FaceOrthographicViewStrategy(
+      faceIndex,
+      faceNormal,
+      bestUpDirection
+    );
     this.currentStrategy = strategy;
     if (faceCenter) {
       this.targetPoint = faceCenter;
@@ -130,7 +160,29 @@ export class CameraStateService {
         normal.coordinateX,
         normal.coordinateZ
       );
+    } else if (normal.coordinateY > 0) {
+      const rawAzimuth = Math.atan2(
+        -bestUpDirection.coordinateX,
+        -bestUpDirection.coordinateZ
+      );
+      this.azimuthRadians = this.normalizeAzimuth(rawAzimuth);
+    } else {
+      const rawAzimuth = Math.atan2(
+        bestUpDirection.coordinateX,
+        bestUpDirection.coordinateZ
+      );
+      this.azimuthRadians = this.normalizeAzimuth(rawAzimuth);
     }
+  }
+
+  private normalizeAzimuth(rawAzimuth: number): number {
+    if (Math.abs(rawAzimuth) < 1e-10) {
+      return 0;
+    }
+    if (Math.abs(rawAzimuth - (-Math.PI)) < 1e-10) {
+      return Math.PI;
+    }
+    return rawAzimuth;
   }
 
   public orbit(deltaAzimuth: number, deltaElevation: number): void {

@@ -131,9 +131,50 @@ add a new file menu item, Export as Zip. it should compress the wavefront obj fi
 
 add a new file menu item, Import as Zip. the zip file will have the obj, mtl and texture files.
 
+# Confusing Vertex Selection In Insert Mode
 
 In insert mode, adding a new vertex when another vertex is already selected , adds the new vertex in the same plane as the already selected vertex. this is an existing functionality. but in orthographic view,  if there is vertex right behind the point where the new vertex is going to be added, the vertex in the background is getting selected instead.  this stops user from adding vertex in the desired plane.   so if a vertex is already selected, show only the vertices in the currently selected plane. 
 
 for example, if im looking at XZ plane,  looking thru Y axis. if i want to add a vertex at X=3,Z=4, and if  a vertex is selected which is at Y=5,  then current functionality adds the new vertex at X=3,Z=4, Y=5. it takes Y from selected vertex.  but lets say there is a vertex at X=3,Z=4, Y=10.  this directly aligns with the new vertex position in orthographic view. if i click at X=3,Z=4, the vertex at  Y=10 gets selected instead of adding a new vertex at Y=5.  To avoid this issue,  when an vertex is selected, all vertices in planes behind or before gets hidden Y <> 5, only the Y=5 plane and its vertices are shown. then the user can add new vertices in XZ plane without accidentally clicking other vertices directly behind or infront of it.
 
-tell me if you understood the problem. 
+## Breakdown of the Issue
+
+1. **Orthographic Projection & Coincident Screen Coordinates**:
+   - In an orthographic view (e.g., looking along the **Y** axis onto the **XZ** plane), 3D points project flatly: two vertices with the same \((X, Z)\) coordinates but different depth values (e.g., \(Y = 5\) vs. \(Y = 10\)) collapse onto the **exact same 2D screen position**.
+   - When a vertex at \(Y = 5\) is selected, the placement plane is anchored at \(Y = 5\) so any new vertex placed in empty space is correctly assigned \(Y = 5\).
+
+2. **The Raycasting Conflict**:
+   - When the user clicks at \((X = 3, Z = 4)\) intending to place a new vertex at \((3, 5, 4)\), the viewport raycaster / hit-tester checks against *all* vertices in the model.
+   - Because a vertex already exists at \((3, 10, 4)\) (or any other \(Y \neq 5\)), it directly aligns with the cursor position. The raycaster detects this existing vertex and selects it (or connects to it) rather than registering the click as empty space on the \(Y = 5\) plane.
+
+3. **The Solution**:
+   - When in an **orthographic view** and a **vertex is selected**:
+     - Identify the view axis (e.g., **Y** axis for top/bottom views, **X** for left/right, **Z** for front/back).
+     - Retrieve the selected vertex's coordinate along that axis (e.g., \(Y_{\text{selected}} = 5\)).
+     - **Active plane vertices**: Vertices on the active plane (\(Y = 5\)) remain fully visible (solid points) and interactable.
+     - **Inactive plane vertices**: Instead of hiding vertices on other planes (\(Y \neq 5\)), render them with a low-opacity outline (`opacity: 0.35`). This visually indicates to the user that those vertices reside on an inactive background plane without jarringly making geometry disappear.
+     - **Stop selection on inactive planes**: Inactive vertices are strictly excluded from raycasting and hit testing across all modes (`DEFAULT`, `MULTI_SELECT`, `INSERT`, `FILL`), preventing background vertices from intercepting clicks or getting accidentally selected.
+   - When no vertex is selected (or in perspective view), all vertices are active, solid, and interactable as usual.
+
+# Pan
+
+Add support for pan.  Two finger drag for panning the 3d view port in orthographic or perspective.  for desktop, right click and drag
+
+# Orient Orthographic view  closest to camera angle.
+
+When switching to an orthographic view (via canvas double-click, 3D gizmo, or face double-click):
+1. **Preserve Orientation in the Plane**:
+   - The view direction aligns with the target normal/axis (e.g. looking straight down $+Y$ or perpendicular to the face).
+   - The camera's **up vector** on that plane must be chosen to be **closest to the user's current screen-up direction** instead of a hardcoded default.
+2. **For Standard Principal Views (e.g. $+Y$ / $-Y$ / $\pm X$ / $\pm Z$)**:
+   - For an orthographic plane like **XZ**, the valid axis-aligned orientations are $+Z, -Z, +X, -X$.
+   - Select the candidate axis that has the greatest dot product with the current camera up vector (or current azimuth), so that:
+     - If the user was viewing with $-Z$ up, $-Z$ stays up.
+     - If the user was viewing with $+Z$ up, $+Z$ stays up.
+     - If viewing sideways ($+X$ or $-X$ up), that rotation is retained without flipping the image upside down.
+3. **For Face Orthographic Views**:
+   - Project the active camera's current `upDirection` onto the face's plane:
+     $$\vec{U}_{\text{projected}} = \vec{U}_{\text{current}} - (\vec{U}_{\text{current}} \cdot \vec{N})\vec{N}$$
+   - Pass this projected up vector (or the closest principal in-plane axis if snapping is desired) to [`FaceOrthographicViewStrategy`]rather than falling back to $(0, 0, -1)$.
+4. **Synchronize Angles**:
+   - Keep `azimuthRadians` and `elevationRadians` in [`CameraStateService`] aligned with the selected up vector so subsequent orbit interactions remain smooth and continuous.

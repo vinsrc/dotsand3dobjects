@@ -121,36 +121,6 @@ describe("GeometryEditorService", () => {
     expect(edgesAfterP3).toContainEqual([1, 2]);
   });
 
-  it("should translate selected vertices only", () => {
-    const { modelService, selectionService, editorService } = setupService();
-
-    // Start with 2 vertices: (0, 0, 0) and (2, 2, 2)
-    const vertices = [new Vector3D(0, 0, 0), new Vector3D(2, 2, 2)];
-    modelService.setCurrentModel(new MeshGeometry(vertices, []));
-
-    // Select vertex 0 only
-    selectionService.selectSingle(0);
-
-    editorService.translateSelected(new Vector3D(0, 3, 5));
-
-    const currentModel = modelService.getCurrentModel();
-    expect(currentModel.vertices[0].coordinateX).toBe(0);
-    expect(currentModel.vertices[0].coordinateY).toBe(3);
-    expect(currentModel.vertices[0].coordinateZ).toBe(5);
-
-    // Vertex 1 should be untouched
-    expect(currentModel.vertices[1].coordinateX).toBe(2);
-    expect(currentModel.vertices[1].coordinateY).toBe(2);
-    expect(currentModel.vertices[1].coordinateZ).toBe(2);
-  });
-
-  it("should do nothing when translating with empty selection", () => {
-    const { modelService, editorService } = setupService();
-    const beforeModel = modelService.getCurrentModel();
-    editorService.translateSelected(new Vector3D(1, 1, 1));
-    expect(modelService.getCurrentModel()).toBe(beforeModel);
-  });
-
   it("should insert vertex on edge, placing midpoint and splitting the edge", () => {
     const { modelService, selectionService, editorService } = setupService();
 
@@ -405,212 +375,59 @@ describe("GeometryEditorService", () => {
     expect(selectionService.getSelectedIndices()).toEqual([]);
   });
 
-  it("should do nothing in applyTranslationFromInitial if no vertices are selected", () => {
-    const { modelService, editorService } = setupService();
-    const initialModel = modelService.getCurrentModel();
-    editorService.applyTranslationFromInitial(
-      initialModel,
-      new Vector3D(1.5, 2.5, 3.5),
-      "XY",
-      true
-    );
-    expect(modelService.getCurrentModel()).toBe(initialModel);
-  });
+  describe("getCoplanarVertexIndices", () => {
+    it("should filter coplanar vertices along the Y depth axis for XZ grid plane", () => {
+      const { modelService, editorService } = setupService();
+      const testVertices = [
+        new Vector3D(1, 5, 2),  // index 0: Y = 5
+        new Vector3D(3, 5, 4),  // index 1: Y = 5
+        new Vector3D(1, 10, 2), // index 2: Y = 10
+        new Vector3D(3, -2, 4), // index 3: Y = -2
+        new Vector3D(0, 5.00005, 0), // index 4: within tolerance of 5
+      ];
+      modelService.setCurrentModel(new MeshGeometry(testVertices, []));
 
-  it("should translate selected vertices continuously when snapEnabled is false", () => {
-    const { modelService, selectionService, editorService } = setupService();
-    const initialModel = modelService.getCurrentModel();
-    selectionService.restoreSelection([0, 1], 0);
+      const coplanar = editorService.getCoplanarVertexIndices(0, "XZ");
+      expect(coplanar).toEqual([0, 1, 4]);
+    });
 
-    const initialPosZero = initialModel.vertices[0] as Vector3D;
-    const initialPosOne = initialModel.vertices[1] as Vector3D;
-    const continuousOffset = new Vector3D(0.33, 0.67, 0);
+    it("should filter coplanar vertices along the X depth axis for YZ grid plane", () => {
+      const { modelService, editorService } = setupService();
+      const testVertices = [
+        new Vector3D(7, 1, 2), // index 0: X = 7
+        new Vector3D(7, 3, 4), // index 1: X = 7
+        new Vector3D(0, 3, 4), // index 2: X = 0
+      ];
+      modelService.setCurrentModel(new MeshGeometry(testVertices, []));
 
-    editorService.applyTranslationFromInitial(
-      initialModel,
-      continuousOffset,
-      "XY",
-      false
-    );
+      const coplanar = editorService.getCoplanarVertexIndices(0, "YZ");
+      expect(coplanar).toEqual([0, 1]);
+    });
 
-    const updatedVertices = modelService.getCurrentModel().vertices;
-    expect(updatedVertices[0]?.coordinateX).toBeCloseTo(
-      initialPosZero.coordinateX + 0.33,
-      5
-    );
-    expect(updatedVertices[0]?.coordinateY).toBeCloseTo(
-      initialPosZero.coordinateY + 0.67,
-      5
-    );
-    expect(updatedVertices[1]?.coordinateX).toBeCloseTo(
-      initialPosOne.coordinateX + 0.33,
-      5
-    );
-    expect(updatedVertices[1]?.coordinateY).toBeCloseTo(
-      initialPosOne.coordinateY + 0.67,
-      5
-    );
-    // Unselected vertex 2 remains unchanged
-    expect(updatedVertices[2]?.coordinateX).toBe(
-      initialModel.vertices[2]?.coordinateX
-    );
-  });
+    it("should filter coplanar vertices along the Z depth axis for XY grid plane", () => {
+      const { modelService, editorService } = setupService();
+      const testVertices = [
+        new Vector3D(1, 2, -3), // index 0: Z = -3
+        new Vector3D(4, 5, 3),  // index 1: Z = 3
+        new Vector3D(0, 0, -3), // index 2: Z = -3
+      ];
+      modelService.setCurrentModel(new MeshGeometry(testVertices, []));
 
-  it("should translate selected vertices with grid snapping when snapEnabled is true using active vertex", () => {
-    const { modelService, selectionService, editorService } = setupService();
-    // Use an initial model with known integer coordinates
-    const testVertices = [
-      new Vector3D(1, 1, 0),
-      new Vector3D(2, 1, 0),
-      new Vector3D(3, 3, 0),
-    ];
-    const baseModel = new MeshGeometry(testVertices, []);
-    modelService.setCurrentModel(baseModel);
+      const coplanar = editorService.getCoplanarVertexIndices(0, "XY");
+      expect(coplanar).toEqual([0, 2]);
+    });
 
-    // Select vertex 0 and 1, with active vertex = 0
-    selectionService.restoreSelection([0, 1], 0);
+    it("should return all vertex indices when activeVertexIndex is invalid or gridPlane is NONE", () => {
+      const { modelService, editorService } = setupService();
+      const testVertices = [
+        new Vector3D(1, 2, 3),
+        new Vector3D(4, 5, 6),
+      ];
+      modelService.setCurrentModel(new MeshGeometry(testVertices, []));
 
-    // Drag offset moves vertex 0 candidate from (1, 1, 0) + (1.2, 0.8, 0) = (2.2, 1.8, 0) -> snaps to (2, 2, 0)
-    // Effective offset is (2, 2, 0) - (1, 1, 0) = (1, 1, 0)
-    editorService.applyTranslationFromInitial(
-      baseModel,
-      new Vector3D(1.2, 0.8, 0),
-      "XY",
-      true
-    );
-
-    const resultVertices = modelService.getCurrentModel().vertices;
-    expect(resultVertices[0]?.coordinateX).toBe(2);
-    expect(resultVertices[0]?.coordinateY).toBe(2);
-    expect(resultVertices[1]?.coordinateX).toBe(3);
-    expect(resultVertices[1]?.coordinateY).toBe(2);
-    // Unselected vertex 2 remains at (3, 3, 0)
-    expect(resultVertices[2]?.coordinateX).toBe(3);
-    expect(resultVertices[2]?.coordinateY).toBe(3);
-  });
-
-  it("should fallback to first selected vertex if active vertex is null or not in selection when snapEnabled is true", () => {
-    const { modelService, selectionService, editorService } = setupService();
-    const testVertices = [
-      new Vector3D(0, 0, 0),
-      new Vector3D(5, 5, 0),
-    ];
-    const baseModel = new MeshGeometry(testVertices, []);
-    modelService.setCurrentModel(baseModel);
-
-    // Select vertex 1, but active vertex is 0 (not in selection)
-    selectionService.restoreSelection([1], 0);
-
-    // Candidate for vertex 1: (5, 5, 0) + (0.9, 0.1, 0) = (5.9, 5.1, 0) -> snaps to (6, 5, 0)
-    // Effective offset: (1, 0, 0)
-    editorService.applyTranslationFromInitial(
-      baseModel,
-      new Vector3D(0.9, 0.1, 0),
-      "XY",
-      true
-    );
-
-    const resultVertices = modelService.getCurrentModel().vertices;
-    expect(resultVertices[1]?.coordinateX).toBe(6);
-    expect(resultVertices[1]?.coordinateY).toBe(5);
-  });
-
-  it("should apply rotation from initial model around center on specified plane", () => {
-    const { modelService, editorService } = setupService();
-    const testVertices = [
-      new Vector3D(1, 0, 0),
-      new Vector3D(-1, 0, 0),
-      new Vector3D(0, 1, 0),
-      new Vector3D(0, -1, 0),
-    ];
-    // Center is (0, 0, 0)
-    const baseModel = new MeshGeometry(testVertices, []);
-    modelService.setCurrentModel(baseModel);
-
-    // Rotate 90 degrees (pi / 2) on XY plane (axis: (0, 0, 1)) without snap
-    editorService.applyRotationFromInitial(
-      baseModel,
-      Math.PI / 2,
-      "XY",
-      false
-    );
-
-    const rotated = modelService.getCurrentModel().vertices;
-    expect(rotated[0]?.coordinateX).toBeCloseTo(0, 5);
-    expect(rotated[0]?.coordinateY).toBeCloseTo(1, 5);
-    expect(rotated[1]?.coordinateX).toBeCloseTo(0, 5);
-    expect(rotated[1]?.coordinateY).toBeCloseTo(-1, 5);
-  });
-
-  it("should snap rotation angle when snapEnabled is true", () => {
-    const { modelService, editorService } = setupService();
-    const testVertices = [
-      new Vector3D(1, 0, 0),
-      new Vector3D(-1, 0, 0),
-    ];
-    const baseModel = new MeshGeometry(testVertices, []);
-    modelService.setCurrentModel(baseModel);
-
-    // 16 degrees = 0.279 rad. Snap to 15 deg (pi / 12 = 0.2618 rad)
-    const angle16Deg = (16 * Math.PI) / 180;
-    editorService.applyRotationFromInitial(
-      baseModel,
-      angle16Deg,
-      "XY",
-      true
-    );
-
-    const expectedX = Math.cos(Math.PI / 12);
-    const expectedY = Math.sin(Math.PI / 12);
-    const rotated = modelService.getCurrentModel().vertices;
-    expect(rotated[0]?.coordinateX).toBeCloseTo(expectedX, 5);
-    expect(rotated[0]?.coordinateY).toBeCloseTo(expectedY, 5);
-  });
-
-  it("should rotate only selected vertices if vertices are selected", () => {
-    const { modelService, selectionService, editorService } = setupService();
-    const testVertices = [
-      new Vector3D(1, 0, 0),
-      new Vector3D(0, 1, 0),
-    ];
-    const baseModel = new MeshGeometry(testVertices, []);
-    modelService.setCurrentModel(baseModel);
-
-    // Select vertex 0 only
-    selectionService.selectSingle(0);
-
-    editorService.applyRotationFromInitial(
-      baseModel,
-      Math.PI / 2,
-      "XY",
-      false
-    );
-
-    const rotated = modelService.getCurrentModel().vertices;
-    // Vertex 0 rotated 90 degrees around center (0.5, 0.5, 0)
-    // Vertex 1 unselected, stays at (0, 1, 0)
-    expect(rotated[1]?.coordinateX).toBe(0);
-    expect(rotated[1]?.coordinateY).toBe(1);
-  });
-
-  it("should scale entire model uniformly around its center with applyScaleFromInitial", () => {
-    const { modelService, editorService } = setupService();
-    const testVertices = [
-      new Vector3D(-1, -1, -1),
-      new Vector3D(1, 1, 1),
-    ];
-    const baseModel = new MeshGeometry(testVertices, []);
-    modelService.setCurrentModel(baseModel);
-
-    // Center is (0, 0, 0), scale by factor 2
-    editorService.applyScaleFromInitial(baseModel, 2);
-
-    const scaled = modelService.getCurrentModel().vertices;
-    expect(scaled[0]?.coordinateX).toBeCloseTo(-2, 5);
-    expect(scaled[0]?.coordinateY).toBeCloseTo(-2, 5);
-    expect(scaled[0]?.coordinateZ).toBeCloseTo(-2, 5);
-    expect(scaled[1]?.coordinateX).toBeCloseTo(2, 5);
-    expect(scaled[1]?.coordinateY).toBeCloseTo(2, 5);
-    expect(scaled[1]?.coordinateZ).toBeCloseTo(2, 5);
+      expect(editorService.getCoplanarVertexIndices(-1, "XZ")).toEqual([0, 1]);
+      expect(editorService.getCoplanarVertexIndices(99, "XZ")).toEqual([0, 1]);
+      expect(editorService.getCoplanarVertexIndices(0, "NONE")).toEqual([0, 1]);
+    });
   });
 });

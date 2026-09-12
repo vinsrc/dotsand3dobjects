@@ -11,6 +11,7 @@ import { RenderModeService } from "./Services/RenderModeService/RenderModeServic
 import { EditorModeService } from "./Services/EditorModeService/EditorModeService";
 import { SelectionService } from "./Services/SelectionService/SelectionService";
 import { GeometryEditorService } from "./Services/GeometryEditorService/GeometryEditorService";
+import { GeometryTransformService } from "./Services/GeometryTransformService/GeometryTransformService";
 import { UndoRedoService } from "./Services/UndoRedoService/UndoRedoService";
 import { AppController } from "./Controllers/AppController";
 
@@ -18,6 +19,7 @@ import { MaterialService } from "./Services/MaterialService/MaterialService";
 import { UiCustomizationService } from "./Services/UiCustomizationService/UiCustomizationService";
 import { DecalService } from "./Services/DecalService/DecalService";
 import { ZipExportService } from "./Services/ZipExportService/ZipExportService";
+import { ZipImportService } from "./Services/ZipExportService/ZipImportService";
 import { DataUrlConverter } from "./Common/DataUrlConverter";
 
 export class AppBootstrapper {
@@ -29,11 +31,13 @@ export class AppBootstrapper {
     editorModeService: EditorModeService;
     selectionService: SelectionService;
     geometryEditorService: GeometryEditorService;
+    geometryTransformService: GeometryTransformService;
     undoRedoService: UndoRedoService;
     materialService: MaterialService;
     uiCustomizationService: UiCustomizationService;
     decalService: DecalService;
     zipExportService: ZipExportService;
+    zipImportService: ZipImportService;
     stateNotifier: ApplicationStateNotifier;
   } {
     const modelFactory = new ModelFactory();
@@ -64,12 +68,18 @@ export class AppBootstrapper {
       modelService,
       selectionService
     );
+    const geometryTransformService = new GeometryTransformService(
+      modelService,
+      selectionService,
+      geometryEditorService
+    );
     const undoRedoService = new UndoRedoService(stateNotifier);
     const materialService = new MaterialService(stateNotifier);
     const uiCustomizationService = new UiCustomizationService(stateNotifier);
     const decalService = new DecalService(stateNotifier);
     const zipExportService = new ZipExportService();
     const dataUrlConverter = new DataUrlConverter();
+    const zipImportService = new ZipImportService(dataUrlConverter);
 
     const appController = new AppController(
       modelService,
@@ -78,13 +88,15 @@ export class AppBootstrapper {
       editorModeService,
       selectionService,
       geometryEditorService,
+      geometryTransformService,
       undoRedoService,
       stateNotifier,
       materialService,
       uiCustomizationService,
       decalService,
       zipExportService,
-      dataUrlConverter
+      dataUrlConverter,
+      zipImportService
     );
 
     return {
@@ -95,11 +107,13 @@ export class AppBootstrapper {
       editorModeService,
       selectionService,
       geometryEditorService,
+      geometryTransformService,
       undoRedoService,
       materialService,
       uiCustomizationService,
       decalService,
       zipExportService,
+      zipImportService,
       stateNotifier,
     };
   }

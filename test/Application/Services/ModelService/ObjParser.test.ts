@@ -34,13 +34,14 @@ describe("ObjParser", () => {
       f 1 3 4
     `;
 
-    const mesh = objParser.parse(objData, "test.obj");
+    const { model: mesh, decals } = objParser.parse(objData, "test.obj");
     expect(mesh.getVertexCount()).toBe(4);
     expect(mesh.getFaceCount()).toBe(2);
     expect(mesh.vertices[0]?.coordinateX).toBe(0);
     expect(mesh.vertices[1]?.coordinateX).toBe(1);
     expect(mesh.faces[0]?.vertexIndices).toEqual([0, 1, 2]);
     expect(mesh.faces[1]?.vertexIndices).toEqual([0, 2, 3]);
+    expect(decals).toHaveLength(0);
   });
 
   it("should handle vertex texture and normal index formatting in faces (e.g. 1/1/1 or 1//1)", () => {
@@ -51,7 +52,7 @@ describe("ObjParser", () => {
       f 1/1/1 2/2/2 3/3/3
     `;
 
-    const mesh = objParser.parse(objData);
+    const { model: mesh } = objParser.parse(objData);
     expect(mesh.getVertexCount()).toBe(3);
     expect(mesh.getFaceCount()).toBe(1);
     expect(mesh.faces[0]?.vertexIndices).toEqual([0, 1, 2]);
@@ -65,7 +66,7 @@ describe("ObjParser", () => {
       f -3 -2 -1
     `;
 
-    const mesh = objParser.parse(objData);
+    const { model: mesh } = objParser.parse(objData);
     expect(mesh.getVertexCount()).toBe(3);
     expect(mesh.getFaceCount()).toBe(1);
     expect(mesh.faces[0]?.vertexIndices).toEqual([0, 1, 2]);
@@ -81,7 +82,7 @@ describe("ObjParser", () => {
       f notANumber
     `;
 
-    const mesh = objParser.parse(objData);
+    const { model: mesh } = objParser.parse(objData);
     expect(mesh.getVertexCount()).toBe(1);
     expect(mesh.getFaceCount()).toBe(0);
   });
@@ -95,7 +96,7 @@ describe("ObjParser", () => {
       l -3 -1
     `;
 
-    const mesh = objParser.parse(objData);
+    const { model: mesh } = objParser.parse(objData);
     expect(mesh.getVertexCount()).toBe(3);
     expect(mesh.explicitEdges.length).toBe(3); // (0,1), (1,2) from l 1 2 3, and (0,2) from l -3 -1
     expect(mesh.getWireframeEdges().length).toBe(3);
@@ -113,7 +114,7 @@ describe("ObjParser", () => {
       f 1 3 4
     `;
 
-    const mesh = objParser.parse(objData);
+    const { model: mesh } = objParser.parse(objData);
     expect(mesh.faces[0]?.materialId).toBe("WoodFloor");
     expect(mesh.faces[1]?.materialId).toBe("BrickWall");
   });
@@ -132,7 +133,45 @@ describe("ObjParser", () => {
       name: "Shiny Gold",
     } as any;
 
-    const mesh = objParser.parse(objData, "model.obj", [mockMaterial]);
+    const { model: mesh } = objParser.parse(objData, "model.obj", [mockMaterial]);
     expect(mesh.faces[0]?.materialId).toBe("mat_unique_123");
+  });
+
+  it("should parse decal objects and extract them as DecalPlane instances", () => {
+    const objData = `
+      # Base mesh
+      o MainModel
+      g MainModel
+      v 0 0 0
+      v 1 0 0
+      v 1 1 0
+      v 0 1 0
+      f 1 2 3 4
+
+      # Decal plane
+      o Decal_test_1
+      g Decal_test_1
+      usemtl Sticker_Mat
+      v 0.2 0.2 0.01
+      v 0.8 0.2 0.01
+      v 0.8 0.8 0.01
+      v 0.2 0.8 0.01
+      f 5/1 6/2 7/3 8/4
+    `;
+
+    const mockMaterial = {
+      id: "mat_sticker",
+      name: "Sticker Mat",
+    } as any;
+
+    const { model: mesh, decals } = objParser.parse(objData, "model.obj", [mockMaterial]);
+
+    expect(mesh.getVertexCount()).toBe(4);
+    expect(mesh.getFaceCount()).toBe(1);
+    expect(decals).toHaveLength(1);
+    expect(decals[0]?.id).toBe("Decal_test_1");
+    expect(decals[0]?.materialId).toBe("mat_sticker");
+    expect(decals[0]?.vertices).toHaveLength(4);
+    expect(decals[0]?.parentFaceIndex).toBe(0);
   });
 });

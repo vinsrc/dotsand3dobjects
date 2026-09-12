@@ -1,11 +1,12 @@
 import { MeshGeometry } from "./MeshGeometry";
 import { ModelFactory } from "./ModelFactory";
-import { ObjParser } from "./ObjParser";
+import { ObjParser, ParsedObjResult } from "./ObjParser";
 import { ObjExporter, ExportedImageFile } from "./ObjExporter";
 import { MtlParser } from "./MtlParser";
 import { Material3D } from "../MaterialService/Material3D";
 import { ApplicationStateNotifier } from "../../Common/ApplicationStateNotifier";
 import { DecalPlane } from "../DecalService/DecalPlane";
+import { Vector3D } from "../../Common/Vector3D";
 
 export class ModelService {
   private readonly modelFactory: ModelFactory;
@@ -49,15 +50,47 @@ export class ModelService {
     fileContent: string,
     fileName?: string,
     materials?: readonly Material3D[]
-  ): void {
+  ): ParsedObjResult {
     try {
-      const parsedGeometry = this.objParser.parse(
+      const parsedResult = this.objParser.parse(
         fileContent,
         fileName,
         materials
       );
-      this.currentModel = parsedGeometry.fitToDimension(2.0);
+
+      const boundingBox = parsedResult.model.calculateBoundingBox();
+      const extentX =
+        boundingBox.maximum.coordinateX - boundingBox.minimum.coordinateX;
+      const extentY =
+        boundingBox.maximum.coordinateY - boundingBox.minimum.coordinateY;
+      const extentZ =
+        boundingBox.maximum.coordinateZ - boundingBox.minimum.coordinateZ;
+      const currentMaxDimension = Math.max(extentX, extentY, extentZ);
+      const centerPoint = parsedResult.model.calculateCenter();
+      const centeringOffset = new Vector3D(
+        -centerPoint.coordinateX,
+        -centerPoint.coordinateY,
+        -centerPoint.coordinateZ
+      );
+      const scalingFactor =
+        currentMaxDimension > 0.000001 ? 2.0 / currentMaxDimension : 1.0;
+
+      this.currentModel = parsedResult.model.fitToDimension(2.0);
+
+      let fittedDecals = parsedResult.decals;
+      if (parsedResult.decals.length > 0) {
+        fittedDecals = parsedResult.decals.map((decal) =>
+          decal
+            .translate(centeringOffset)
+            .scale(scalingFactor, new Vector3D(0, 0, 0))
+        );
+      }
+
       this.stateNotifier.notify("MODEL_CHANGED", this.currentModel);
+      return {
+        model: this.currentModel,
+        decals: fittedDecals,
+      };
     } catch (parseError) {
       const errorMessage =
         parseError instanceof Error

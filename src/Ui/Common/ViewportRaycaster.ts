@@ -18,7 +18,8 @@ export class ViewportRaycaster {
     activeCamera: THREE.Camera,
     viewportWidth: number,
     viewportHeight: number,
-    tolerancePixels: number = 25
+    tolerancePixels: number = 25,
+    candidateIndices?: readonly number[] | null
   ): number | null {
     if (vertices.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) {
       return null;
@@ -28,7 +29,12 @@ export class ViewportRaycaster {
     let closestDistanceSquared = tolerancePixels * tolerancePixels;
     let closestNdcZ = 1.0;
 
-    for (let index = 0; index < vertices.length; index += 1) {
+    const indicesToIterate =
+      candidateIndices !== null && candidateIndices !== undefined
+        ? candidateIndices
+        : Array.from({ length: vertices.length }, (_, index) => index);
+
+    for (const index of indicesToIterate) {
       const vertex = vertices[index];
       if (!vertex) {
         continue;

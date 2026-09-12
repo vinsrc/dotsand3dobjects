@@ -8,6 +8,7 @@ import {
   PositiveZViewStrategy,
   NegativeZViewStrategy,
 } from "../../../../src/Application/Services/CameraService/OrthographicViewStrategy";
+import { Vector3D } from "../../../../src/Application/Common/Vector3D";
 
 describe("OrthographicViewStrategy", () => {
   const factory = new OrthographicViewStrategyFactory();
@@ -71,4 +72,16 @@ describe("OrthographicViewStrategy", () => {
     expect(strategy.getViewDirection().coordinateZ).toBe(-1);
     expect(strategy.getUpDirection().coordinateY).toBe(1);
   });
+
+  it("should support custom up directions across strategies", () => {
+    const customUpZ = factory.createStrategy("+Y", new Vector3D(0, 0, 1));
+    expect(customUpZ.getUpDirection()).toEqual(new Vector3D(0, 0, 1));
+
+    const customUpX = factory.createStrategy("+Y", new Vector3D(1, 0, 0));
+    expect(customUpX.getUpDirection()).toEqual(new Vector3D(1, 0, 0));
+
+    const customUpY = factory.createStrategy("+X", new Vector3D(0, -1, 0));
+    expect(customUpY.getUpDirection()).toEqual(new Vector3D(0, -1, 0));
+  });
 });
+

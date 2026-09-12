@@ -27,6 +27,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mtlFileInputRef = useRef<HTMLInputElement>(null);
+  const zipFileInputRef = useRef<HTMLInputElement>(null);
   const isWireframe = controller.getRenderModeService().isWireframe();
   const isMaterialPanelOpen = controller.isMaterialLibraryPanelOpen();
   const isFaceOrthographic = controller.isFaceOrthographicView();
@@ -144,6 +145,32 @@ export const ToolBar: React.FC<ToolBarProps> = ({
       controller.loadMaterialsFromFile(targetFile.name, fileContentString);
     };
     fileReader.readAsText(targetFile);
+  };
+
+  const handleImportZipClick = () => {
+    if (zipFileInputRef.current) {
+      zipFileInputRef.current.value = "";
+      zipFileInputRef.current.click();
+    }
+  };
+
+  const handleZipFileSelected = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const selectedFiles = event.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) {
+      return;
+    }
+    const targetFile = selectedFiles[0];
+    if (!targetFile) {
+      return;
+    }
+    const fileReader = new FileReader();
+    fileReader.onload = () => {
+      const arrayBuffer = fileReader.result as ArrayBuffer;
+      controller.importZip(arrayBuffer, targetFile.name);
+    };
+    fileReader.readAsArrayBuffer(targetFile);
   };
 
   const dataUrlToBlob = (dataUrl: string): Blob => {
@@ -289,9 +316,18 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           style={{ display: "none" }}
           onChange={handleMtlFileSelected}
         />
+        <input
+          ref={zipFileInputRef}
+          type="file"
+          accept=".zip"
+          data-testid="zip-file-input"
+          style={{ display: "none" }}
+          onChange={handleZipFileSelected}
+        />
         <FileMenu
           onLoadClick={handleLoadClick}
           onLoadMtlClick={handleLoadMtlClick}
+          onImportZipClick={handleImportZipClick}
           onExportClick={handleExportClick}
           onExportZipClick={handleExportZipClick}
           onCustomizeUiClick={onOpenCustomizeUi}
@@ -326,20 +362,6 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           <span>🎨</span>
           <span>Material Library</span>
         </button>
-        {(hasSelectedFace || isDecalSelected) && (
-          <button
-            data-testid="clear-material-button"
-            onClick={handleClearMaterial}
-            title="Clear material from selected face or decal"
-            style={{
-              ...buttonStyle,
-              backgroundColor: ThemeColors.widget,
-              color: ThemeColors.textPrimary,
-            }}
-          >
-            Clear Material
-          </button>
-        )}
         {onOpenHelp && (
           <button
             data-testid="help-button"
@@ -407,6 +429,21 @@ export const ToolBar: React.FC<ToolBarProps> = ({
             }}
           >
             Delete Decal Plane
+          </button>
+        )}
+
+        {(hasSelectedFace || isDecalSelected) && (
+          <button
+            data-testid="clear-material-button"
+            onClick={handleClearMaterial}
+            title="Clear material from selected face or decal"
+            style={{
+              ...buttonStyle,
+              backgroundColor: ThemeColors.widget,
+              color: ThemeColors.textPrimary,
+            }}
+          >
+            Clear Material
           </button>
         )}
 

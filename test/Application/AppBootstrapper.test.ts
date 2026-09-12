@@ -12,10 +12,12 @@ describe("AppBootstrapper", () => {
     expect(appComponents.editorModeService).toBeDefined();
     expect(appComponents.selectionService).toBeDefined();
     expect(appComponents.geometryEditorService).toBeDefined();
+    expect(appComponents.geometryTransformService).toBeDefined();
     expect(appComponents.materialService).toBeDefined();
     expect(appComponents.uiCustomizationService).toBeDefined();
     expect(appComponents.decalService).toBeDefined();
     expect(appComponents.zipExportService).toBeDefined();
+    expect(appComponents.zipImportService).toBeDefined();
     expect(appComponents.stateNotifier).toBeDefined();
 
     expect(appComponents.modelService.getCurrentModel().isEmpty()).toBe(false);

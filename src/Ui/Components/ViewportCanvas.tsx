@@ -10,6 +10,18 @@ import { ThemeColors } from "../Common/Theme";
 import { RotateOverlay } from "./RotateOverlay";
 import { ScaleOverlay } from "./ScaleOverlay";
 
+const calculatePanFactor = (
+  cameraDistance: number,
+  containerHeight: number,
+  isOrthographic: boolean
+): number => {
+  const safeHeight = containerHeight > 0 ? containerHeight : 600;
+  if (isOrthographic) {
+    return cameraDistance / safeHeight;
+  }
+  return (2 * cameraDistance * Math.tan((45 * Math.PI / 180) / 2)) / safeHeight;
+};
+
 export const ViewportCanvas: React.FC = () => {
   const controller = useAppController();
   useApplicationState([
@@ -44,6 +56,8 @@ export const ViewportCanvas: React.FC = () => {
   const lastDoubleActionTimeRef = useRef<number>(0);
   const pendingErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchDoubleTapRef = useRef<boolean>(false);
+  const isRightClickPanningRef = useRef<boolean>(false);
+  const lastMultiTouchTimeRef = useRef<number>(0);
 
   const findHitDecal = (clickX: number, clickY: number): string | null => {
     if (!rendererRef.current || !canvasRef.current) {
@@ -148,8 +162,19 @@ export const ViewportCanvas: React.FC = () => {
     const initialWidth = targetContainer.clientWidth || 800;
     const initialHeight = targetContainer.clientHeight || 600;
 
-    const viewportRenderer = new ViewportRenderer(targetCanvas);
+    const viewportRenderer = new ViewportRenderer(
+      targetCanvas,
+      controller.getEdgeLineWidth()
+    );
     rendererRef.current = viewportRenderer;
+    (targetCanvas as unknown as {
+      __appController?: typeof controller;
+      __viewportRenderer?: ViewportRenderer;
+    }).__appController = controller;
+    (targetCanvas as unknown as {
+      __appController?: typeof controller;
+      __viewportRenderer?: ViewportRenderer;
+    }).__viewportRenderer = viewportRenderer;
 
     viewportRenderer.resize(initialWidth, initialHeight);
     viewportRenderer.updateMaterials(
@@ -175,7 +200,8 @@ export const ViewportCanvas: React.FC = () => {
     viewportRenderer.updateSelection(
       controller.getSelectionService().getSelectedIndices(),
       controller.getSelectionService().getActiveVertex(),
-      controller.getSelectionService().getSelectedFaceIndices()
+      controller.getSelectionService().getSelectedFaceIndices(),
+      controller.getVisibleVertexIndices()
     );
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -188,7 +214,8 @@ export const ViewportCanvas: React.FC = () => {
           viewportRenderer.updateCamera(
             controller.getCameraStateService(),
             measuredWidth,
-            measuredHeight
+            measuredHeight,
+            controller.getVisibleVertexIndices()
           );
         }
       }
@@ -204,7 +231,8 @@ export const ViewportCanvas: React.FC = () => {
             : controller.getModelService().getCurrentModel();
         viewportRenderer.updateModel(
           currentModel,
-          controller.getMaterialService().getMaterials()
+          controller.getMaterialService().getMaterials(),
+          controller.getVisibleVertexIndices()
         );
       }
     );
@@ -240,7 +268,8 @@ export const ViewportCanvas: React.FC = () => {
         viewportRenderer.updateCamera(
           controller.getCameraStateService(),
           currentWidth,
-          currentHeight
+          currentHeight,
+          controller.getVisibleVertexIndices()
         );
       }
     );
@@ -258,7 +287,8 @@ export const ViewportCanvas: React.FC = () => {
         viewportRenderer.updateSelection(
           controller.getSelectionService().getSelectedIndices(),
           controller.getSelectionService().getActiveVertex(),
-          selectedFaceIndices
+          selectedFaceIndices,
+          controller.getVisibleVertexIndices()
         );
       }
     );
@@ -274,6 +304,13 @@ export const ViewportCanvas: React.FC = () => {
       }
     );
 
+    const unsubscribeUiCustomization = controller.getStateNotifier().subscribe(
+      "UI_CUSTOMIZATION_CHANGED",
+      () => {
+        viewportRenderer.setEdgeLineWidth(controller.getEdgeLineWidth());
+      }
+    );
+
     return () => {
       if (pendingErrorTimerRef.current !== null) {
         clearTimeout(pendingErrorTimerRef.current);
@@ -285,6 +322,8 @@ export const ViewportCanvas: React.FC = () => {
       unsubscribeView();
       unsubscribeSelection();
       unsubscribeDecals();
+      unsubscribeUiCustomization();
+      delete (targetCanvas as unknown as { __viewportRenderer?: ViewportRenderer }).__viewportRenderer;
       resizeObserver.disconnect();
       viewportRenderer.dispose();
       rendererRef.current = null;
@@ -302,6 +341,7 @@ export const ViewportCanvas: React.FC = () => {
 
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     if (event.touches.length === 2) {
+      lastMultiTouchTimeRef.current = Date.now();
       const touch1 = event.touches[0];
       const touch2 = event.touches[1];
       if (touch1 && touch2) {
@@ -313,6 +353,10 @@ export const ViewportCanvas: React.FC = () => {
           x: (touch1.clientX + touch2.clientX) / 2,
           y: (touch1.clientY + touch2.clientY) / 2,
         };
+        isDraggingRef.current = false;
+        pointerDownPosRef.current = null;
+        dragStartWorldPosRef.current = null;
+        lastDragWorldPosRef.current = null;
       }
     }
   };
@@ -323,6 +367,7 @@ export const ViewportCanvas: React.FC = () => {
       touchDistanceRef.current !== null &&
       touchMidpointRef.current !== null
     ) {
+      lastMultiTouchTimeRef.current = Date.now();
       event.preventDefault();
       const touch1 = event.touches[0];
       const touch2 = event.touches[1];
@@ -348,27 +393,51 @@ export const ViewportCanvas: React.FC = () => {
             controller.zoomOut();
           }
           touchDistanceRef.current = currentDistance;
+          touchMidpointRef.current = currentMidpoint;
         } else if (Math.hypot(deltaMidpointX, deltaMidpointY) > 3) {
           // Double finger drag pan
           const container = containerRef.current;
           const containerHeight = container ? container.clientHeight : 600;
-          const cameraDistance = controller.getCameraStateService().getCameraDistance();
-          const panFactor = cameraDistance / containerHeight;
+          const cameraService = controller.getCameraStateService();
+          const panFactor = calculatePanFactor(
+            cameraService.getCameraDistance(),
+            containerHeight,
+            cameraService.isOrthographic()
+          );
 
-          controller.panCamera(-deltaMidpointX * panFactor, deltaMidpointY * panFactor);
+          controller.panCamera(deltaMidpointX * panFactor, deltaMidpointY * panFactor);
           touchMidpointRef.current = currentMidpoint;
+          touchDistanceRef.current = currentDistance;
         }
       }
     }
   };
 
   const handleTouchEnd = () => {
+    lastMultiTouchTimeRef.current = Date.now();
     touchDistanceRef.current = null;
     touchMidpointRef.current = null;
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (event.isPrimary === false) {
+      return;
+    }
+
+    // Right-click drag pan on desktop
+    if (event.button === 2) {
+      try {
+        (event.target as HTMLElement).setPointerCapture(event.pointerId);
+      } catch {
+        // Ignored if capture unsupported
+      }
+      isRightClickPanningRef.current = true;
+      pointerDownPosRef.current = { x: event.clientX, y: event.clientY };
+      lastPointerPosRef.current = { x: event.clientX, y: event.clientY };
+      return;
+    }
+
+    if (event.button !== 0) {
       return;
     }
 
@@ -425,7 +494,9 @@ export const ViewportCanvas: React.FC = () => {
       currentModel.vertices,
       camera,
       rect.width,
-      rect.height
+      rect.height,
+      25,
+      controller.getVisibleVertexIndices()
     );
 
     if (nearestVertex !== null) {
@@ -529,6 +600,45 @@ export const ViewportCanvas: React.FC = () => {
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    // Desktop right-click drag pan
+    if (isRightClickPanningRef.current) {
+      if ((event.buttons & 2) === 0) {
+        isRightClickPanningRef.current = false;
+        pointerDownPosRef.current = null;
+        isDraggingRef.current = false;
+        return;
+      }
+
+      const deltaPixelX = event.clientX - lastPointerPosRef.current.x;
+      const deltaPixelY = event.clientY - lastPointerPosRef.current.y;
+      lastPointerPosRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+      };
+
+      if (deltaPixelX !== 0 || deltaPixelY !== 0) {
+        const container = containerRef.current;
+        const containerHeight = container ? container.clientHeight : 600;
+        const cameraService = controller.getCameraStateService();
+        const panFactor = calculatePanFactor(
+          cameraService.getCameraDistance(),
+          containerHeight,
+          cameraService.isOrthographic()
+        );
+
+        controller.panCamera(deltaPixelX * panFactor, deltaPixelY * panFactor);
+      }
+      return;
+    }
+
+    // If two-finger gesture is currently or recently active, ignore single-pointer drag
+    if (
+      event.pointerType === "touch" &&
+      (touchDistanceRef.current !== null || Date.now() - lastMultiTouchTimeRef.current < 350)
+    ) {
+      return;
+    }
+
     if (!pointerDownPosRef.current) {
       return;
     }
@@ -615,22 +725,7 @@ export const ViewportCanvas: React.FC = () => {
     };
   };
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    try {
-      (event.target as HTMLElement).releasePointerCapture(event.pointerId);
-    } catch {
-      // Ignored
-    }
-
-    if (isTouchDoubleTapRef.current) {
-      isTouchDoubleTapRef.current = false;
-      pointerDownPosRef.current = null;
-      isDraggingRef.current = false;
-      return;
-    }
-
-    const wasDragging = isDraggingRef.current;
-    const clickedVertexInfo = clickedVertexOnDownRef.current;
+  const resetDragSession = () => {
     const currentMode = controller.getEditorModeService().getMode();
     if (currentMode === "TRANSLATE") {
       controller.endTranslation();
@@ -646,6 +741,42 @@ export const ViewportCanvas: React.FC = () => {
     dragStartWorldPosRef.current = null;
     dragCenterScreenPosRef.current = null;
     clickedVertexOnDownRef.current = null;
+  };
+
+  const handlePointerCancel = () => {
+    isRightClickPanningRef.current = false;
+    resetDragSession();
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignored
+    }
+
+    if (isRightClickPanningRef.current || event.button === 2) {
+      isRightClickPanningRef.current = false;
+      resetDragSession();
+      return;
+    }
+
+    if (isTouchDoubleTapRef.current) {
+      isTouchDoubleTapRef.current = false;
+      resetDragSession();
+      return;
+    }
+
+    // Suppress tap/click if pointerDown was cleared (e.g. multi-touch) or recent two-finger gesture (< 350ms)
+    const isRecentMultiTouch = Date.now() - lastMultiTouchTimeRef.current < 350;
+    if (!pointerDownPosRef.current || isRecentMultiTouch) {
+      resetDragSession();
+      return;
+    }
+
+    const wasDragging = isDraggingRef.current;
+    const clickedVertexInfo = clickedVertexOnDownRef.current;
+    resetDragSession();
 
     if (wasDragging) {
       return;
@@ -704,13 +835,16 @@ export const ViewportCanvas: React.FC = () => {
     }
 
     if (mode === "DEFAULT") {
+      const visibleVertexIndices = controller.getVisibleVertexIndices();
       const nearestVertex = raycasterRef.current.findNearestVertex(
         clickX,
         clickY,
         currentModel.vertices,
         camera,
         width,
-        height
+        height,
+        25,
+        visibleVertexIndices
       );
       if (nearestVertex !== null) {
         controller.selectSingleVertex(nearestVertex);
@@ -730,13 +864,16 @@ export const ViewportCanvas: React.FC = () => {
         }
       }
     } else if (mode === "MULTI_SELECT") {
+      const visibleVertexIndices = controller.getVisibleVertexIndices();
       const nearestVertex = raycasterRef.current.findNearestVertex(
         clickX,
         clickY,
         currentModel.vertices,
         camera,
         width,
-        height
+        height,
+        25,
+        visibleVertexIndices
       );
       if (nearestVertex !== null) {
         controller.toggleVertexSelection(nearestVertex);
@@ -754,13 +891,16 @@ export const ViewportCanvas: React.FC = () => {
         }
       }
     } else if (mode === "INSERT") {
+      const visibleVertexIndices = controller.getVisibleVertexIndices();
       const nearestVertex = raycasterRef.current.findNearestVertex(
         clickX,
         clickY,
         currentModel.vertices,
         camera,
         width,
-        height
+        height,
+        25,
+        visibleVertexIndices
       );
       if (nearestVertex !== null) {
         const activeVertex = controller
@@ -778,10 +918,17 @@ export const ViewportCanvas: React.FC = () => {
           controller.selectSingleVertex(nearestVertex);
         }
       } else {
+        let edgesToSearch = currentModel.getWireframeEdges();
+        if (visibleVertexIndices !== null) {
+          const visibleSet = new Set(visibleVertexIndices);
+          edgesToSearch = edgesToSearch.filter(
+            ([start, end]) => visibleSet.has(start) && visibleSet.has(end)
+          );
+        }
         const nearestEdge = raycasterRef.current.findNearestEdge(
           clickX,
           clickY,
-          currentModel.getWireframeEdges(),
+          edgesToSearch,
           currentModel.vertices,
           camera,
           width,
@@ -824,13 +971,16 @@ export const ViewportCanvas: React.FC = () => {
         }
       }
     } else if (mode === "FILL") {
+      const visibleVertexIndices = controller.getVisibleVertexIndices();
       const nearestVertex = raycasterRef.current.findNearestVertex(
         clickX,
         clickY,
         currentModel.vertices,
         camera,
         width,
-        height
+        height,
+        25,
+        visibleVertexIndices
       );
       if (nearestVertex !== null) {
         const activeVertex = controller
@@ -853,6 +1003,8 @@ export const ViewportCanvas: React.FC = () => {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onContextMenu={(event) => event.preventDefault()}
       style={{
         flex: 1,
         width: "100%",
@@ -869,6 +1021,9 @@ export const ViewportCanvas: React.FC = () => {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onLostPointerCapture={handlePointerCancel}
+        onContextMenu={(event) => event.preventDefault()}
         onDoubleClick={(event) =>
           triggerDoubleActionOrthographicView(event.clientX, event.clientY)
         }

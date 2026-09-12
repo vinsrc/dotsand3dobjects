@@ -204,4 +204,56 @@ test.describe("Clear Material Button Functional Tests", () => {
     });
     expect(assignedCountAfter).toBe(0);
   });
+
+  test("Clear Material button is located in mode-specific-buttons on right side of top toolbar, stacked after Add Decal Plane button", async ({
+    page,
+  }) => {
+    // Switch to orthographic +Z view and select front face
+    await page.getByTestId("gizmo-axis-+Z").click();
+
+    const canvas = page.getByTestId("viewport-canvas");
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).not.toBeNull();
+    const centerX = (canvasBox?.x ?? 0) + (canvasBox?.width ?? 0) / 2;
+    const centerY = (canvasBox?.y ?? 0) + (canvasBox?.height ?? 0) / 2;
+
+    await page.mouse.click(centerX, centerY);
+
+    // Verify mode-specific-buttons container
+    const modeButtons = page.getByTestId("mode-specific-buttons");
+    await expect(modeButtons).toBeVisible();
+
+    // Verify clear-material-button is inside mode-specific-buttons
+    const clearButton = modeButtons.getByTestId("clear-material-button");
+    await expect(clearButton).toBeVisible();
+
+    // Verify add-decal-plane-button is also present
+    const addDecalButton = modeButtons.getByTestId("add-decal-plane-button");
+    await expect(addDecalButton).toBeVisible();
+
+    // Verify toolbar layout: mode-specific-buttons is on the right side of the toolbar
+    const toolbarBox = await page.getByTestId("toolbar").boundingBox();
+    const modeButtonsBox = await modeButtons.boundingBox();
+    expect(toolbarBox).not.toBeNull();
+    expect(modeButtonsBox).not.toBeNull();
+    expect(modeButtonsBox!.x).toBeGreaterThan(toolbarBox!.x + toolbarBox!.width / 2);
+
+    // Verify clear-material-button is stacked after add-decal-plane-button horizontally
+    const addDecalBox = await addDecalButton.boundingBox();
+    const clearBox = await clearButton.boundingBox();
+    expect(addDecalBox).not.toBeNull();
+    expect(clearBox).not.toBeNull();
+    expect(clearBox!.x).toBeGreaterThan(addDecalBox!.x);
+
+    // Verify DOM order within mode-specific-buttons container
+    const isStackedAfter = await page.evaluate(() => {
+      const modeContainer = document.querySelector('[data-testid="mode-specific-buttons"]');
+      const addDecalEl = modeContainer?.querySelector('[data-testid="add-decal-plane-button"]');
+      const clearEl = modeContainer?.querySelector('[data-testid="clear-material-button"]');
+      if (!addDecalEl || !clearEl) return false;
+      return !!(addDecalEl.compareDocumentPosition(clearEl) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(isStackedAfter).toBe(true);
+  });
 });
+

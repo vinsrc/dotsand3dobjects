@@ -4,6 +4,7 @@ import { ThemeColors } from "../Common/Theme";
 export interface FileMenuProps {
   onLoadClick: () => void;
   onLoadMtlClick?: () => void;
+  onImportZipClick?: () => void;
   onExportClick: () => void;
   onExportZipClick?: () => void;
   onCustomizeUiClick?: () => void;
@@ -12,6 +13,7 @@ export interface FileMenuProps {
 export const FileMenu: React.FC<FileMenuProps> = ({
   onLoadClick,
   onLoadMtlClick,
+  onImportZipClick,
   onExportClick,
   onExportZipClick,
   onCustomizeUiClick,
@@ -137,6 +139,15 @@ export const FileMenu: React.FC<FileMenuProps> = ({
             style={getMenuItemStyle("load-mtl")}
           >
             Load .mtl
+          </button>
+          <button
+            data-testid="import-zip-button"
+            onClick={() => handleItemClick(() => onImportZipClick?.())}
+            onMouseEnter={() => setHoveredItem("import-zip")}
+            onMouseLeave={() => setHoveredItem(null)}
+            style={getMenuItemStyle("import-zip")}
+          >
+            Import as Zip
           </button>
           <button
             data-testid="export-obj-button"
