@@ -32,8 +32,8 @@ export const ThemeColors = {
   disabledSolid: "#4a4a50",
 
   viewportBackground: "#141417",
-  gridLine: "#707079",
-  gridCenterLine: "#a3a3ac",
+  gridLine: "#b3571f",
+  gridCenterLine: "#ff8c2e",
 
   backdrop: "rgba(0, 0, 0, 0.5)",
   shadow: "rgba(0, 0, 0, 0.5)",
