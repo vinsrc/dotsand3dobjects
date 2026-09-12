@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { unzipSync } from "fflate";
 import { AppController } from "../../../src/Application/Controllers/AppController";
 import { ModelService } from "../../../src/Application/Services/ModelService/ModelService";
 import { CameraStateService } from "../../../src/Application/Services/CameraService/CameraStateService";
@@ -125,6 +126,120 @@ describe("AppController", () => {
     const { appController } = createController();
     const exportedText = appController.exportModelToFile();
     expect(exportedText).toContain("v ");
+  });
+
+  it("should export the model as a zip archive containing the OBJ file", () => {
+    const { appController } = createController();
+
+    const archive = appController.exportModelAsZip("custom_model");
+    expect(archive[0]).toBe(0x50);
+    expect(archive[1]).toBe(0x4b);
+
+    const unzipped = unzipSync(archive);
+    expect(Object.keys(unzipped)).toEqual(["custom_model.obj"]);
+    const objContent = new TextDecoder().decode(unzipped["custom_model.obj"]);
+    expect(objContent).toContain("v ");
+    expect(objContent).toContain("f ");
+  });
+
+  it("should export a zip archive containing OBJ, MTL, and texture image files", () => {
+    const { appController } = createController();
+    const material = appController.createMaterial();
+    const matWithImage = material.withImage(
+      "data:image/png;base64,iVBORw0KGgo=",
+      "texture_decal.png"
+    );
+    appController.updateMaterial(matWithImage);
+    appController.selectFace(0);
+    appController.assignMaterialToSelectedFaces(material.id);
+
+    const archive = appController.exportModelAsZip();
+    const unzipped = unzipSync(archive);
+
+    const fileNames = Object.keys(unzipped).sort();
+    expect(fileNames).toEqual(["model.mtl", "model.obj", "texture_decal.png"]);
+
+    const mtlContent = new TextDecoder().decode(unzipped["model.mtl"]);
+    expect(mtlContent).toContain("newmtl Material_1");
+    expect(mtlContent).toContain("map_Kd texture_decal.png");
+    expect(mtlContent).not.toContain("base64");
+
+    const objContent = new TextDecoder().decode(unzipped["model.obj"]);
+    expect(objContent).toContain("mtllib model.mtl");
+
+    const imageBytes = unzipped["texture_decal.png"];
+    const expectedBytes = atob("iVBORw0KGgo=");
+    expect(imageBytes.length).toBe(expectedBytes.length);
+    for (let index = 0; index < expectedBytes.length; index += 1) {
+      expect(imageBytes[index]).toBe(expectedBytes.charCodeAt(index));
+    }
+  });
+
+  it("should exclude texture files whose data is not available as a data URL", () => {
+    const { appController } = createController();
+    const material = appController.createMaterial();
+    const matWithRemoteImage = material.withImage(
+      "textures/remote_texture.png",
+      "remote_texture.png"
+    );
+    appController.updateMaterial(matWithRemoteImage);
+
+    const archive = appController.exportModelAsZip();
+    const unzipped = unzipSync(archive);
+
+    expect(Object.keys(unzipped).sort()).toEqual(["model.mtl", "model.obj"]);
+    const mtlContent = new TextDecoder().decode(unzipped["model.mtl"]);
+    expect(mtlContent).toContain("map_Kd remote_texture.png");
+  });
+
+  it("should skip texture files whose name collides with the reserved OBJ or MTL entry names", () => {
+    const { appController } = createController();
+    const material = appController.createMaterial();
+    const objCollision = material.withImage(
+      "data:image/png;base64,iVBORw0KGgo=",
+      "model.obj"
+    );
+    appController.updateMaterial(objCollision);
+
+    const archive = appController.exportModelAsZip();
+    const unzipped = unzipSync(archive);
+
+    expect(Object.keys(unzipped).sort()).toEqual(["model.mtl", "model.obj"]);
+    const objContent = new TextDecoder().decode(unzipped["model.obj"]);
+    expect(objContent).toContain("v ");
+    expect(objContent).toContain("f ");
+  });
+
+  it("should skip texture files whose name contains unsafe path segments", () => {
+    const { appController } = createController();
+    const material = appController.createMaterial();
+    const unsafeImage = material.withImage(
+      "data:image/png;base64,iVBORw0KGgo=",
+      "../escape_texture.png"
+    );
+    appController.updateMaterial(unsafeImage);
+
+    const archive = appController.exportModelAsZip();
+    const unzipped = unzipSync(archive);
+
+    expect(Object.keys(unzipped).sort()).toEqual(["model.mtl", "model.obj"]);
+  });
+
+  it("should skip texture files whose data URL cannot be decoded", () => {
+    const { appController } = createController();
+    const material = appController.createMaterial();
+    const brokenImage = material.withImage(
+      "data:image/png;base64,%%%INVALID%%%",
+      "broken_texture.png"
+    );
+    appController.updateMaterial(brokenImage);
+
+    const archive = appController.exportModelAsZip();
+    const unzipped = unzipSync(archive);
+
+    expect(Object.keys(unzipped).sort()).toEqual(["model.mtl", "model.obj"]);
+    const mtlContent = new TextDecoder().decode(unzipped["model.mtl"]);
+    expect(mtlContent).toContain("map_Kd broken_texture.png");
   });
 
   it("should export MTL and images associated with materials", () => {
@@ -1103,7 +1218,7 @@ describe("AppController", () => {
 
     it("should assign and clear material on selected decal plane", () => {
       const { appController } = createController();
-      const material = appController.createMaterial("Sticker_1");
+      const material = appController.createMaterial();
 
       appController.selectFace(0);
       appController.addDecalPlaneToSelectedFace();
@@ -1172,7 +1287,7 @@ describe("AppController", () => {
       expect(appController.getDecals().length).toBe(1);
 
       // Assign material
-      const mat = appController.createMaterial("Logo");
+      const mat = appController.createMaterial();
       appController.selectDecal("decal_1");
       appController.assignMaterialToSelectedFaces(mat.id);
       expect(appController.getSelectedDecal()?.materialId).toBe(mat.id);

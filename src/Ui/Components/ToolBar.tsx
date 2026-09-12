@@ -211,6 +211,21 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     }
   };
 
+  const handleExportZipClick = () => {
+    const zipContent = controller.exportModelAsZip();
+    const zipBlob = new Blob([new Uint8Array(zipContent)], {
+      type: "application/zip",
+    });
+    const downloadUrl = URL.createObjectURL(zipBlob);
+    const anchorElement = document.createElement("a");
+    anchorElement.href = downloadUrl;
+    anchorElement.download = "model.zip";
+    document.body.appendChild(anchorElement);
+    anchorElement.click();
+    document.body.removeChild(anchorElement);
+    URL.revokeObjectURL(downloadUrl);
+  };
+
   const handleToggleRenderMode = () => {
     controller.toggleRenderMode();
   };
@@ -278,6 +293,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           onLoadClick={handleLoadClick}
           onLoadMtlClick={handleLoadMtlClick}
           onExportClick={handleExportClick}
+          onExportZipClick={handleExportZipClick}
           onCustomizeUiClick={onOpenCustomizeUi}
         />
         <button

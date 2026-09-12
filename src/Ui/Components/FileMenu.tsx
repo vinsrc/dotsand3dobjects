@@ -5,6 +5,7 @@ export interface FileMenuProps {
   onLoadClick: () => void;
   onLoadMtlClick?: () => void;
   onExportClick: () => void;
+  onExportZipClick?: () => void;
   onCustomizeUiClick?: () => void;
 }
 
@@ -12,6 +13,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
   onLoadClick,
   onLoadMtlClick,
   onExportClick,
+  onExportZipClick,
   onCustomizeUiClick,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
@@ -144,6 +146,15 @@ export const FileMenu: React.FC<FileMenuProps> = ({
             style={getMenuItemStyle("export")}
           >
             Export .obj
+          </button>
+          <button
+            data-testid="export-zip-button"
+            onClick={() => handleItemClick(() => onExportZipClick?.())}
+            onMouseEnter={() => setHoveredItem("export-zip")}
+            onMouseLeave={() => setHoveredItem(null)}
+            style={getMenuItemStyle("export-zip")}
+          >
+            Export as Zip
           </button>
           <button
             data-testid="customize-ui-button"

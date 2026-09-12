@@ -14,6 +14,8 @@ describe("AppBootstrapper", () => {
     expect(appComponents.geometryEditorService).toBeDefined();
     expect(appComponents.materialService).toBeDefined();
     expect(appComponents.uiCustomizationService).toBeDefined();
+    expect(appComponents.decalService).toBeDefined();
+    expect(appComponents.zipExportService).toBeDefined();
     expect(appComponents.stateNotifier).toBeDefined();
 
     expect(appComponents.modelService.getCurrentModel().isEmpty()).toBe(false);
