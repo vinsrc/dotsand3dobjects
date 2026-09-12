@@ -4,6 +4,7 @@ import { ViewportRenderer } from "../Common/ViewportRenderer";
 import { ViewportRaycaster } from "../Common/ViewportRaycaster";
 import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeometry";
 import { Vector3D } from "../../Application/Common/Vector3D";
+import { ThemeColors } from "../Common/Theme";
 
 export const ViewportCanvas: React.FC = () => {
   const controller = useAppController();
@@ -678,7 +679,7 @@ export const ViewportCanvas: React.FC = () => {
         width: "100%",
         height: "calc(100vh - 48px)",
         position: "relative",
-        backgroundColor: "#f5f5f5",
+        backgroundColor: ThemeColors.viewportBackground,
         overflow: "hidden",
         touchAction: "none",
       }}

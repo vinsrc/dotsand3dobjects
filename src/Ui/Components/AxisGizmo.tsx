@@ -4,6 +4,7 @@ import { useApplicationState } from "../Common/UseApplicationState";
 import { OrthographicAxis } from "../../Application/Services/CameraService/OrthographicViewStrategy";
 import { Vector3D } from "../../Application/Common/Vector3D";
 import { AXIS_COLOR_STRINGS } from "../Common/AxisColors";
+import { ThemeColors } from "../Common/Theme";
 
 interface AxisDefinition {
   readonly axisId: OrthographicAxis;
@@ -175,8 +176,8 @@ export const AxisGizmo: React.FC = () => {
         width: "110px",
         height: "110px",
         borderRadius: "50%",
-        backgroundColor: "rgba(240, 240, 240, 0.85)",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+        backgroundColor: "rgba(22, 22, 25, 0.9)",
+        boxShadow: `0 2px 8px ${ThemeColors.shadow}`,
         cursor: isDragging ? "grabbing" : "grab",
         userSelect: "none",
         touchAction: "none",
@@ -199,7 +200,7 @@ export const AxisGizmo: React.FC = () => {
               y1={gizmoCenter}
               x2={positionX}
               y2={positionY}
-              stroke={axisDefinition.isNegative ? "#aaaaaa" : axisDefinition.color}
+              stroke={axisDefinition.isNegative ? ThemeColors.textMuted : axisDefinition.color}
               strokeWidth={axisDefinition.isNegative ? "1" : "2"}
               strokeDasharray={axisDefinition.isNegative ? "2 2" : undefined}
             />

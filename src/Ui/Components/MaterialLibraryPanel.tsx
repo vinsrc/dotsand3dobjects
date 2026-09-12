@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
 import { Material3D } from "../../Application/Services/MaterialService/Material3D";
+import { ThemeColors } from "../Common/Theme";
 
 export const MaterialLibraryPanel: React.FC = () => {
   const controller = useAppController();
@@ -128,14 +129,16 @@ export const MaterialLibraryPanel: React.FC = () => {
       style={{
         width: "280px",
         height: "100%",
-        backgroundColor: "#fcfcfc",
-        borderRight: dockSide === "left" ? "1px solid #d0d0d0" : "none",
-        borderLeft: dockSide === "right" ? "1px solid #d0d0d0" : "none",
+        backgroundColor: ThemeColors.panelBackground,
+        borderRight:
+          dockSide === "left" ? `1px solid ${ThemeColors.border}` : "none",
+        borderLeft:
+          dockSide === "right" ? `1px solid ${ThemeColors.border}` : "none",
         display: "flex",
         flexDirection: "column",
         boxSizing: "border-box",
         zIndex: 50,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        boxShadow: `0 2px 8px ${ThemeColors.shadow}`,
         overflow: "hidden",
       }}
     >
@@ -146,13 +149,19 @@ export const MaterialLibraryPanel: React.FC = () => {
           justifyContent: "space-between",
           alignItems: "center",
           padding: "10px 14px",
-          backgroundColor: "#ebebeb",
-          borderBottom: "1px solid #d0d0d0",
+          backgroundColor: ThemeColors.panelHeaderBackground,
+          borderBottom: `1px solid ${ThemeColors.border}`,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span style={{ fontSize: "15px" }}>🎨</span>
-          <span style={{ fontWeight: 600, fontSize: "13px", color: "#333333" }}>
+          <span
+            style={{
+              fontWeight: 600,
+              fontSize: "13px",
+              color: ThemeColors.textPrimary,
+            }}
+          >
             Material Library
           </span>
         </div>
@@ -164,12 +173,13 @@ export const MaterialLibraryPanel: React.FC = () => {
             style={{
               width: "26px",
               height: "26px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #aaaaaa",
+              backgroundColor: ThemeColors.widget,
+              border: `1px solid ${ThemeColors.borderStrong}`,
               borderRadius: "4px",
               cursor: "pointer",
               fontWeight: "bold",
               fontSize: "14px",
+              color: ThemeColors.textPrimary,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -185,14 +195,16 @@ export const MaterialLibraryPanel: React.FC = () => {
             style={{
               width: "26px",
               height: "26px",
-              backgroundColor: selectedMaterial ? "#ffffff" : "#f0f0f0",
-              border: "1px solid #aaaaaa",
+              backgroundColor: selectedMaterial
+                ? ThemeColors.widget
+                : ThemeColors.listItem,
+              border: `1px solid ${ThemeColors.borderStrong}`,
               borderRadius: "4px",
               cursor: selectedMaterial ? "pointer" : "not-allowed",
               opacity: selectedMaterial ? 1 : 0.4,
               fontWeight: "bold",
               fontSize: "12px",
-              color: selectedMaterial ? "#d32f2f" : "#999999",
+              color: selectedMaterial ? ThemeColors.danger : ThemeColors.textDisabled,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -211,15 +223,15 @@ export const MaterialLibraryPanel: React.FC = () => {
             style={{
               width: "26px",
               height: "26px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #aaaaaa",
+              backgroundColor: ThemeColors.widget,
+              border: `1px solid ${ThemeColors.borderStrong}`,
               borderRadius: "4px",
               cursor: "pointer",
               fontSize: "13px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#333333",
+              color: ThemeColors.textPrimary,
             }}
           >
             {dockSide === "left" ? "⇥" : "⇤"}
@@ -235,7 +247,7 @@ export const MaterialLibraryPanel: React.FC = () => {
               border: "none",
               cursor: "pointer",
               fontSize: "15px",
-              color: "#666666",
+              color: ThemeColors.textSecondary,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -252,8 +264,8 @@ export const MaterialLibraryPanel: React.FC = () => {
         style={{
           flex: "0 0 140px",
           overflowY: "auto",
-          borderBottom: "1px solid #e0e0e0",
-          backgroundColor: "#ffffff",
+          borderBottom: `1px solid ${ThemeColors.border}`,
+          backgroundColor: ThemeColors.surface,
           padding: "6px",
         }}
       >
@@ -262,7 +274,7 @@ export const MaterialLibraryPanel: React.FC = () => {
             style={{
               padding: "16px",
               textAlign: "center",
-              color: "#888888",
+              color: ThemeColors.textMuted,
               fontSize: "12px",
             }}
           >
@@ -284,10 +296,12 @@ export const MaterialLibraryPanel: React.FC = () => {
                   marginBottom: "4px",
                   borderRadius: "4px",
                   cursor: "pointer",
-                  backgroundColor: isSelected ? "#e3f2fd" : "#f8f8f8",
+                  backgroundColor: isSelected
+                    ? ThemeColors.selectedItem
+                    : ThemeColors.listItem,
                   border: isSelected
-                    ? "1px solid #2196f3"
-                    : "1px solid #eeeeee",
+                    ? `1px solid ${ThemeColors.accent}`
+                    : `1px solid ${ThemeColors.borderSubtle}`,
                 }}
               >
                 <div
@@ -300,7 +314,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                       ? `url(${mat.imageUrl})`
                       : "none",
                     backgroundSize: "cover",
-                    border: "1px solid #bbbbbb",
+                    border: `1px solid ${ThemeColors.borderStrong}`,
                     flexShrink: 0,
                   }}
                 />
@@ -308,7 +322,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                   style={{
                     fontSize: "12px",
                     fontWeight: isSelected ? 600 : 400,
-                    color: "#333333",
+                    color: ThemeColors.textPrimary,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -343,7 +357,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                   display: "block",
                   fontSize: "11px",
                   fontWeight: 600,
-                  color: "#666666",
+                  color: ThemeColors.textSecondary,
                   marginBottom: "4px",
                   textTransform: "uppercase",
                 }}
@@ -359,10 +373,12 @@ export const MaterialLibraryPanel: React.FC = () => {
                   width: "100%",
                   padding: "5px 8px",
                   fontSize: "12px",
-                  border: "1px solid #cccccc",
-                  borderRadius: "4px",
-                  boxSizing: "border-box",
-                }}
+backgroundColor: ThemeColors.widget,
+                    border: `1px solid ${ThemeColors.borderStrong}`,
+                    borderRadius: "4px",
+                    boxSizing: "border-box",
+                    color: ThemeColors.textPrimary,
+                  }}
               />
             </div>
 
@@ -373,7 +389,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                   display: "block",
                   fontSize: "11px",
                   fontWeight: 600,
-                  color: hasImage ? "#aaaaaa" : "#666666",
+                  color: hasImage ? ThemeColors.textDisabled : ThemeColors.textSecondary,
                   marginBottom: "4px",
                   textTransform: "uppercase",
                 }}
@@ -391,7 +407,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                     width: "36px",
                     height: "28px",
                     padding: 0,
-                    border: "1px solid #cccccc",
+                    border: `1px solid ${ThemeColors.borderStrong}`,
                     borderRadius: "4px",
                     cursor: hasImage ? "not-allowed" : "pointer",
                     opacity: hasImage ? 0.4 : 1,
@@ -400,7 +416,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                 <span
                   style={{
                     fontSize: "12px",
-                    color: hasImage ? "#aaaaaa" : "#444444",
+                    color: hasImage ? ThemeColors.textDisabled : ThemeColors.textPrimary,
                     fontFamily: "monospace",
                   }}
                 >
@@ -422,13 +438,13 @@ export const MaterialLibraryPanel: React.FC = () => {
                   style={{
                     fontSize: "11px",
                     fontWeight: 600,
-                    color: hasImage ? "#aaaaaa" : "#666666",
+                    color: hasImage ? ThemeColors.textDisabled : ThemeColors.textSecondary,
                     textTransform: "uppercase",
                   }}
                 >
                   Roughness
                 </label>
-                <span style={{ fontSize: "11px", color: "#666666" }}>
+                <span style={{ fontSize: "11px", color: ThemeColors.textSecondary }}>
                   {selectedMaterial.roughness.toFixed(2)}
                 </span>
               </div>
@@ -462,13 +478,13 @@ export const MaterialLibraryPanel: React.FC = () => {
                   style={{
                     fontSize: "11px",
                     fontWeight: 600,
-                    color: hasImage ? "#aaaaaa" : "#666666",
+                    color: hasImage ? ThemeColors.textDisabled : ThemeColors.textSecondary,
                     textTransform: "uppercase",
                   }}
                 >
                   Metalness
                 </label>
-                <span style={{ fontSize: "11px", color: "#666666" }}>
+                <span style={{ fontSize: "11px", color: ThemeColors.textSecondary }}>
                   {selectedMaterial.metalness.toFixed(2)}
                 </span>
               </div>
@@ -496,7 +512,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                   display: "block",
                   fontSize: "11px",
                   fontWeight: 600,
-                  color: "#666666",
+                  color: ThemeColors.textSecondary,
                   marginBottom: "4px",
                   textTransform: "uppercase",
                 }}
@@ -518,9 +534,9 @@ export const MaterialLibraryPanel: React.FC = () => {
                     alignItems: "center",
                     gap: "8px",
                     padding: "6px",
-                    border: "1px solid #cccccc",
+                    border: `1px solid ${ThemeColors.borderStrong}`,
                     borderRadius: "4px",
-                    backgroundColor: "#ffffff",
+                    backgroundColor: ThemeColors.widget,
                   }}
                 >
                   <img
@@ -531,10 +547,16 @@ export const MaterialLibraryPanel: React.FC = () => {
                       height: "36px",
                       objectFit: "cover",
                       borderRadius: "3px",
-                      border: "1px solid #dddddd",
+                      border: `1px solid ${ThemeColors.borderSubtle}`,
                     }}
                   />
-                  <span style={{ flex: 1, fontSize: "11px", color: "#555555" }}>
+                  <span
+                    style={{
+                      flex: 1,
+                      fontSize: "11px",
+                      color: ThemeColors.textSecondary,
+                    }}
+                  >
                     Image Set (Decal)
                   </span>
                   <button
@@ -543,9 +565,9 @@ export const MaterialLibraryPanel: React.FC = () => {
                     onClick={handleClearImage}
                     style={{
                       padding: "3px 8px",
-                      backgroundColor: "#ffebee",
-                      color: "#d32f2f",
-                      border: "1px solid #ffcdd2",
+                      backgroundColor: ThemeColors.dangerBackground,
+                      color: ThemeColors.danger,
+                      border: `1px solid ${ThemeColors.dangerBorder}`,
                       borderRadius: "3px",
                       fontSize: "11px",
                       fontWeight: "bold",
@@ -562,11 +584,11 @@ export const MaterialLibraryPanel: React.FC = () => {
                   style={{
                     width: "100%",
                     padding: "6px",
-                    backgroundColor: "#ffffff",
-                    border: "1px dashed #aaaaaa",
+                    backgroundColor: ThemeColors.widget,
+                    border: `1px dashed ${ThemeColors.borderStrong}`,
                     borderRadius: "4px",
                     fontSize: "12px",
-                    color: "#555555",
+                    color: ThemeColors.textSecondary,
                     cursor: "pointer",
                   }}
                 >
@@ -585,7 +607,9 @@ export const MaterialLibraryPanel: React.FC = () => {
                   width: "100%",
                   padding: "8px",
                   backgroundColor:
-                    selectedFaceCount > 0 ? "#4caf50" : "#cccccc",
+                    selectedFaceCount > 0
+                      ? ThemeColors.success
+                      : ThemeColors.disabledSolid,
                   color: "#ffffff",
                   border: "none",
                   borderRadius: "4px",
@@ -594,7 +618,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                   cursor: selectedFaceCount > 0 ? "pointer" : "not-allowed",
                   boxShadow:
                     selectedFaceCount > 0
-                      ? "0 2px 4px rgba(76,175,80,0.3)"
+                      ? "0 2px 4px rgba(63,185,80,0.3)"
                       : "none",
                 }}
               >
@@ -608,7 +632,7 @@ export const MaterialLibraryPanel: React.FC = () => {
           <div
             style={{
               textAlign: "center",
-              color: "#888888",
+              color: ThemeColors.textMuted,
               fontSize: "12px",
               margin: "auto 0",
             }}
@@ -640,10 +664,10 @@ export const MaterialLibraryPanel: React.FC = () => {
           <div
             data-testid="delete-material-confirm-modal"
             style={{
-              backgroundColor: "#ffffff",
+              backgroundColor: ThemeColors.surface,
               padding: "16px",
               borderRadius: "6px",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+              boxShadow: `0 4px 16px ${ThemeColors.shadow}`,
               width: "100%",
               textAlign: "center",
             }}
@@ -652,7 +676,7 @@ export const MaterialLibraryPanel: React.FC = () => {
               style={{
                 fontSize: "13px",
                 margin: "0 0 14px 0",
-                color: "#333333",
+                color: ThemeColors.textPrimary,
               }}
             >
               Delete <strong>{selectedMaterial?.name}</strong>?
@@ -669,7 +693,7 @@ export const MaterialLibraryPanel: React.FC = () => {
                 onClick={handleConfirmDelete}
                 style={{
                   padding: "5px 12px",
-                  backgroundColor: "#d32f2f",
+                  backgroundColor: ThemeColors.danger,
                   color: "#ffffff",
                   border: "none",
                   borderRadius: "4px",
@@ -685,9 +709,9 @@ export const MaterialLibraryPanel: React.FC = () => {
                 onClick={handleCancelDelete}
                 style={{
                   padding: "5px 12px",
-                  backgroundColor: "#eeeeee",
-                  color: "#333333",
-                  border: "1px solid #cccccc",
+                  backgroundColor: ThemeColors.widget,
+                  color: ThemeColors.textPrimary,
+                  border: `1px solid ${ThemeColors.borderStrong}`,
                   borderRadius: "4px",
                   fontSize: "12px",
                   cursor: "pointer",

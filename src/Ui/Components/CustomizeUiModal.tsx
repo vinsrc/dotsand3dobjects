@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAppController } from "../Common/AppContext";
 import { DockSide } from "../../Application/Services/UiCustomizationService/UiCustomizationService";
+import { ThemeColors } from "../Common/Theme";
 
 export interface CustomizeUiModalProps {
   isOpen: boolean;
@@ -52,7 +53,7 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
     position: "relative",
     width: "48px",
     height: "26px",
-    backgroundColor: isActive ? "#2196f3" : "#cccccc",
+    backgroundColor: isActive ? ThemeColors.accent : ThemeColors.widget,
     borderRadius: "13px",
     border: "none",
     cursor: "pointer",
@@ -82,7 +83,7 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: ThemeColors.backdrop,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -93,13 +94,13 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
       <div
         data-testid="customize-ui-modal"
         style={{
-          backgroundColor: "#ffffff",
+          backgroundColor: ThemeColors.surface,
           borderRadius: "8px",
           width: "440px",
           maxWidth: "90vw",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.25)",
+          boxShadow: `0 8px 32px ${ThemeColors.shadow}`,
           overflow: "hidden",
         }}
         onClick={(event) => event.stopPropagation()}
@@ -107,14 +108,16 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
         <div
           style={{
             padding: "16px 20px",
-            borderBottom: "1px solid #e0e0e0",
+            borderBottom: `1px solid ${ThemeColors.border}`,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            backgroundColor: "#f7f7f7",
+            backgroundColor: ThemeColors.panelHeaderBackground,
           }}
         >
-          <h2 style={{ margin: 0, fontSize: "17px", color: "#333333" }}>
+          <h2
+            style={{ margin: 0, fontSize: "17px", color: ThemeColors.textPrimary }}
+          >
             Customize UI
           </h2>
           <button
@@ -125,7 +128,7 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
               border: "none",
               fontSize: "18px",
               cursor: "pointer",
-              color: "#666666",
+              color: ThemeColors.textSecondary,
               padding: "4px 8px",
               lineHeight: 1,
             }}
@@ -154,7 +157,7 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
               style={{
                 fontSize: "14px",
                 fontWeight: 600,
-                color: "#333333",
+                color: ThemeColors.textPrimary,
               }}
             >
               Side Tool Bar:
@@ -169,7 +172,9 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
               <span
                 style={{
                   fontSize: "13px",
-                  color: !isSideToolBarOn ? "#1976d2" : "#777777",
+                  color: !isSideToolBarOn
+                    ? ThemeColors.accentLight
+                    : ThemeColors.textMuted,
                   fontWeight: !isSideToolBarOn ? 600 : 400,
                   cursor: "pointer",
                 }}
@@ -191,7 +196,9 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
               <span
                 style={{
                   fontSize: "13px",
-                  color: isSideToolBarOn ? "#1976d2" : "#777777",
+                  color: isSideToolBarOn
+                    ? ThemeColors.accentLight
+                    : ThemeColors.textMuted,
                   fontWeight: isSideToolBarOn ? 600 : 400,
                   cursor: "pointer",
                 }}
@@ -214,7 +221,7 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
               style={{
                 fontSize: "14px",
                 fontWeight: 600,
-                color: "#333333",
+                color: ThemeColors.textPrimary,
               }}
             >
               Material Library:
@@ -229,7 +236,9 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
               <span
                 style={{
                   fontSize: "13px",
-                  color: !isMaterialLibraryOn ? "#1976d2" : "#777777",
+                  color: !isMaterialLibraryOn
+                    ? ThemeColors.accentLight
+                    : ThemeColors.textMuted,
                   fontWeight: !isMaterialLibraryOn ? 600 : 400,
                   cursor: "pointer",
                 }}
@@ -251,7 +260,9 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
               <span
                 style={{
                   fontSize: "13px",
-                  color: isMaterialLibraryOn ? "#1976d2" : "#777777",
+                  color: isMaterialLibraryOn
+                    ? ThemeColors.accentLight
+                    : ThemeColors.textMuted,
                   fontWeight: isMaterialLibraryOn ? 600 : 400,
                   cursor: "pointer",
                 }}
@@ -266,11 +277,11 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
         <div
           style={{
             padding: "12px 20px",
-            borderTop: "1px solid #e0e0e0",
+            borderTop: `1px solid ${ThemeColors.border}`,
             display: "flex",
             justifyContent: "flex-end",
             gap: "10px",
-            backgroundColor: "#f7f7f7",
+            backgroundColor: ThemeColors.panelHeaderBackground,
           }}
         >
           <button
@@ -278,13 +289,13 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
             onClick={onClose}
             style={{
               padding: "8px 16px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #999999",
+              backgroundColor: ThemeColors.widget,
+              border: `1px solid ${ThemeColors.borderStrong}`,
               borderRadius: "4px",
               fontSize: "13px",
               fontWeight: 500,
               cursor: "pointer",
-              color: "#333333",
+              color: ThemeColors.textPrimary,
             }}
           >
             Close
@@ -294,8 +305,8 @@ export const CustomizeUiModal: React.FC<CustomizeUiModalProps> = ({
             onClick={handleSave}
             style={{
               padding: "8px 18px",
-              backgroundColor: "#2196f3",
-              border: "1px solid #1976d2",
+              backgroundColor: ThemeColors.accent,
+              border: `1px solid ${ThemeColors.accentBorder}`,
               borderRadius: "4px",
               fontSize: "13px",
               fontWeight: 600,

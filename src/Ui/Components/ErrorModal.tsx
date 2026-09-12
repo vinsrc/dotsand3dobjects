@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAppController } from "../Common/AppContext";
+import { ThemeColors } from "../Common/Theme";
 
 export const ErrorModal: React.FC = () => {
   const controller = useAppController();
@@ -36,7 +37,7 @@ export const ErrorModal: React.FC = () => {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: ThemeColors.backdrop,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -45,11 +46,11 @@ export const ErrorModal: React.FC = () => {
     >
       <div
         style={{
-          backgroundColor: "#ffffff",
-          color: "#222222",
+          backgroundColor: ThemeColors.surface,
+          color: ThemeColors.textPrimary,
           padding: "24px 32px",
           borderRadius: "8px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+          boxShadow: `0 8px 24px ${ThemeColors.shadow}`,
           maxWidth: "400px",
           width: "90%",
           textAlign: "center",
@@ -59,7 +60,7 @@ export const ErrorModal: React.FC = () => {
         <h3
           style={{
             margin: "0 0 12px 0",
-            color: "#d32f2f",
+            color: ThemeColors.danger,
             fontSize: "1.25rem",
           }}
         >
@@ -70,7 +71,7 @@ export const ErrorModal: React.FC = () => {
           style={{
             margin: "0 0 20px 0",
             fontSize: "1rem",
-            color: "#444444",
+            color: ThemeColors.textSecondary,
           }}
         >
           {errorMessage}
@@ -79,7 +80,7 @@ export const ErrorModal: React.FC = () => {
           data-testid="error-dismiss-button"
           onClick={handleDismiss}
           style={{
-            backgroundColor: "#2196f3",
+            backgroundColor: ThemeColors.accent,
             color: "#ffffff",
             border: "none",
             borderRadius: "4px",

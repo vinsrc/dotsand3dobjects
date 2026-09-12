@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
 import { FileMenu } from "./FileMenu";
+import { ThemeColors } from "../Common/Theme";
 
 export interface ToolBarProps {
   onOpenHelp?: () => void;
@@ -163,13 +164,13 @@ export const ToolBar: React.FC<ToolBarProps> = ({
 
   const buttonStyle: React.CSSProperties = {
     padding: "6px 12px",
-    backgroundColor: "#ffffff",
-    border: "1px solid #999999",
+    backgroundColor: ThemeColors.widget,
+    border: `1px solid ${ThemeColors.borderStrong}`,
     borderRadius: "4px",
     fontSize: "13px",
     fontWeight: 500,
     cursor: "pointer",
-    color: "#333333",
+    color: ThemeColors.textPrimary,
     whiteSpace: "nowrap",
   };
 
@@ -189,8 +190,8 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         alignItems: "center",
         justifyContent: "space-between",
         height: "48px",
-        backgroundColor: "#e0e0e0",
-        borderBottom: "1px solid #c0c0c0",
+        backgroundColor: ThemeColors.toolbarBackground,
+        borderBottom: `1px solid ${ThemeColors.border}`,
         padding: "0 12px",
         boxSizing: "border-box",
         userSelect: "none",
@@ -227,8 +228,8 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           onClick={handleToggleRenderMode}
           style={{
             ...buttonStyle,
-            backgroundColor: isWireframe ? "#333333" : "#ffffff",
-            color: isWireframe ? "#ffffff" : "#333333",
+            backgroundColor: isWireframe ? ThemeColors.accent : ThemeColors.widget,
+            color: isWireframe ? "#ffffff" : ThemeColors.textPrimary,
           }}
         >
           {isWireframe ? "Wireframe View" : "Shaded View"}
@@ -239,9 +240,11 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           title="Material Library"
           style={{
             ...buttonStyle,
-            backgroundColor: isMaterialPanelOpen ? "#2196f3" : "#ffffff",
-            color: isMaterialPanelOpen ? "#ffffff" : "#333333",
-            borderColor: isMaterialPanelOpen ? "#1976d2" : "#999999",
+            backgroundColor: isMaterialPanelOpen ? ThemeColors.accent : ThemeColors.widget,
+            color: isMaterialPanelOpen ? "#ffffff" : ThemeColors.textPrimary,
+            borderColor: isMaterialPanelOpen
+              ? ThemeColors.accentBorder
+              : ThemeColors.borderStrong,
             display: "flex",
             alignItems: "center",
             gap: "6px",
@@ -271,8 +274,8 @@ export const ToolBar: React.FC<ToolBarProps> = ({
             title="Set current view as front side of face"
             style={{
               ...buttonStyle,
-              backgroundColor: "#ffffff",
-              color: "#333333",
+              backgroundColor: ThemeColors.widget,
+              color: ThemeColors.textPrimary,
             }}
           >
             Set Front
@@ -295,9 +298,11 @@ export const ToolBar: React.FC<ToolBarProps> = ({
             onClick={handleToggleAutoConnect}
             style={{
               ...buttonStyle,
-              backgroundColor: isAutoConnect ? "#4caf50" : "#ffffff",
-              color: isAutoConnect ? "#ffffff" : "#333333",
-              borderColor: isAutoConnect ? "#388e3c" : "#999999",
+              backgroundColor: isAutoConnect ? ThemeColors.success : ThemeColors.widget,
+              color: isAutoConnect ? "#ffffff" : ThemeColors.textPrimary,
+              borderColor: isAutoConnect
+                ? ThemeColors.successBorder
+                : ThemeColors.borderStrong,
             }}
           >
             {isAutoConnect ? "Auto Connect: ON" : "Auto Connect: OFF"}

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { ThemeColors } from "../Common/Theme";
 
 export interface FileMenuProps {
   onLoadClick: () => void;
@@ -56,13 +57,13 @@ export const FileMenu: React.FC<FileMenuProps> = ({
 
   const triggerButtonStyle: React.CSSProperties = {
     padding: "6px 12px",
-    backgroundColor: isOpen ? "#e8e8e8" : "#ffffff",
-    border: "1px solid #999999",
+    backgroundColor: isOpen ? ThemeColors.widgetHover : ThemeColors.widget,
+    border: `1px solid ${ThemeColors.borderStrong}`,
     borderRadius: "4px",
     fontSize: "13px",
     fontWeight: 500,
     cursor: "pointer",
-    color: "#333333",
+    color: ThemeColors.textPrimary,
     whiteSpace: "nowrap",
   };
 
@@ -70,10 +71,10 @@ export const FileMenu: React.FC<FileMenuProps> = ({
     position: "absolute",
     top: "calc(100% + 4px)",
     left: 0,
-    backgroundColor: "#ffffff",
-    border: "1px solid #c0c0c0",
+    backgroundColor: ThemeColors.surface,
+    border: `1px solid ${ThemeColors.border}`,
     borderRadius: "4px",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+    boxShadow: `0 4px 12px ${ThemeColors.shadow}`,
     zIndex: 1000,
     minWidth: "140px",
     display: "flex",
@@ -84,11 +85,12 @@ export const FileMenu: React.FC<FileMenuProps> = ({
   const getMenuItemStyle = (itemName: string): React.CSSProperties => ({
     padding: "8px 16px",
     textAlign: "left",
-    backgroundColor: hoveredItem === itemName ? "#f0f0f0" : "transparent",
+    backgroundColor:
+      hoveredItem === itemName ? ThemeColors.widgetHover : "transparent",
     border: "none",
     fontSize: "13px",
     fontWeight: 500,
-    color: "#333333",
+    color: ThemeColors.textPrimary,
     cursor: "pointer",
     width: "100%",
     display: "block",

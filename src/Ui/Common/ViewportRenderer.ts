@@ -76,7 +76,7 @@ export class ViewportRenderer {
     this.wireframeLines = new THREE.LineSegments(
       new THREE.BufferGeometry(),
       new THREE.LineBasicMaterial({
-        color: 0x444444,
+        color: 0x9a9a9a,
         transparent: true,
         opacity: 0.35,
       })
@@ -86,7 +86,7 @@ export class ViewportRenderer {
     this.vertexPoints = new THREE.Points(
       new THREE.BufferGeometry(),
       new THREE.PointsMaterial({
-        color: 0x222222,
+        color: 0xcccccc,
         size: 7,
         sizeAttenuation: false,
         depthTest: false,
@@ -268,13 +268,13 @@ export class ViewportRenderer {
     if (renderMode === "FLAT_SHADED") {
       this.surfaceMesh.visible = true;
       this.wireframeLines.visible = true;
-      wireframeMaterial.color.set(0x444444);
+      wireframeMaterial.color.set(0x9a9a9a);
       wireframeMaterial.transparent = true;
       wireframeMaterial.opacity = 0.35;
     } else {
       this.surfaceMesh.visible = false;
       this.wireframeLines.visible = true;
-      wireframeMaterial.color.set(0x111111);
+      wireframeMaterial.color.set(0xdddddd);
       wireframeMaterial.transparent = false;
       wireframeMaterial.opacity = 1.0;
     }
@@ -473,8 +473,8 @@ export class ViewportRenderer {
     this.gridHelperInstance = new THREE.GridHelper(
       gridSize,
       gridDivisions,
-      0x888888,
-      0xd0d0d0
+      0x5a5a5a,
+      0x333333
     );
     this.gridHelperInstance.position.set(0, 0, 0);
     this.gridHelperInstance.visible = false;

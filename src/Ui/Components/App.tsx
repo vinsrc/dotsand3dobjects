@@ -12,6 +12,7 @@ import { CustomizeUiModal } from "./CustomizeUiModal";
 
 import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
+import { ThemeColors } from "../Common/Theme";
 
 const AppContent: React.FC = () => {
   const controller = useAppController();
@@ -36,6 +37,8 @@ const AppContent: React.FC = () => {
         padding: 0,
         overflow: "hidden",
         fontFamily: "system-ui, -apple-system, sans-serif",
+        color: ThemeColors.textPrimary,
+        backgroundColor: ThemeColors.appBackground,
         position: "relative",
       }}
     >

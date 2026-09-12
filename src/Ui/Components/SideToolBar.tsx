@@ -2,6 +2,7 @@ import React from "react";
 import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
 import { UiMode } from "../../Application/Services/EditorModeService/EditorModeService";
+import { ThemeColors } from "../Common/Theme";
 
 export const SideToolBar: React.FC = () => {
   const controller = useAppController();
@@ -59,13 +60,13 @@ export const SideToolBar: React.FC = () => {
 
   const buttonStyle: React.CSSProperties = {
     padding: "8px 12px",
-    backgroundColor: "#ffffff",
-    border: "1px solid #999999",
+    backgroundColor: ThemeColors.widget,
+    border: `1px solid ${ThemeColors.borderStrong}`,
     borderRadius: "4px",
     fontSize: "13px",
     fontWeight: 500,
     cursor: "pointer",
-    color: "#333333",
+    color: ThemeColors.textPrimary,
     whiteSpace: "nowrap",
     width: "100%",
     textAlign: "center",
@@ -74,9 +75,9 @@ export const SideToolBar: React.FC = () => {
 
   const activeModeButtonStyle: React.CSSProperties = {
     ...buttonStyle,
-    backgroundColor: "#2196f3",
+    backgroundColor: ThemeColors.accent,
     color: "#ffffff",
-    borderColor: "#1976d2",
+    borderColor: ThemeColors.accentBorder,
   };
 
   const disabledButtonStyle: React.CSSProperties = {
@@ -92,9 +93,9 @@ export const SideToolBar: React.FC = () => {
         width: "140px",
         minWidth: "140px",
         height: "100%",
-        backgroundColor: "#e0e0e0",
-        borderLeft: dockSide === "right" ? "1px solid #c0c0c0" : "none",
-        borderRight: dockSide === "left" ? "1px solid #c0c0c0" : "none",
+        backgroundColor: ThemeColors.toolbarBackground,
+        borderLeft: dockSide === "right" ? `1px solid ${ThemeColors.border}` : "none",
+        borderRight: dockSide === "left" ? `1px solid ${ThemeColors.border}` : "none",
         display: "flex",
         flexDirection: "column",
         padding: "12px 8px",
@@ -190,9 +191,11 @@ export const SideToolBar: React.FC = () => {
         onClick={handleToggleGridSnap}
         style={{
           ...buttonStyle,
-          backgroundColor: isGridSnap ? "#4caf50" : "#ffffff",
-          color: isGridSnap ? "#ffffff" : "#333333",
-          borderColor: isGridSnap ? "#388e3c" : "#999999",
+          backgroundColor: isGridSnap ? ThemeColors.success : ThemeColors.widget,
+          color: isGridSnap ? "#ffffff" : ThemeColors.textPrimary,
+          borderColor: isGridSnap
+            ? ThemeColors.successBorder
+            : ThemeColors.borderStrong,
         }}
       >
         {isGridSnap ? "Grid Snap: ON" : "Grid Snap: OFF"}

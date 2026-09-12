@@ -1,4 +1,5 @@
 import React from "react";
+import { ThemeColors } from "../Common/Theme";
 
 export interface HelpModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: ThemeColors.backdrop,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -30,14 +31,14 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
       <div
         data-testid="help-modal"
         style={{
-          backgroundColor: "#ffffff",
+          backgroundColor: ThemeColors.surface,
           borderRadius: "8px",
           width: "560px",
           maxWidth: "90vw",
           maxHeight: "85vh",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.25)",
+          boxShadow: `0 8px 32px ${ThemeColors.shadow}`,
           overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -45,14 +46,20 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         <div
           style={{
             padding: "16px 20px",
-            borderBottom: "1px solid #e0e0e0",
+            borderBottom: `1px solid ${ThemeColors.border}`,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            backgroundColor: "#f7f7f7",
+            backgroundColor: ThemeColors.panelHeaderBackground,
           }}
         >
-          <h2 style={{ margin: 0, fontSize: "18px", color: "#333333" }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "18px",
+              color: ThemeColors.textPrimary,
+            }}
+          >
             WireframeVibe3D - Help & User Guide
           </h2>
           <button
@@ -63,7 +70,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
               border: "none",
               fontSize: "20px",
               cursor: "pointer",
-              color: "#666666",
+              color: ThemeColors.textSecondary,
               lineHeight: 1,
             }}
           >
@@ -77,10 +84,12 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
             overflowY: "auto",
             fontSize: "14px",
             lineHeight: 1.6,
-            color: "#444444",
+            color: ThemeColors.textSecondary,
           }}
         >
-          <h3 style={{ marginTop: 0, color: "#222222" }}>🎨 Material Library</h3>
+          <h3
+            style={{ marginTop: 0, color: ThemeColors.textPrimary }}
+          >🎨 Material Library</h3>
           <p>
             The <strong>Material Library</strong> panel lets you create, customize, and assign PBR materials to mesh faces:
           </p>
@@ -102,14 +111,14 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
             </li>
           </ul>
 
-          <h3 style={{ color: "#222222" }}>🧭 Viewport Navigation</h3>
+          <h3 style={{ color: ThemeColors.textPrimary }}>🧭 Viewport Navigation</h3>
           <ul>
             <li><strong>Rotate</strong>: Drag with mouse or single finger in perspective mode or Translate mode (when no vertex is selected).</li>
             <li><strong>Snap View</strong>: Double-click empty space to snap to the closest orthographic view (+X, +Y, +Z, etc.). Double-click a mesh face to rotate into that face's orthographic view.</li>
             <li><strong>Pan & Zoom</strong>: Use mouse wheel to zoom, or two-finger pinch and drag on touch screens.</li>
           </ul>
 
-          <h3 style={{ color: "#222222" }}>🛠️ Editor Modes</h3>
+          <h3 style={{ color: ThemeColors.textPrimary }}>🛠️ Editor Modes</h3>
           <ul>
             <li><strong>Default</strong>: Click vertices to select. Click faces to select.</li>
             <li><strong>Multi-Select</strong>: Toggle selection of multiple vertices and faces.</li>
@@ -122,17 +131,17 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         <div
           style={{
             padding: "12px 20px",
-            borderTop: "1px solid #e0e0e0",
+            borderTop: `1px solid ${ThemeColors.border}`,
             display: "flex",
             justifyContent: "flex-end",
-            backgroundColor: "#f7f7f7",
+            backgroundColor: ThemeColors.panelHeaderBackground,
           }}
         >
           <button
             onClick={onClose}
             style={{
               padding: "6px 16px",
-              backgroundColor: "#2196f3",
+              backgroundColor: ThemeColors.accent,
               color: "#ffffff",
               border: "none",
               borderRadius: "4px",
