@@ -9,7 +9,8 @@ export type StateEventType =
   | "GRID_SNAP_CHANGED"
   | "UNDO_REDO_STATE_CHANGED"
   | "MATERIAL_PANEL_CHANGED"
-  | "UI_CUSTOMIZATION_CHANGED";
+  | "UI_CUSTOMIZATION_CHANGED"
+  | "DECALS_CHANGED";
 
 export type StateListenerCallback = (payload?: unknown) => void;
 export type UnsubscribeCallback = () => void;

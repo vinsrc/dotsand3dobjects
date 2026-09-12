@@ -514,4 +514,82 @@ describe("GeometryEditorService", () => {
     expect(resultVertices[1]?.coordinateX).toBe(6);
     expect(resultVertices[1]?.coordinateY).toBe(5);
   });
+
+  it("should apply rotation from initial model around center on specified plane", () => {
+    const { modelService, editorService } = setupService();
+    const testVertices = [
+      new Vector3D(1, 0, 0),
+      new Vector3D(-1, 0, 0),
+      new Vector3D(0, 1, 0),
+      new Vector3D(0, -1, 0),
+    ];
+    // Center is (0, 0, 0)
+    const baseModel = new MeshGeometry(testVertices, []);
+    modelService.setCurrentModel(baseModel);
+
+    // Rotate 90 degrees (pi / 2) on XY plane (axis: (0, 0, 1)) without snap
+    editorService.applyRotationFromInitial(
+      baseModel,
+      Math.PI / 2,
+      "XY",
+      false
+    );
+
+    const rotated = modelService.getCurrentModel().vertices;
+    expect(rotated[0]?.coordinateX).toBeCloseTo(0, 5);
+    expect(rotated[0]?.coordinateY).toBeCloseTo(1, 5);
+    expect(rotated[1]?.coordinateX).toBeCloseTo(0, 5);
+    expect(rotated[1]?.coordinateY).toBeCloseTo(-1, 5);
+  });
+
+  it("should snap rotation angle when snapEnabled is true", () => {
+    const { modelService, editorService } = setupService();
+    const testVertices = [
+      new Vector3D(1, 0, 0),
+      new Vector3D(-1, 0, 0),
+    ];
+    const baseModel = new MeshGeometry(testVertices, []);
+    modelService.setCurrentModel(baseModel);
+
+    // 16 degrees = 0.279 rad. Snap to 15 deg (pi / 12 = 0.2618 rad)
+    const angle16Deg = (16 * Math.PI) / 180;
+    editorService.applyRotationFromInitial(
+      baseModel,
+      angle16Deg,
+      "XY",
+      true
+    );
+
+    const expectedX = Math.cos(Math.PI / 12);
+    const expectedY = Math.sin(Math.PI / 12);
+    const rotated = modelService.getCurrentModel().vertices;
+    expect(rotated[0]?.coordinateX).toBeCloseTo(expectedX, 5);
+    expect(rotated[0]?.coordinateY).toBeCloseTo(expectedY, 5);
+  });
+
+  it("should rotate only selected vertices if vertices are selected", () => {
+    const { modelService, selectionService, editorService } = setupService();
+    const testVertices = [
+      new Vector3D(1, 0, 0),
+      new Vector3D(0, 1, 0),
+    ];
+    const baseModel = new MeshGeometry(testVertices, []);
+    modelService.setCurrentModel(baseModel);
+
+    // Select vertex 0 only
+    selectionService.selectSingle(0);
+
+    editorService.applyRotationFromInitial(
+      baseModel,
+      Math.PI / 2,
+      "XY",
+      false
+    );
+
+    const rotated = modelService.getCurrentModel().vertices;
+    // Vertex 0 rotated 90 degrees around center (0.5, 0.5, 0)
+    // Vertex 1 unselected, stays at (0, 1, 0)
+    expect(rotated[1]?.coordinateX).toBe(0);
+    expect(rotated[1]?.coordinateY).toBe(1);
+  });
 });

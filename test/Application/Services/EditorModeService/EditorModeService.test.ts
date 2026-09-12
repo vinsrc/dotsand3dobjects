@@ -33,7 +33,7 @@ describe("EditorModeService", () => {
     expect(service.getMode()).toBe("FILL");
   });
 
-  it("should prevent entering TRANSLATE mode in perspective view and emit error", () => {
+  it("should prevent entering TRANSLATE and ROTATE modes in perspective view and emit error", () => {
     const notifier = new ApplicationStateNotifier();
     const errorListener = vi.fn();
     notifier.subscribe("ERROR_OCCURRED", errorListener);
@@ -45,9 +45,15 @@ describe("EditorModeService", () => {
     expect(canEnterTranslate).toBe(false);
     expect(service.getMode()).toBe("DEFAULT");
     expect(errorListener).toHaveBeenCalledWith("Switch to an Orthographic view");
+
+    // Attempt entering ROTATE in perspective
+    const canEnterRotate = service.setMode("ROTATE", false);
+    expect(canEnterRotate).toBe(false);
+    expect(service.getMode()).toBe("DEFAULT");
+    expect(errorListener).toHaveBeenCalledTimes(2);
   });
 
-  it("should allow entering TRANSLATE mode in orthographic view", () => {
+  it("should allow entering TRANSLATE and ROTATE modes in orthographic view", () => {
     const notifier = new ApplicationStateNotifier();
     const modeListener = vi.fn();
     notifier.subscribe("MODE_CHANGED", modeListener);
@@ -58,6 +64,11 @@ describe("EditorModeService", () => {
     expect(canEnterTranslate).toBe(true);
     expect(service.getMode()).toBe("TRANSLATE");
     expect(modeListener).toHaveBeenCalledWith("TRANSLATE");
+
+    const canEnterRotate = service.setMode("ROTATE", true);
+    expect(canEnterRotate).toBe(true);
+    expect(service.getMode()).toBe("ROTATE");
+    expect(modeListener).toHaveBeenCalledWith("ROTATE");
   });
 
   it("should return to DEFAULT mode on finishMode()", () => {

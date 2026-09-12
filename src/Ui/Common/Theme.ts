@@ -32,9 +32,16 @@ export const ThemeColors = {
   disabledSolid: "#4a4a50",
 
   viewportBackground: "#141417",
-  gridLine: "#b3571f",
-  gridCenterLine: "#ff8c2e",
+  gridLine: "#2c2c34",
+  gridCenterLine: "#4e4e5a",
+  edgeShaded: "#f712b2",
+  edgeWireframe: "#f712b2",
 
   backdrop: "rgba(0, 0, 0, 0.5)",
   shadow: "rgba(0, 0, 0, 0.5)",
+
+  decalPlane: "rgba(46, 204, 113, 0.45)",
+  decalPlaneBorder: "#2ecc71",
+  decalPlaneSelected: "rgba(59, 130, 246, 0.5)",
+  decalPlaneSelectedBorder: "#2f81f7",
 } as const;

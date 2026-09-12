@@ -67,5 +67,5 @@ Dont fetch git repository or push to git repository ever.
 
 # Iteration Delivery :
 
-Read  @docs/workflows/iteration-workflow.md and Follow the Iteration Delivery Workflow to deliver the iteration backlog.
+Read  @docs/workflows/local-iteration-workflow.md and Follow the Iteration Delivery Workflow to deliver the iteration backlog.
 

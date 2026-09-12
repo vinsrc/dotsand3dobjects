@@ -1,10 +1,13 @@
 import { MeshGeometry } from "../ModelService/MeshGeometry";
 import { ApplicationStateNotifier } from "../../Common/ApplicationStateNotifier";
+import { DecalPlane } from "../DecalService/DecalPlane";
 
 export interface EditorStateSnapshot {
   readonly model: MeshGeometry;
   readonly selectedIndices: readonly number[];
   readonly activeVertexIndex: number | null;
+  readonly decals?: readonly DecalPlane[];
+  readonly selectedDecalId?: string | null;
 }
 
 export class UndoRedoService {

@@ -5,7 +5,7 @@ import { MeshGeometry } from "../../../../src/Application/Services/ModelService/
 
 describe("MeshGeometry", () => {
   it("should handle empty geometry gracefully", () => {
-    const emptyMesh = new MeshGeometry([], []);
+    const emptyMesh = MeshGeometry.createEmpty();
     expect(emptyMesh.isEmpty()).toBe(true);
     expect(emptyMesh.getVertexCount()).toBe(0);
     expect(emptyMesh.getFaceCount()).toBe(0);
@@ -215,5 +215,28 @@ describe("MeshGeometry", () => {
     // Out of bounds faceIndex returns same mesh
     expect(mesh.reverseFaceWinding(-1)).toBe(mesh);
     expect(mesh.reverseFaceWinding(99)).toBe(mesh);
+  });
+
+  it("should rotate vertices around specified axis and center point", () => {
+    const vertices = [
+      new Vector3D(1, 0, 0),
+      new Vector3D(0, 1, 0),
+    ];
+    const mesh = new MeshGeometry(vertices, []);
+
+    // Rotate 90 degrees around Z axis (0, 0, 1) through origin (0, 0, 0)
+    const rotatedZ = mesh.rotateAroundAxis(
+      new Vector3D(0, 0, 0),
+      new Vector3D(0, 0, 1),
+      Math.PI / 2
+    );
+
+    expect(rotatedZ.vertices[0].coordinateX).toBeCloseTo(0, 5);
+    expect(rotatedZ.vertices[0].coordinateY).toBeCloseTo(1, 5);
+    expect(rotatedZ.vertices[0].coordinateZ).toBeCloseTo(0, 5);
+
+    expect(rotatedZ.vertices[1].coordinateX).toBeCloseTo(-1, 5);
+    expect(rotatedZ.vertices[1].coordinateY).toBeCloseTo(0, 5);
+    expect(rotatedZ.vertices[1].coordinateZ).toBeCloseTo(0, 5);
   });
 });

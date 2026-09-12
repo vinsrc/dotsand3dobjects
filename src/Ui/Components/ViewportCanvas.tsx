@@ -1,13 +1,22 @@
 import React, { useRef, useEffect } from "react";
+import * as THREE from "three";
 import { useAppController } from "../Common/AppContext";
+import { useApplicationState } from "../Common/UseApplicationState";
 import { ViewportRenderer } from "../Common/ViewportRenderer";
 import { ViewportRaycaster } from "../Common/ViewportRaycaster";
 import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeometry";
 import { Vector3D } from "../../Application/Common/Vector3D";
 import { ThemeColors } from "../Common/Theme";
+import { RotateOverlay } from "./RotateOverlay";
 
 export const ViewportCanvas: React.FC = () => {
   const controller = useAppController();
+  useApplicationState([
+    "MODE_CHANGED",
+    "VIEW_CHANGED",
+    "MODEL_CHANGED",
+    "DECALS_CHANGED",
+  ]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -22,6 +31,8 @@ export const ViewportCanvas: React.FC = () => {
   const isDraggingRef = useRef<boolean>(false);
   const lastDragWorldPosRef = useRef<Vector3D | null>(null);
   const dragStartWorldPosRef = useRef<Vector3D | null>(null);
+  const dragCenterScreenPosRef = useRef<{ x: number; y: number } | null>(null);
+  const dragStartAngleRef = useRef<number>(0);
   const clickedVertexOnDownRef = useRef<{
     index: number;
     wasSelected: boolean;
@@ -31,6 +42,39 @@ export const ViewportCanvas: React.FC = () => {
   const lastDoubleActionTimeRef = useRef<number>(0);
   const pendingErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchDoubleTapRef = useRef<boolean>(false);
+
+  const findHitDecal = (clickX: number, clickY: number): string | null => {
+    if (!rendererRef.current || !canvasRef.current) {
+      return null;
+    }
+    const decalMeshes = rendererRef.current.getDecalMeshes();
+    if (decalMeshes.length === 0) {
+      return null;
+    }
+    const rect = canvasRef.current.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+    const normalizedX = (clickX / rect.width) * 2 - 1;
+    const normalizedY = -(clickY / rect.height) * 2 + 1;
+    const camera = rendererRef.current.getActiveCamera();
+    const threeRaycaster = new THREE.Raycaster();
+    threeRaycaster.setFromCamera(
+      new THREE.Vector2(normalizedX, normalizedY),
+      camera
+    );
+    const intersects = threeRaycaster.intersectObjects(
+      decalMeshes as THREE.Mesh[],
+      false
+    );
+    if (intersects.length > 0) {
+      const hit = intersects[0];
+      if (hit?.object?.userData?.decalId) {
+        return hit.object.userData.decalId as string;
+      }
+    }
+    return null;
+  };
 
   const triggerDoubleActionOrthographicView = (
     clientX?: number,
@@ -56,6 +100,20 @@ export const ViewportCanvas: React.FC = () => {
       const rect = canvasRef.current.getBoundingClientRect();
       const clickX = clientX - rect.left;
       const clickY = clientY - rect.top;
+
+      const hitDecalId = findHitDecal(clickX, clickY);
+      if (hitDecalId !== null) {
+        const decal = controller.getDecalService().getDecal(hitDecalId);
+        if (decal) {
+          if (controller.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
+            controller.setDecalOrthographicView(hitDecalId);
+          } else {
+            controller.setFaceOrthographicView(decal.parentFaceIndex);
+          }
+          return;
+        }
+      }
+
       const camera = rendererRef.current.getActiveCamera();
       const currentModel = controller.getModelService().getCurrentModel();
       const nearestFace = raycasterRef.current.findNearestFace(
@@ -107,6 +165,11 @@ export const ViewportCanvas: React.FC = () => {
       initialWidth,
       initialHeight
     );
+    viewportRenderer.updateDecals(
+      controller.getDecals(),
+      controller.getSelectedDecalId(),
+      controller.getMaterialService().getMaterials()
+    );
     viewportRenderer.updateSelection(
       controller.getSelectionService().getSelectedIndices(),
       controller.getSelectionService().getActiveVertex(),
@@ -148,6 +211,11 @@ export const ViewportCanvas: React.FC = () => {
       "MATERIALS_CHANGED",
       () => {
         viewportRenderer.updateMaterials(
+          controller.getMaterialService().getMaterials()
+        );
+        viewportRenderer.updateDecals(
+          controller.getDecals(),
+          controller.getSelectedDecalId(),
           controller.getMaterialService().getMaterials()
         );
       }
@@ -193,6 +261,17 @@ export const ViewportCanvas: React.FC = () => {
       }
     );
 
+    const unsubscribeDecals = controller.getStateNotifier().subscribe(
+      "DECALS_CHANGED",
+      () => {
+        viewportRenderer.updateDecals(
+          controller.getDecals(),
+          controller.getSelectedDecalId(),
+          controller.getMaterialService().getMaterials()
+        );
+      }
+    );
+
     return () => {
       if (pendingErrorTimerRef.current !== null) {
         clearTimeout(pendingErrorTimerRef.current);
@@ -203,6 +282,7 @@ export const ViewportCanvas: React.FC = () => {
       unsubscribeRenderMode();
       unsubscribeView();
       unsubscribeSelection();
+      unsubscribeDecals();
       resizeObserver.disconnect();
       viewportRenderer.dispose();
       rendererRef.current = null;
@@ -335,6 +415,7 @@ export const ViewportCanvas: React.FC = () => {
     const camera = rendererRef.current.getActiveCamera();
     const currentModel = controller.getModelService().getCurrentModel();
     const currentMode = controller.getEditorModeService().getMode();
+    const hitDecalId = findHitDecal(clickX, clickY);
 
     const nearestVertex = raycasterRef.current.findNearestVertex(
       clickX,
@@ -374,7 +455,13 @@ export const ViewportCanvas: React.FC = () => {
         dragStartWorldPosRef.current = startWorldPos;
       }
     } else if (currentMode === "TRANSLATE") {
-      if (controller.getSelectionService().getSelectedIndices().length > 0) {
+      if (hitDecalId !== null && controller.getSelectedDecalId() !== hitDecalId) {
+        controller.selectDecal(hitDecalId);
+      }
+      if (
+        controller.getSelectionService().getSelectedIndices().length > 0 ||
+        controller.isDecalSelected()
+      ) {
         controller.beginTranslation();
         const gridPlane = controller
           .getCameraStateService()
@@ -393,6 +480,27 @@ export const ViewportCanvas: React.FC = () => {
         lastDragWorldPosRef.current = startWorldPos;
         dragStartWorldPosRef.current = startWorldPos;
       }
+    } else if (currentMode === "ROTATE") {
+      if (hitDecalId !== null && controller.getSelectedDecalId() !== hitDecalId) {
+        controller.selectDecal(hitDecalId);
+      }
+      controller.beginRotation();
+      const center = controller.isDecalSelected()
+        ? (controller.getSelectedDecal()?.center ?? currentModel.calculateCenter())
+        : currentModel.calculateCenter();
+      const proj = new THREE.Vector3(
+        center.coordinateX,
+        center.coordinateY,
+        center.coordinateZ
+      );
+      proj.project(camera);
+      const screenCenterX = (proj.x * 0.5 + 0.5) * rect.width;
+      const screenCenterY = (-proj.y * 0.5 + 0.5) * rect.height;
+      dragCenterScreenPosRef.current = { x: screenCenterX, y: screenCenterY };
+      dragStartAngleRef.current = Math.atan2(
+        clickY - screenCenterY,
+        clickX - screenCenterX
+      );
     }
   };
 
@@ -442,6 +550,18 @@ export const ViewportCanvas: React.FC = () => {
           lastDragWorldPosRef.current = currentWorldPos;
         }
       }
+    } else if (currentMode === "ROTATE" && dragCenterScreenPosRef.current) {
+      if (isDraggingRef.current && canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const currentX = event.clientX - rect.left;
+        const currentY = event.clientY - rect.top;
+        const currentAngle = Math.atan2(
+          currentY - dragCenterScreenPosRef.current.y,
+          currentX - dragCenterScreenPosRef.current.x
+        );
+        const deltaAngle = currentAngle - dragStartAngleRef.current;
+        controller.applyDragRotation(-deltaAngle);
+      }
     } else if (isDraggingRef.current) {
       const deltaPixelX = event.clientX - lastPointerPosRef.current.x;
       const deltaPixelY = event.clientY - lastPointerPosRef.current.y;
@@ -479,12 +599,15 @@ export const ViewportCanvas: React.FC = () => {
     const currentMode = controller.getEditorModeService().getMode();
     if (currentMode === "TRANSLATE") {
       controller.endTranslation();
+    } else if (currentMode === "ROTATE") {
+      controller.endRotation();
     }
 
     pointerDownPosRef.current = null;
     isDraggingRef.current = false;
     lastDragWorldPosRef.current = null;
     dragStartWorldPosRef.current = null;
+    dragCenterScreenPosRef.current = null;
     clickedVertexOnDownRef.current = null;
 
     if (wasDragging) {
@@ -504,6 +627,25 @@ export const ViewportCanvas: React.FC = () => {
     const camera = rendererRef.current.getActiveCamera();
     const currentModel = controller.getModelService().getCurrentModel();
     const mode = controller.getEditorModeService().getMode();
+    const hitDecalId = findHitDecal(clickX, clickY);
+
+    const handleDecalTap = (decalId: string): boolean => {
+      const decal = controller.getDecalService().getDecal(decalId);
+      if (!decal) {
+        return false;
+      }
+      if (controller.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
+        controller.selectDecal(decalId);
+      } else {
+        controller.selectFace(decal.parentFaceIndex);
+      }
+      return true;
+    };
+
+    if (hitDecalId !== null) {
+      handleDecalTap(hitDecalId);
+      return;
+    }
 
     if (mode === "TRANSLATE") {
       if (clickedVertexInfo && clickedVertexInfo.wasSelected) {
@@ -698,11 +840,22 @@ export const ViewportCanvas: React.FC = () => {
           height: "100%",
           display: "block",
           cursor:
-            controller.getEditorModeService().getMode() === "TRANSLATE"
+            controller.getEditorModeService().getMode() === "TRANSLATE" ||
+            controller.getEditorModeService().getMode() === "ROTATE"
               ? "grab"
               : "crosshair",
         }}
       />
+      {controller.getEditorModeService().getMode() === "ROTATE" &&
+        controller.getCameraStateService().isOrthographic() && (
+          <RotateOverlay
+            controller={controller}
+            canvasElement={canvasRef.current}
+            getActiveCamera={() =>
+              rendererRef.current?.getActiveCamera() ?? null
+            }
+          />
+        )}
     </div>
   );
 };

@@ -11,6 +11,7 @@ export const MaterialLibraryPanel: React.FC = () => {
     "MATERIAL_PANEL_CHANGED",
     "SELECTION_CHANGED",
     "MODEL_CHANGED",
+    "DECALS_CHANGED",
   ]);
 
   const materialService = controller.getMaterialService();
@@ -18,9 +19,11 @@ export const MaterialLibraryPanel: React.FC = () => {
   const dockSide = materialService.getDockSide();
   const materials = materialService.getMaterials();
   const selectedMaterial = materialService.getSelectedMaterial();
+  const isDecalSelected = controller.isDecalSelected();
   const selectedFaceCount =
     controller.getSelectedFaceIndices().length ||
     (controller.getSelectedFaceIndex() !== null ? 1 : 0);
+  const hasTarget = selectedFaceCount > 0 || isDecalSelected;
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -597,17 +600,17 @@ backgroundColor: ThemeColors.widget,
               )}
             </div>
 
-            {/* Assign to Selected Face(s) */}
+            {/* Assign to Selected Face(s) / Decal */}
             <div style={{ marginTop: "auto", paddingTop: "12px" }}>
               <button
                 data-testid="assign-material-button"
                 onClick={handleAssignToFace}
-                disabled={selectedFaceCount === 0}
+                disabled={!hasTarget}
                 style={{
                   width: "100%",
                   padding: "8px",
                   backgroundColor:
-                    selectedFaceCount > 0
+                    hasTarget
                       ? ThemeColors.success
                       : ThemeColors.disabledSolid,
                   color: "#ffffff",
@@ -615,14 +618,16 @@ backgroundColor: ThemeColors.widget,
                   borderRadius: "4px",
                   fontSize: "12px",
                   fontWeight: 600,
-                  cursor: selectedFaceCount > 0 ? "pointer" : "not-allowed",
+                  cursor: hasTarget ? "pointer" : "not-allowed",
                   boxShadow:
-                    selectedFaceCount > 0
+                    hasTarget
                       ? "0 2px 4px rgba(63,185,80,0.3)"
                       : "none",
                 }}
               >
-                {selectedFaceCount > 0
+                {isDecalSelected
+                  ? "Assign to Decal Plane"
+                  : selectedFaceCount > 0
                   ? `Assign to Selected Face (${selectedFaceCount})`
                   : "Select Face to Assign"}
               </button>

@@ -19,6 +19,8 @@ import {
   UiCustomizationService,
   DockSide,
 } from "../Services/UiCustomizationService/UiCustomizationService";
+import { DecalService } from "../Services/DecalService/DecalService";
+import { DecalPlane } from "../Services/DecalService/DecalPlane";
 
 export class AppController {
   private readonly modelService: ModelService;
@@ -31,7 +33,11 @@ export class AppController {
   private readonly stateNotifier: ApplicationStateNotifier;
   private readonly materialService: MaterialService;
   private readonly uiCustomizationService: UiCustomizationService;
+  private readonly decalService: DecalService;
   private translationInitialModel: MeshGeometry | null = null;
+  private rotationInitialModel: MeshGeometry | null = null;
+  private translationInitialDecal: DecalPlane | null = null;
+  private rotationInitialDecal: DecalPlane | null = null;
 
   public constructor(
     modelService: ModelService,
@@ -43,7 +49,8 @@ export class AppController {
     undoRedoService: UndoRedoService,
     stateNotifier: ApplicationStateNotifier,
     materialService: MaterialService,
-    uiCustomizationService?: UiCustomizationService
+    uiCustomizationService?: UiCustomizationService,
+    decalService?: DecalService
   ) {
     this.modelService = modelService;
     this.cameraStateService = cameraStateService;
@@ -56,6 +63,7 @@ export class AppController {
     this.materialService = materialService;
     this.uiCustomizationService =
       uiCustomizationService ?? new UiCustomizationService(stateNotifier);
+    this.decalService = decalService ?? new DecalService(stateNotifier);
   }
 
   public getModelService(): ModelService {
@@ -238,6 +246,12 @@ export class AppController {
   }
 
   public assignMaterialToSelectedFaces(materialId: string | null): void {
+    if (this.decalService.isDecalSelected()) {
+      this.recordSnapshot();
+      this.decalService.assignMaterialToSelectedDecal(materialId);
+      return;
+    }
+
     const selectedFaces = this.selectionService.getSelectedFaceIndices();
     const targetFaces =
       selectedFaces.length > 0
@@ -257,6 +271,126 @@ export class AppController {
     this.modelService.setCurrentModel(updatedModel);
   }
 
+  public clearMaterialOnSelectedFaces(): void {
+    this.assignMaterialToSelectedFaces(null);
+  }
+
+  public getDecalService(): DecalService {
+    return this.decalService;
+  }
+
+  public getDecals(): readonly DecalPlane[] {
+    return this.decalService.getDecals();
+  }
+
+  public getSelectedDecalId(): string | null {
+    return this.decalService.getSelectedDecalId();
+  }
+
+  public getSelectedDecal(): DecalPlane | null {
+    return this.decalService.getSelectedDecal();
+  }
+
+  public isDecalSelected(): boolean {
+    return this.decalService.isDecalSelected();
+  }
+
+  public isFaceOrthographicViewOf(faceIndex: number): boolean {
+    return (
+      this.cameraStateService.isFaceOrthographicView() &&
+      this.cameraStateService.getActiveFaceIndex() === faceIndex
+    );
+  }
+
+  public canSelectDecal(decalId: string): boolean {
+    const decal = this.decalService.getDecal(decalId);
+    if (!decal) {
+      return false;
+    }
+    return this.isFaceOrthographicViewOf(decal.parentFaceIndex);
+  }
+
+  public selectDecal(id: string | null): boolean {
+    if (id === null) {
+      this.decalService.selectDecal(null);
+      return true;
+    }
+    if (!this.canSelectDecal(id)) {
+      return false;
+    }
+    this.selectionService.clearSelection();
+    this.decalService.selectDecal(id);
+    return true;
+  }
+
+  public deleteSelectedDecal(): boolean {
+    if (!this.decalService.isDecalSelected()) {
+      return false;
+    }
+    this.recordSnapshot();
+    return this.decalService.deleteDecal();
+  }
+
+  public addDecalPlaneToSelectedFace(): boolean {
+    const selectedFaces = this.selectionService.getSelectedFaceIndices();
+    const targetFaceIndex =
+      selectedFaces.length > 0
+        ? selectedFaces[0]
+        : this.selectionService.getSelectedFaceIndex();
+
+    if (targetFaceIndex === null || targetFaceIndex === undefined) {
+      return false;
+    }
+
+    const currentModel = this.modelService.getCurrentModel();
+    const face = currentModel.faces[targetFaceIndex];
+    if (!face) {
+      return false;
+    }
+
+    const faceVertices = face.vertexIndices
+      .map((idx) => currentModel.vertices[idx])
+      .filter((v): v is Vector3D => v !== undefined);
+    if (faceVertices.length < 3) {
+      return false;
+    }
+
+    this.recordSnapshot();
+    const newDecal = this.decalService.createDecalOnFace(
+      targetFaceIndex,
+      faceVertices
+    );
+    this.selectionService.clearSelection();
+
+    // Switch to face orthographic view so decal can be selected and manipulated
+    const faceNormal = face.calculateNormal(currentModel.vertices);
+    const faceCenter = currentModel.calculateFaceCenter(targetFaceIndex);
+    this.cameraStateService.setFaceOrthographicView(
+      targetFaceIndex,
+      faceNormal,
+      faceCenter
+    );
+    this.decalService.selectDecal(newDecal.id);
+    this.stateNotifier.notify("VIEW_CHANGED");
+    return true;
+  }
+
+  public setDecalOrthographicView(decalId: string): boolean {
+    const decal = this.decalService.getDecal(decalId);
+    if (!decal) {
+      return false;
+    }
+    this.cameraStateService.setFaceOrthographicView(
+      decal.parentFaceIndex,
+      decal.normal,
+      decal.center
+    );
+    this.selectionService.clearSelection();
+    this.decalService.selectDecal(decalId);
+    this.stateNotifier.notify("VIEW_CHANGED");
+    return true;
+  }
+
   public getSelectedFaceIndices(): readonly number[] {
     return this.selectionService.getSelectedFaceIndices();
   }
@@ -267,11 +401,17 @@ export class AppController {
   }
 
   public selectOrthographicView(axisIdentifier: OrthographicAxis): void {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
     this.cameraStateService.setOrthographicAxis(axisIdentifier);
     this.stateNotifier.notify("VIEW_CHANGED");
   }
 
   public switchToClosestOrthographicView(): OrthographicAxis {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
     const closestAxis =
       this.cameraStateService.switchToClosestOrthographicView();
     this.stateNotifier.notify("VIEW_CHANGED");
@@ -279,6 +419,9 @@ export class AppController {
   }
 
   public selectFace(faceIndex: number): void {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
     this.recordSnapshot();
     const currentModel = this.modelService.getCurrentModel();
     const targetFace = currentModel.faces[faceIndex];
@@ -301,6 +444,10 @@ export class AppController {
   }
 
   public setFaceOrthographicView(faceIndex: number): void {
+    const selectedDecal = this.decalService.getSelectedDecal();
+    if (selectedDecal && selectedDecal.parentFaceIndex !== faceIndex) {
+      this.decalService.selectDecal(null);
+    }
     const currentModel = this.modelService.getCurrentModel();
     const targetFace = currentModel.faces[faceIndex];
     if (!targetFace) {
@@ -361,6 +508,9 @@ export class AppController {
   }
 
   public rotateCamera(deltaAzimuth: number, deltaElevation: number): void {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
     this.cameraStateService.orbit(deltaAzimuth, deltaElevation);
     this.stateNotifier.notify("VIEW_CHANGED");
   }
@@ -381,12 +531,20 @@ export class AppController {
   }
 
   public centerObject(): void {
+    if (this.decalService.isDecalSelected()) {
+      return;
+    }
     const objectCenter = this.modelService.getCurrentModel().calculateCenter();
     this.cameraStateService.centerOn(objectCenter);
     this.stateNotifier.notify("VIEW_CHANGED");
   }
 
   public enterMode(targetMode: UiMode): boolean {
+    if (this.decalService.isDecalSelected()) {
+      if (targetMode === "INSERT" || targetMode === "FILL") {
+        return false;
+      }
+    }
     const isOrthographic = this.cameraStateService.isOrthographic();
     const success = this.editorModeService.setMode(targetMode, isOrthographic);
     if (success && targetMode === "FILL") {
@@ -434,6 +592,8 @@ export class AppController {
       model: this.modelService.getCurrentModel(),
       selectedIndices: this.selectionService.getSelectedIndices(),
       activeVertexIndex: this.selectionService.getActiveVertex(),
+      decals: this.decalService.getDecals(),
+      selectedDecalId: this.decalService.getSelectedDecalId(),
     });
   }
 
@@ -442,6 +602,8 @@ export class AppController {
       model: this.modelService.getCurrentModel(),
       selectedIndices: this.selectionService.getSelectedIndices(),
       activeVertexIndex: this.selectionService.getActiveVertex(),
+      decals: this.decalService.getDecals(),
+      selectedDecalId: this.decalService.getSelectedDecalId(),
     };
     const previousSnapshot = this.undoRedoService.undo(currentSnapshot);
     if (previousSnapshot) {
@@ -450,6 +612,12 @@ export class AppController {
         previousSnapshot.selectedIndices,
         previousSnapshot.activeVertexIndex
       );
+      if (previousSnapshot.decals) {
+        this.decalService.restoreState(
+          previousSnapshot.decals,
+          previousSnapshot.selectedDecalId ?? null
+        );
+      }
     }
   }
 
@@ -458,6 +626,8 @@ export class AppController {
       model: this.modelService.getCurrentModel(),
       selectedIndices: this.selectionService.getSelectedIndices(),
       activeVertexIndex: this.selectionService.getActiveVertex(),
+      decals: this.decalService.getDecals(),
+      selectedDecalId: this.decalService.getSelectedDecalId(),
     };
     const nextSnapshot = this.undoRedoService.redo(currentSnapshot);
     if (nextSnapshot) {
@@ -466,6 +636,12 @@ export class AppController {
         nextSnapshot.selectedIndices,
         nextSnapshot.activeVertexIndex
       );
+      if (nextSnapshot.decals) {
+        this.decalService.restoreState(
+          nextSnapshot.decals,
+          nextSnapshot.selectedDecalId ?? null
+        );
+      }
     }
   }
 
@@ -478,16 +654,26 @@ export class AppController {
   }
 
   public selectSingleVertex(vertexIndex: number): void {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
     this.recordSnapshot();
     this.selectionService.selectSingle(vertexIndex);
   }
 
   public toggleVertexSelection(vertexIndex: number): void {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
     this.recordSnapshot();
     this.selectionService.toggleSelect(vertexIndex);
   }
 
   public clearSelection(): void {
+    if (this.decalService.isDecalSelected()) {
+      this.recordSnapshot();
+      this.decalService.selectDecal(null);
+    }
     if (this.selectionService.getSelectedIndices().length > 0) {
       this.recordSnapshot();
       this.selectionService.clearSelection();
@@ -495,6 +681,9 @@ export class AppController {
   }
 
   public deleteSelectedVertices(): void {
+    if (this.decalService.isDecalSelected()) {
+      return;
+    }
     if (this.selectionService.getSelectedIndices().length === 0) {
       return;
     }
@@ -504,11 +693,16 @@ export class AppController {
 
   public beginTranslation(): void {
     this.recordSnapshot();
-    this.translationInitialModel = this.modelService.getCurrentModel();
+    if (this.decalService.isDecalSelected()) {
+      this.translationInitialDecal = this.decalService.getSelectedDecal();
+    } else {
+      this.translationInitialModel = this.modelService.getCurrentModel();
+    }
   }
 
   public endTranslation(): void {
     this.translationInitialModel = null;
+    this.translationInitialDecal = null;
   }
 
   public applyDragTranslation(totalDragOffset: Vector3D): void {
@@ -518,6 +712,20 @@ export class AppController {
         "ERROR_OCCURRED",
         "Switch to an Orthographic view"
       );
+      return;
+    }
+
+    if (this.decalService.isDecalSelected()) {
+      if (!this.translationInitialDecal) {
+        this.translationInitialDecal = this.decalService.getSelectedDecal();
+      }
+      if (this.translationInitialDecal) {
+        const translatedDecal = this.translationInitialDecal.translate(totalDragOffset);
+        this.decalService.restoreState(
+          this.decalService.getDecals().map((d) => (d.id === translatedDecal.id ? translatedDecal : d)),
+          translatedDecal.id
+        );
+      }
       return;
     }
 
@@ -535,6 +743,69 @@ export class AppController {
       totalDragOffset,
       activeGridPlane,
       isSnapEnabled
+    );
+  }
+
+  public beginRotation(): void {
+    this.recordSnapshot();
+    if (this.decalService.isDecalSelected()) {
+      this.rotationInitialDecal = this.decalService.getSelectedDecal();
+    } else {
+      this.rotationInitialModel = this.modelService.getCurrentModel();
+    }
+  }
+
+  public endRotation(): void {
+    this.rotationInitialModel = null;
+    this.rotationInitialDecal = null;
+  }
+
+  public applyDragRotation(angleRadians: number): void {
+    const isOrthographic = this.cameraStateService.isOrthographic();
+    if (!isOrthographic) {
+      this.stateNotifier.notify(
+        "ERROR_OCCURRED",
+        "Switch to an Orthographic view"
+      );
+      return;
+    }
+
+    if (this.decalService.isDecalSelected()) {
+      if (!this.rotationInitialDecal) {
+        this.rotationInitialDecal = this.decalService.getSelectedDecal();
+      }
+      if (this.rotationInitialDecal) {
+        const viewDirection = this.cameraStateService.getActiveStrategy().getViewDirection();
+        const isSnapEnabled = this.editorModeService.isGridSnapEnabled();
+        let effectiveAngle = angleRadians;
+        if (isSnapEnabled) {
+          const step = Math.PI / 12;
+          effectiveAngle = Math.round(angleRadians / step) * step;
+        }
+        const rotatedDecal = this.rotationInitialDecal.rotate(effectiveAngle, viewDirection);
+        this.decalService.restoreState(
+          this.decalService.getDecals().map((d) => (d.id === rotatedDecal.id ? rotatedDecal : d)),
+          rotatedDecal.id
+        );
+      }
+      return;
+    }
+
+    if (!this.rotationInitialModel) {
+      this.rotationInitialModel = this.modelService.getCurrentModel();
+    }
+
+    const activeStrategy = this.cameraStateService.getActiveStrategy();
+    const activeGridPlane = activeStrategy.getGridPlane();
+    const viewDirection = activeStrategy.getViewDirection();
+    const isSnapEnabled = this.editorModeService.isGridSnapEnabled();
+
+    this.geometryEditorService.applyRotationFromInitial(
+      this.rotationInitialModel,
+      angleRadians,
+      activeGridPlane,
+      isSnapEnabled,
+      viewDirection
     );
   }
 

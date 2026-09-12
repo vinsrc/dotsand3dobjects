@@ -176,6 +176,63 @@ export class GeometryEditorService {
     this.modelService.setCurrentModel(updatedModel);
   }
 
+  public applyRotationFromInitial(
+    initialModel: MeshGeometry,
+    angleRadians: number,
+    gridPlane: GridPlaneType,
+    snapEnabled: boolean,
+    rotationAxisDirection?: Vector3D
+  ): void {
+    let effectiveAngle = angleRadians;
+    if (snapEnabled) {
+      const step = Math.PI / 12;
+      effectiveAngle = Math.round(angleRadians / step) * step;
+    }
+
+    const center = initialModel.calculateCenter();
+    let axis: Vector3D;
+    if (rotationAxisDirection) {
+      axis = rotationAxisDirection;
+    } else {
+      switch (gridPlane) {
+        case "XY":
+          axis = new Vector3D(0, 0, 1);
+          break;
+        case "YZ":
+          axis = new Vector3D(1, 0, 0);
+          break;
+        case "XZ":
+          axis = new Vector3D(0, 1, 0);
+          break;
+        default:
+          axis = new Vector3D(0, 0, 1);
+      }
+    }
+
+    const selectedIndices = this.selectionService.getSelectedIndices();
+    let updatedModel: MeshGeometry;
+
+    if (selectedIndices.length > 0) {
+      const selectedSet = new Set(selectedIndices);
+      const rotatedFull = initialModel.rotateAroundAxis(center, axis, effectiveAngle);
+      const updatedVertices = initialModel.vertices.map((curVertex, index) => {
+        if (selectedSet.has(index)) {
+          return rotatedFull.vertices[index] as Vector3D;
+        }
+        return curVertex;
+      });
+      updatedModel = new MeshGeometry(
+        updatedVertices,
+        initialModel.faces,
+        initialModel.explicitEdges
+      );
+    } else {
+      updatedModel = initialModel.rotateAroundAxis(center, axis, effectiveAngle);
+    }
+
+    this.modelService.setCurrentModel(updatedModel);
+  }
+
   public insertVertexOnEdge(
     startVertexIndex: number,
     endVertexIndex: number

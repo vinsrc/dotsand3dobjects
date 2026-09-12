@@ -13,6 +13,7 @@ export const SideToolBar: React.FC = () => {
     "SELECTION_CHANGED",
     "UNDO_REDO_STATE_CHANGED",
     "UI_CUSTOMIZATION_CHANGED",
+    "DECALS_CHANGED",
   ]);
 
   const dockSide = controller.getUiCustomizationService().getSideToolBarDock();
@@ -20,6 +21,7 @@ export const SideToolBar: React.FC = () => {
   const isGridSnap = controller.isGridSnapEnabled();
   const canUndo = controller.canUndo();
   const canRedo = controller.canRedo();
+  const isDecalSelected = controller.isDecalSelected();
   const selectedVertexCount = controller
     .getSelectionService()
     .getSelectedIndices().length;
@@ -127,7 +129,8 @@ export const SideToolBar: React.FC = () => {
       <button
         data-testid="center-object-button"
         onClick={handleCenterObject}
-        style={buttonStyle}
+        disabled={isDecalSelected}
+        style={!isDecalSelected ? buttonStyle : disabledButtonStyle}
       >
         Center Object
       </button>
@@ -145,8 +148,8 @@ export const SideToolBar: React.FC = () => {
       <button
         data-testid="clear-selection-button"
         onClick={handleClearSelection}
-        disabled={!hasSelectedVertex}
-        style={hasSelectedVertex ? buttonStyle : disabledButtonStyle}
+        disabled={!hasSelectedVertex && !isDecalSelected}
+        style={hasSelectedVertex || isDecalSelected ? buttonStyle : disabledButtonStyle}
       >
         Clear selection
       </button>
@@ -154,8 +157,8 @@ export const SideToolBar: React.FC = () => {
       <button
         data-testid="delete-vertex-button"
         onClick={handleDeleteVertex}
-        disabled={!hasSelectedVertex}
-        style={hasSelectedVertex ? buttonStyle : disabledButtonStyle}
+        disabled={!hasSelectedVertex || isDecalSelected}
+        style={hasSelectedVertex && !isDecalSelected ? buttonStyle : disabledButtonStyle}
       >
         Delete vertex
       </button>
@@ -163,7 +166,14 @@ export const SideToolBar: React.FC = () => {
       <button
         data-testid="mode-insert-button"
         onClick={() => handleEnterMode("INSERT")}
-        style={currentMode === "INSERT" ? activeModeButtonStyle : buttonStyle}
+        disabled={isDecalSelected}
+        style={
+          isDecalSelected
+            ? disabledButtonStyle
+            : currentMode === "INSERT"
+            ? activeModeButtonStyle
+            : buttonStyle
+        }
       >
         Insert
       </button>
@@ -179,9 +189,24 @@ export const SideToolBar: React.FC = () => {
       </button>
 
       <button
+        data-testid="mode-rotate-button"
+        onClick={() => handleEnterMode("ROTATE")}
+        style={currentMode === "ROTATE" ? activeModeButtonStyle : buttonStyle}
+      >
+        Rotate
+      </button>
+
+      <button
         data-testid="mode-fill-button"
         onClick={() => handleEnterMode("FILL")}
-        style={currentMode === "FILL" ? activeModeButtonStyle : buttonStyle}
+        disabled={isDecalSelected}
+        style={
+          isDecalSelected
+            ? disabledButtonStyle
+            : currentMode === "FILL"
+            ? activeModeButtonStyle
+            : buttonStyle
+        }
       >
         Fill
       </button>

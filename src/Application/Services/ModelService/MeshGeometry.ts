@@ -18,6 +18,10 @@ export class MeshGeometry {
     this.wireframeEdges = this.buildUniqueEdges();
   }
 
+  public static createEmpty(): MeshGeometry {
+    return new MeshGeometry([]);
+  }
+
   public isEmpty(): boolean {
     return this.vertices.length === 0;
   }
@@ -114,6 +118,43 @@ export class MeshGeometry {
       currentVertex.add(offsetVector)
     );
     return new MeshGeometry(translatedVertices, this.faces, this.explicitEdges);
+  }
+
+  public rotateAroundAxis(
+    centerPoint: Vector3D,
+    axisDirection: Vector3D,
+    angleRadians: number
+  ): MeshGeometry {
+    const normalizedAxis = axisDirection.normalize();
+    const cosAngle = Math.cos(angleRadians);
+    const sinAngle = Math.sin(angleRadians);
+
+    const rotatedVertices = this.vertices.map((currentVertex) => {
+      const relativeVector = currentVertex.subtract(centerPoint);
+      const dotProduct = relativeVector.calculateDotProduct(normalizedAxis);
+      const crossProduct = normalizedAxis.calculateCrossProduct(relativeVector);
+
+      const rotatedX =
+        relativeVector.coordinateX * cosAngle +
+        crossProduct.coordinateX * sinAngle +
+        normalizedAxis.coordinateX * dotProduct * (1 - cosAngle);
+      const rotatedY =
+        relativeVector.coordinateY * cosAngle +
+        crossProduct.coordinateY * sinAngle +
+        normalizedAxis.coordinateY * dotProduct * (1 - cosAngle);
+      const rotatedZ =
+        relativeVector.coordinateZ * cosAngle +
+        crossProduct.coordinateZ * sinAngle +
+        normalizedAxis.coordinateZ * dotProduct * (1 - cosAngle);
+
+      return new Vector3D(
+        centerPoint.coordinateX + rotatedX,
+        centerPoint.coordinateY + rotatedY,
+        centerPoint.coordinateZ + rotatedZ
+      );
+    });
+
+    return new MeshGeometry(rotatedVertices, this.faces, this.explicitEdges);
   }
 
   public scale(scalarFactor: number): MeshGeometry {

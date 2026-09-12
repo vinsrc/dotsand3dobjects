@@ -410,6 +410,44 @@ describe("AppController", () => {
     appController.endTranslation();
   });
 
+  it("should handle beginRotation, applyDragRotation, and endRotation in orthographic and reject in perspective", () => {
+    const { appController, modelService, stateNotifier } = createController();
+    const errorListener = vi.fn();
+    stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+
+    // Rejects in perspective view
+    appController.applyDragRotation(Math.PI / 2);
+    expect(errorListener).toHaveBeenCalledWith("Switch to an Orthographic view");
+
+    // Switch to orthographic
+    appController.selectOrthographicView("+Z");
+    appController.beginRotation();
+
+    const initialPos = modelService.getCurrentModel().vertices[0] as Vector3D;
+
+    // Apply rotation of 90 degrees with snap enabled
+    appController.applyDragRotation(Math.PI / 2);
+
+    const rotatedVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
+    expect(rotatedVertex.coordinateX).not.toBe(initialPos.coordinateX);
+
+    appController.endRotation();
+
+    // Test undo
+    expect(appController.canUndo()).toBe(true);
+    appController.undo();
+    const undoneVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
+    expect(undoneVertex.coordinateX).toBeCloseTo(initialPos.coordinateX, 5);
+    expect(undoneVertex.coordinateY).toBeCloseTo(initialPos.coordinateY, 5);
+
+    // Test redo
+    expect(appController.canRedo()).toBe(true);
+    appController.redo();
+    const redoneVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
+    expect(redoneVertex.coordinateX).toBeCloseTo(rotatedVertex.coordinateX, 5);
+    expect(redoneVertex.coordinateY).toBeCloseTo(rotatedVertex.coordinateY, 5);
+  });
+
   it("should insert vertex on edge and connect vertices", () => {
     const { appController, modelService } = createController();
     const initialCount = modelService.getCurrentModel().getVertexCount();
@@ -670,6 +708,47 @@ describe("AppController", () => {
     appController.assignMaterialToSelectedFaces(secondMat.id);
   });
 
+  it("should clear material on selected faces and support undo/redo", () => {
+    const { appController, modelService, materialService } = createController();
+    const createdMat = appController.createMaterial();
+
+    // Select single face and assign material
+    appController.selectFace(0);
+    appController.assignMaterialToSelectedFaces(createdMat.id);
+    expect(modelService.getCurrentModel().faces[0].materialId).toBe(createdMat.id);
+
+    // Clear material on selected face
+    appController.clearMaterialOnSelectedFaces();
+    expect(modelService.getCurrentModel().faces[0].materialId).toBeNull();
+
+    // Undo should restore material
+    expect(appController.canUndo()).toBe(true);
+    appController.undo();
+    expect(modelService.getCurrentModel().faces[0].materialId).toBe(createdMat.id);
+
+    // Redo should re-clear material
+    expect(appController.canRedo()).toBe(true);
+    appController.redo();
+    expect(modelService.getCurrentModel().faces[0].materialId).toBeNull();
+
+    // Multi-selection material clearing
+    appController.selectFace(0);
+    appController.assignMaterialToSelectedFaces(createdMat.id);
+    appController.enterMode("MULTI_SELECT");
+    appController.selectFace(1);
+    appController.assignMaterialToSelectedFaces(createdMat.id);
+    expect(modelService.getCurrentModel().faces[0].materialId).toBe(createdMat.id);
+    expect(modelService.getCurrentModel().faces[1].materialId).toBe(createdMat.id);
+
+    appController.clearMaterialOnSelectedFaces();
+    expect(modelService.getCurrentModel().faces[0].materialId).toBeNull();
+    expect(modelService.getCurrentModel().faces[1].materialId).toBeNull();
+
+    // Safe no-op when no face is selected
+    appController.clearSelection();
+    appController.clearMaterialOnSelectedFaces();
+  });
+
   it("should support loadModelFromFile with both OBJ and MTL content", () => {
     const { appController, modelService, materialService } = createController();
 
@@ -885,6 +964,209 @@ describe("AppController", () => {
     selectionService.restoreSelection([0, 1, 2], 2);
     appController.enterMode("FILL");
     expect(modelService.getCurrentModel().explicitEdges).toHaveLength(0);
+  });
+
+  describe("Decal Plane Feature", () => {
+    it("should add decal plane to selected face and select it", () => {
+      const { appController } = createController();
+      appController.selectFace(0);
+      expect(appController.isDecalSelected()).toBe(false);
+
+      const added = appController.addDecalPlaneToSelectedFace();
+      expect(added).toBe(true);
+      expect(appController.getDecals().length).toBe(1);
+      expect(appController.isDecalSelected()).toBe(true);
+      expect(appController.getSelectedDecal()).toBeDefined();
+      expect(appController.getSelectedDecal()?.parentFaceIndex).toBe(0);
+    });
+
+    it("should fail to add decal plane when no face is selected", () => {
+      const { appController } = createController();
+      appController.clearSelection();
+      const added = appController.addDecalPlaneToSelectedFace();
+      expect(added).toBe(false);
+      expect(appController.getDecals().length).toBe(0);
+    });
+
+    it("should disable INSERT and FILL modes when decal is selected", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+      expect(appController.isDecalSelected()).toBe(true);
+
+      // INSERT should be rejected
+      const insertResult = appController.enterMode("INSERT");
+      expect(insertResult).toBe(false);
+      expect(appController.getEditorModeService().getMode()).toBe("DEFAULT");
+
+      // FILL should be rejected
+      const fillResult = appController.enterMode("FILL");
+      expect(fillResult).toBe(false);
+      expect(appController.getEditorModeService().getMode()).toBe("DEFAULT");
+
+      // TRANSLATE and ROTATE should succeed
+      const translateResult = appController.enterMode("TRANSLATE");
+      expect(translateResult).toBe(true);
+      expect(appController.getEditorModeService().getMode()).toBe("TRANSLATE");
+
+      const rotateResult = appController.enterMode("ROTATE");
+      expect(rotateResult).toBe(true);
+      expect(appController.getEditorModeService().getMode()).toBe("ROTATE");
+    });
+
+    it("should prevent deleteSelectedVertices and centerObject when decal is selected", () => {
+      const { appController, modelService, cameraStateService } = createController();
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+
+      const vertexCount = modelService.getCurrentModel().getVertexCount();
+      appController.deleteSelectedVertices();
+      expect(modelService.getCurrentModel().getVertexCount()).toBe(vertexCount);
+
+      const targetBefore = cameraStateService.getTargetPoint();
+      cameraStateService.pan(5, 5);
+      appController.centerObject();
+      // centerObject should be a no-op when decal is selected
+      expect(cameraStateService.getTargetPoint().coordinateX).not.toBe(targetBefore.coordinateX);
+    });
+
+    it("should switch to decal orthographic view", () => {
+      const { appController, cameraStateService } = createController();
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+      const decal = appController.getSelectedDecal()!;
+
+      const success = appController.setDecalOrthographicView(decal.id);
+      expect(success).toBe(true);
+      expect(cameraStateService.isOrthographic()).toBe(true);
+      expect(cameraStateService.isFaceOrthographicView()).toBe(true);
+    });
+
+    it("should assign and clear material on selected decal plane", () => {
+      const { appController } = createController();
+      const material = appController.createMaterial("Sticker_1");
+
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+
+      // Assign material to decal
+      appController.assignMaterialToSelectedFaces(material.id);
+      expect(appController.getSelectedDecal()?.materialId).toBe(material.id);
+
+      // Clear material on decal
+      appController.clearMaterialOnSelectedFaces();
+      expect(appController.getSelectedDecal()?.materialId).toBeNull();
+    });
+
+    it("should translate and rotate decal plane in orthographic view", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+      const initialCenter = appController.getSelectedDecal()!.center;
+
+      // Translate decal
+      appController.beginTranslation();
+      appController.applyDragTranslation(new Vector3D(1, 2, 0));
+      appController.endTranslation();
+
+      const translatedCenter = appController.getSelectedDecal()!.center;
+      expect(translatedCenter.coordinateX).toBeCloseTo(initialCenter.coordinateX + 1, 4);
+      expect(translatedCenter.coordinateY).toBeCloseTo(initialCenter.coordinateY + 2, 4);
+
+      // Rotate decal
+      appController.beginRotation();
+      appController.applyDragRotation(Math.PI / 4);
+      appController.endRotation();
+
+      expect(appController.getSelectedDecal()!.rotationAngle).toBeCloseTo(Math.PI / 4, 4);
+    });
+
+    it("should support undo and redo for decal creation and manipulation", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+
+      // Add decal
+      appController.addDecalPlaneToSelectedFace();
+      expect(appController.getDecals().length).toBe(1);
+
+      // Undo creation
+      appController.undo();
+      expect(appController.getDecals().length).toBe(0);
+
+      // Redo creation
+      appController.redo();
+      expect(appController.getDecals().length).toBe(1);
+
+      // Assign material
+      const mat = appController.createMaterial("Logo");
+      appController.selectDecal("decal_1");
+      appController.assignMaterialToSelectedFaces(mat.id);
+      expect(appController.getSelectedDecal()?.materialId).toBe(mat.id);
+
+      // Undo material assignment
+      appController.undo();
+      expect(appController.getSelectedDecal()?.materialId).toBeNull();
+
+      // Redo material assignment
+      appController.redo();
+      expect(appController.getSelectedDecal()?.materialId).toBe(mat.id);
+    });
+
+    it("should delete selected decal and support undo and redo", () => {
+      const { appController } = createController();
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+      expect(appController.getDecals().length).toBe(1);
+      expect(appController.isDecalSelected()).toBe(true);
+
+      const deleted = appController.deleteSelectedDecal();
+      expect(deleted).toBe(true);
+      expect(appController.getDecals().length).toBe(0);
+      expect(appController.isDecalSelected()).toBe(false);
+
+      // Undo deletion
+      appController.undo();
+      expect(appController.getDecals().length).toBe(1);
+
+      // Redo deletion
+      appController.redo();
+      expect(appController.getDecals().length).toBe(0);
+    });
+
+    it("should allow decal selection only in face orthographic view of its parent face", () => {
+      const { appController, cameraStateService } = createController();
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+      const decal = appController.getSelectedDecal()!;
+
+      expect(appController.isFaceOrthographicViewOf(0)).toBe(true);
+      expect(appController.canSelectDecal(decal.id)).toBe(true);
+
+      // Switch to a different view (e.g. +X orthographic)
+      appController.selectOrthographicView("+X");
+      expect(appController.isDecalSelected()).toBe(false);
+      expect(appController.canSelectDecal(decal.id)).toBe(false);
+
+      // Selecting decal while outside parent face orthographic view should fail
+      const selectResult = appController.selectDecal(decal.id);
+      expect(selectResult).toBe(false);
+      expect(appController.isDecalSelected()).toBe(false);
+
+      // Switch back to parent face orthographic view
+      appController.setFaceOrthographicView(0);
+      expect(appController.canSelectDecal(decal.id)).toBe(true);
+      const selectResult2 = appController.selectDecal(decal.id);
+      expect(selectResult2).toBe(true);
+      expect(appController.isDecalSelected()).toBe(true);
+
+      // Orbiting camera should auto-deselect decal
+      appController.rotateCamera(0.2, 0.3);
+      expect(cameraStateService.isOrthographic()).toBe(false);
+      expect(appController.isDecalSelected()).toBe(false);
+    });
   });
 });
 

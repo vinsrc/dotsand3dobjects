@@ -4,6 +4,7 @@ export type UiMode =
   | "DEFAULT"
   | "MULTI_SELECT"
   | "TRANSLATE"
+  | "ROTATE"
   | "INSERT"
   | "FILL";
 
@@ -25,7 +26,7 @@ export class EditorModeService {
   }
 
   public setMode(targetMode: UiMode, isOrthographic: boolean): boolean {
-    if (targetMode === "TRANSLATE" && !isOrthographic) {
+    if ((targetMode === "TRANSLATE" || targetMode === "ROTATE") && !isOrthographic) {
       this.stateNotifier.notify(
         "ERROR_OCCURRED",
         "Switch to an Orthographic view"

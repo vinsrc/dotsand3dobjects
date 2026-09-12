@@ -21,6 +21,8 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     "SELECTION_CHANGED",
     "MATERIAL_PANEL_CHANGED",
     "VIEW_CHANGED",
+    "MODEL_CHANGED",
+    "DECALS_CHANGED",
   ]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +36,23 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     .getSelectionService()
     .getSelectedIndices().length;
   const canFillFace = selectedVertexCount >= 3;
+  const selectedFaceCount =
+    controller.getSelectedFaceIndices().length ||
+    (controller.getSelectedFaceIndex() !== null ? 1 : 0);
+  const hasSelectedFace = selectedFaceCount > 0;
+  const isDecalSelected = controller.isDecalSelected();
+
+  const handleClearMaterial = () => {
+    controller.clearMaterialOnSelectedFaces();
+  };
+
+  const handleAddDecalPlane = () => {
+    controller.addDecalPlaneToSelectedFace();
+  };
+
+  const handleDeleteDecalPlane = () => {
+    controller.deleteSelectedDecal();
+  };
 
   const handleSetFront = () => {
     controller.setFaceFront();
@@ -253,6 +272,20 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           <span>🎨</span>
           <span>Material Library</span>
         </button>
+        {(hasSelectedFace || isDecalSelected) && (
+          <button
+            data-testid="clear-material-button"
+            onClick={handleClearMaterial}
+            title="Clear material from selected face or decal"
+            style={{
+              ...buttonStyle,
+              backgroundColor: ThemeColors.widget,
+              color: ThemeColors.textPrimary,
+            }}
+          >
+            Clear Material
+          </button>
+        )}
         {onOpenHelp && (
           <button
             data-testid="help-button"
@@ -292,6 +325,37 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           justifyContent: "flex-end",
         }}
       >
+        {hasSelectedFace && (
+          <button
+            data-testid="add-decal-plane-button"
+            onClick={handleAddDecalPlane}
+            title="Add Decal Plane to selected face"
+            style={{
+              ...buttonStyle,
+              backgroundColor: ThemeColors.widget,
+              color: ThemeColors.textPrimary,
+            }}
+          >
+            Add Decal Plane
+          </button>
+        )}
+
+        {isDecalSelected && (
+          <button
+            data-testid="delete-decal-plane-button"
+            onClick={handleDeleteDecalPlane}
+            title="Delete selected Decal Plane"
+            style={{
+              ...buttonStyle,
+              backgroundColor: ThemeColors.widget,
+              color: ThemeColors.danger,
+              borderColor: ThemeColors.dangerBorder ?? ThemeColors.borderStrong,
+            }}
+          >
+            Delete Decal Plane
+          </button>
+        )}
+
         {currentMode === "INSERT" && (
           <button
             data-testid="auto-connect-toggle-button"

@@ -6,6 +6,8 @@ import { GridPlaneType } from "../../Application/Services/CameraService/ViewStra
 import { AXIS_COLORS } from "./AxisColors";
 import { ThemeColors } from "./Theme";
 import { Material3D } from "../../Application/Services/MaterialService/Material3D";
+import { ViewportGrid } from "./ViewportGrid";
+import { DecalPlane } from "../../Application/Services/DecalService/DecalPlane";
 
 export class ViewportRenderer {
   private readonly canvasElement: HTMLCanvasElement;
@@ -18,13 +20,14 @@ export class ViewportRenderer {
   private wireframeLines: THREE.LineSegments;
   private vertexPoints: THREE.Points;
   private selectedPoints: THREE.Points;
-  private gridHelperInstance: THREE.GridHelper | null = null;
+  private gridHelperInstance: THREE.LineSegments | null = null;
   private axisLinesInstance: THREE.LineSegments | null = null;
   private isOrthographicViewActive: boolean = false;
   private isRendererDisposed: boolean = false;
 
-  private currentModelGeometry: MeshGeometry | null = null;
+  private currentModelGeometry: MeshGeometry = MeshGeometry.createEmpty();
   private currentSelectedIndices: readonly number[] = [];
+  private currentActiveVertexIndex: number | null = null;
   private currentSelectedFaceIndex: number | null = null;
   private currentSelectedFaceIndices: readonly number[] = [];
   private currentMaterials: readonly Material3D[] = [];
@@ -33,6 +36,11 @@ export class ViewportRenderer {
   private readonly loadedTextures: Map<string, THREE.Texture> = new Map();
   private selectedFaceMesh: THREE.Mesh;
   private activeAxisLabel: string = "";
+
+  private readonly decalGroup: THREE.Group;
+  private currentDecals: readonly DecalPlane[] = [];
+  private currentSelectedDecalId: string | null = null;
+  private decalMeshesList: THREE.Mesh[] = [];
 
   public constructor(canvasElement: HTMLCanvasElement) {
     this.canvasElement = canvasElement;
@@ -67,6 +75,9 @@ export class ViewportRenderer {
       metalness: 0.1,
       flatShading: true,
       side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
     });
     this.surfaceMesh = new THREE.Mesh(
       new THREE.BufferGeometry(),
@@ -77,11 +88,12 @@ export class ViewportRenderer {
     this.wireframeLines = new THREE.LineSegments(
       new THREE.BufferGeometry(),
       new THREE.LineBasicMaterial({
-        color: 0x9a9a9a,
-        transparent: true,
-        opacity: 0.35,
+        color: new THREE.Color(ThemeColors.edgeShaded),
+        transparent: false,
+        opacity: 1.0,
       })
     );
+    this.wireframeLines.renderOrder = 1;
     this.sceneInstance.add(this.wireframeLines);
 
     this.vertexPoints = new THREE.Points(
@@ -121,6 +133,9 @@ export class ViewportRenderer {
     this.selectedFaceMesh.renderOrder = 2;
     this.sceneInstance.add(this.selectedFaceMesh);
 
+    this.decalGroup = new THREE.Group();
+    this.sceneInstance.add(this.decalGroup);
+
     this.setupLighting();
     this.setupGridHelper();
     this.setupAxesHelper();
@@ -130,6 +145,10 @@ export class ViewportRenderer {
 
   public getAxisLines(): THREE.LineSegments | null {
     return this.axisLinesInstance;
+  }
+
+  public getGridLines(): THREE.LineSegments | null {
+    return this.gridHelperInstance;
   }
 
   public getCurrentModel(): MeshGeometry | null {
@@ -269,19 +288,166 @@ export class ViewportRenderer {
     if (renderMode === "FLAT_SHADED") {
       this.surfaceMesh.visible = true;
       this.wireframeLines.visible = true;
-      wireframeMaterial.color.set(0x9a9a9a);
-      wireframeMaterial.transparent = true;
-      wireframeMaterial.opacity = 0.35;
+      wireframeMaterial.color.set(ThemeColors.edgeShaded);
+      wireframeMaterial.transparent = false;
+      wireframeMaterial.opacity = 1.0;
     } else {
       this.surfaceMesh.visible = false;
       this.wireframeLines.visible = true;
-      wireframeMaterial.color.set(0xdddddd);
+      wireframeMaterial.color.set(ThemeColors.edgeWireframe);
       wireframeMaterial.transparent = false;
       wireframeMaterial.opacity = 1.0;
     }
 
     wireframeMaterial.needsUpdate = true;
     this.render();
+  }
+
+  public getDecalMeshes(): readonly THREE.Mesh[] {
+    return this.decalMeshesList;
+  }
+
+  public getCurrentDecals(): readonly DecalPlane[] {
+    return this.currentDecals;
+  }
+
+  public updateDecals(
+    decals: readonly DecalPlane[],
+    selectedDecalId: string | null,
+    materials?: readonly Material3D[]
+  ): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+    this.currentDecals = decals;
+    this.currentSelectedDecalId = selectedDecalId;
+    if (materials) {
+      this.currentMaterials = materials;
+    }
+    this.rebuildDecalMeshes();
+    this.render();
+  }
+
+  private rebuildDecalMeshes(): void {
+    while (this.decalGroup.children.length > 0) {
+      const child = this.decalGroup.children[0] as THREE.Object3D;
+      this.decalGroup.remove(child);
+      if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    }
+    this.decalMeshesList = [];
+
+    const materialMap = new Map<string, Material3D>();
+    for (const mat of this.currentMaterials) {
+      materialMap.set(mat.id, mat);
+    }
+
+    for (const decal of this.currentDecals) {
+      const isSelected = decal.id === this.currentSelectedDecalId;
+      const [v0, v1, v2, v3] = decal.vertices;
+
+      const positions = [
+        v0.coordinateX, v0.coordinateY, v0.coordinateZ,
+        v1.coordinateX, v1.coordinateY, v1.coordinateZ,
+        v2.coordinateX, v2.coordinateY, v2.coordinateZ,
+
+        v0.coordinateX, v0.coordinateY, v0.coordinateZ,
+        v2.coordinateX, v2.coordinateY, v2.coordinateZ,
+        v3.coordinateX, v3.coordinateY, v3.coordinateZ,
+      ];
+
+      const uvs = [
+        0, 0,
+        1, 0,
+        1, 1,
+
+        0, 0,
+        1, 1,
+        0, 1,
+      ];
+
+      const quadGeo = new THREE.BufferGeometry();
+      quadGeo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      quadGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      quadGeo.computeVertexNormals();
+
+      let quadMat: THREE.Material;
+      const assignedMat = decal.materialId ? materialMap.get(decal.materialId) : null;
+      if (assignedMat) {
+        if (assignedMat.hasImage() && assignedMat.imageUrl) {
+          const texture = this.getTexture(assignedMat.imageUrl);
+          quadMat = new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.5,
+            metalness: 0.0,
+            transparent: true,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
+          });
+        } else {
+          quadMat = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(assignedMat.baseColor),
+            roughness: assignedMat.roughness,
+            metalness: assignedMat.metalness,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
+          });
+        }
+      } else {
+        // Transparent light green decal
+        quadMat = new THREE.MeshBasicMaterial({
+          color: 0x2ecc71,
+          transparent: true,
+          opacity: isSelected ? 0.6 : 0.45,
+          side: THREE.DoubleSide,
+          depthTest: true,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2,
+        });
+      }
+
+      const quadMesh = new THREE.Mesh(quadGeo, quadMat);
+      quadMesh.userData = { decalId: decal.id };
+      quadMesh.renderOrder = 3;
+      this.decalGroup.add(quadMesh);
+      this.decalMeshesList.push(quadMesh);
+
+      // Border outline
+      const borderPositions = [
+        v0.coordinateX, v0.coordinateY, v0.coordinateZ,
+        v1.coordinateX, v1.coordinateY, v1.coordinateZ,
+
+        v1.coordinateX, v1.coordinateY, v1.coordinateZ,
+        v2.coordinateX, v2.coordinateY, v2.coordinateZ,
+
+        v2.coordinateX, v2.coordinateY, v2.coordinateZ,
+        v3.coordinateX, v3.coordinateY, v3.coordinateZ,
+
+        v3.coordinateX, v3.coordinateY, v3.coordinateZ,
+        v0.coordinateX, v0.coordinateY, v0.coordinateZ,
+      ];
+      const borderGeo = new THREE.BufferGeometry();
+      borderGeo.setAttribute("position", new THREE.Float32BufferAttribute(borderPositions, 3));
+      const borderMat = new THREE.LineBasicMaterial({
+        color: isSelected ? 0x2f81f7 : 0x2ecc71,
+        transparent: false,
+        depthTest: true,
+      });
+      const borderLine = new THREE.LineSegments(borderGeo, borderMat);
+      borderLine.renderOrder = 4;
+      this.decalGroup.add(borderLine);
+    }
   }
 
   public updateCamera(
@@ -369,24 +535,29 @@ export class ViewportRenderer {
       return;
     }
 
-    if (!isOrthographic || gridPlane === "NONE") {
-      this.gridHelperInstance.visible = false;
-      return;
-    }
+    if (isOrthographic) {
+      if (gridPlane === "NONE") {
+        this.gridHelperInstance.visible = false;
+        return;
+      }
 
-    this.gridHelperInstance.visible = true;
+      this.gridHelperInstance.visible = true;
 
-    switch (gridPlane) {
-      case "XY":
-        this.gridHelperInstance.rotation.set(Math.PI / 2, 0, 0);
-        break;
-      case "YZ":
-        this.gridHelperInstance.rotation.set(0, 0, Math.PI / 2);
-        break;
-      case "XZ":
-      default:
-        this.gridHelperInstance.rotation.set(0, 0, 0);
-        break;
+      switch (gridPlane) {
+        case "XY":
+          this.gridHelperInstance.rotation.set(Math.PI / 2, 0, 0);
+          break;
+        case "YZ":
+          this.gridHelperInstance.rotation.set(0, 0, Math.PI / 2);
+          break;
+        case "XZ":
+        default:
+          this.gridHelperInstance.rotation.set(0, 0, 0);
+          break;
+      }
+    } else {
+      this.gridHelperInstance.visible = true;
+      this.gridHelperInstance.rotation.set(0, 0, 0);
     }
   }
 
@@ -438,6 +609,7 @@ export class ViewportRenderer {
       } else {
         this.gridHelperInstance.material.dispose();
       }
+      this.gridHelperInstance = null;
     }
 
     if (this.axisLinesInstance) {
@@ -445,6 +617,20 @@ export class ViewportRenderer {
       (this.axisLinesInstance.material as THREE.Material).dispose();
       this.axisLinesInstance = null;
     }
+
+    while (this.decalGroup.children.length > 0) {
+      const child = this.decalGroup.children[0] as THREE.Object3D;
+      this.decalGroup.remove(child);
+      if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    }
+    this.decalMeshesList = [];
 
     this.webGlRenderer.dispose();
   }
@@ -471,14 +657,14 @@ export class ViewportRenderer {
   private setupGridHelper(): void {
     const gridSize = 100;
     const gridDivisions = 100; // 100 / 100 = 1.0 unit cell spacing
-    this.gridHelperInstance = new THREE.GridHelper(
+    this.gridHelperInstance = ViewportGrid.createGrid(
       gridSize,
       gridDivisions,
       ThemeColors.gridCenterLine,
       ThemeColors.gridLine
     );
     this.gridHelperInstance.position.set(0, 0, 0);
-    this.gridHelperInstance.visible = false;
+    this.gridHelperInstance.visible = true;
     this.sceneInstance.add(this.gridHelperInstance);
   }
 
@@ -594,6 +780,9 @@ export class ViewportRenderer {
             metalness: 0.0,
             flatShading: true,
             side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1,
           })
         );
       } else {
@@ -604,6 +793,9 @@ export class ViewportRenderer {
             metalness: currentMaterial.metalness,
             flatShading: true,
             side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1,
           })
         );
       }
