@@ -4,6 +4,7 @@ import { RenderMode } from "../../Application/Services/RenderModeService/RenderM
 import { CameraStateService } from "../../Application/Services/CameraService/CameraStateService";
 import { GridPlaneType } from "../../Application/Services/CameraService/ViewStrategy";
 import { AXIS_COLORS } from "./AxisColors";
+import { ThemeColors } from "./Theme";
 import { Material3D } from "../../Application/Services/MaterialService/Material3D";
 
 export class ViewportRenderer {
@@ -473,8 +474,8 @@ export class ViewportRenderer {
     this.gridHelperInstance = new THREE.GridHelper(
       gridSize,
       gridDivisions,
-      0x5a5a5a,
-      0x333333
+      ThemeColors.gridCenterLine,
+      ThemeColors.gridLine
     );
     this.gridHelperInstance.position.set(0, 0, 0);
     this.gridHelperInstance.visible = false;
