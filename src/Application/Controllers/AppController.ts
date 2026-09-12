@@ -22,6 +22,9 @@ import {
 import { DecalService } from "../Services/DecalService/DecalService";
 import { DecalPlane } from "../Services/DecalService/DecalPlane";
 import { ExportedImageFile } from "../Services/ModelService/ObjExporter";
+import { ZipExportService } from "../Services/ZipExportService/ZipExportService";
+import { ZipFileEntry } from "../Services/ZipExportService/ZipFileEntry";
+import { DataUrlConverter } from "../Common/DataUrlConverter";
 
 export class AppController {
   private readonly modelService: ModelService;
@@ -35,6 +38,8 @@ export class AppController {
   private readonly materialService: MaterialService;
   private readonly uiCustomizationService: UiCustomizationService;
   private readonly decalService: DecalService;
+  private readonly zipExportService: ZipExportService;
+  private readonly dataUrlConverter: DataUrlConverter;
   private translationInitialModel: MeshGeometry | null = null;
   private rotationInitialModel: MeshGeometry | null = null;
   private scalingInitialModel: MeshGeometry | null = null;
@@ -54,7 +59,9 @@ export class AppController {
     stateNotifier: ApplicationStateNotifier,
     materialService: MaterialService,
     uiCustomizationService?: UiCustomizationService,
-    decalService?: DecalService
+    decalService?: DecalService,
+    zipExportService?: ZipExportService,
+    dataUrlConverter?: DataUrlConverter
   ) {
     this.modelService = modelService;
     this.cameraStateService = cameraStateService;
@@ -68,6 +75,8 @@ export class AppController {
     this.uiCustomizationService =
       uiCustomizationService ?? new UiCustomizationService(stateNotifier);
     this.decalService = decalService ?? new DecalService(stateNotifier);
+    this.zipExportService = zipExportService ?? new ZipExportService();
+    this.dataUrlConverter = dataUrlConverter ?? new DataUrlConverter();
   }
 
   public getModelService(): ModelService {
@@ -213,6 +222,82 @@ export class AppController {
       this.materialService.getMaterials(),
       baseModelName
     );
+  }
+
+  public exportModelAsZip(baseModelName: string = "model"): Uint8Array {
+    const materials = this.materialService.getMaterials();
+    const objEntry = this.createTextZipEntry(
+      `${baseModelName}.obj`,
+      this.modelService.exportToObj(
+        materials,
+        this.decalService.getDecals(),
+        baseModelName
+      )
+    );
+    const usedEntryNames = new Set<string>([objEntry.fileName]);
+    const zipEntries: ZipFileEntry[] = [objEntry];
+
+    if (materials.length > 0) {
+      const mtlFileName = `${baseModelName}.mtl`;
+      usedEntryNames.add(mtlFileName);
+      zipEntries.push(
+        this.createTextZipEntry(
+          mtlFileName,
+          this.modelService.exportMtl(materials, baseModelName)
+        )
+      );
+    }
+
+    const exportedImages = this.modelService.exportImages(
+      materials,
+      baseModelName
+    );
+    for (const imageFile of exportedImages) {
+      if (!this.shouldBundleImage(imageFile, usedEntryNames)) {
+        continue;
+      }
+      const imageContent = this.dataUrlConverter.toUint8Array(
+        imageFile.dataUrl
+      );
+      if (imageContent.length === 0) {
+        continue;
+      }
+      usedEntryNames.add(imageFile.fileName);
+      zipEntries.push({
+        fileName: imageFile.fileName,
+        content: imageContent,
+      });
+    }
+
+    return this.zipExportService.buildZip(zipEntries);
+  }
+
+  private shouldBundleImage(
+    imageFile: ExportedImageFile,
+    usedEntryNames: ReadonlySet<string>
+  ): boolean {
+    if (!imageFile.dataUrl.startsWith("data:")) {
+      return false;
+    }
+    if (this.containsUnsafePathSegments(imageFile.fileName)) {
+      return false;
+    }
+    return !usedEntryNames.has(imageFile.fileName);
+  }
+
+  private containsUnsafePathSegments(fileName: string): boolean {
+    return (
+      fileName.includes("/") ||
+      fileName.includes("\\") ||
+      fileName.includes("..")
+    );
+  }
+
+  private createTextZipEntry(fileName: string, textContent: string): ZipFileEntry {
+    return {
+      fileName,
+      content: new TextEncoder().encode(textContent),
+    };
   }
 
   public getMaterialService(): MaterialService {

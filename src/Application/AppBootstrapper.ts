@@ -17,6 +17,8 @@ import { AppController } from "./Controllers/AppController";
 import { MaterialService } from "./Services/MaterialService/MaterialService";
 import { UiCustomizationService } from "./Services/UiCustomizationService/UiCustomizationService";
 import { DecalService } from "./Services/DecalService/DecalService";
+import { ZipExportService } from "./Services/ZipExportService/ZipExportService";
+import { DataUrlConverter } from "./Common/DataUrlConverter";
 
 export class AppBootstrapper {
   public static createApplication(): {
@@ -31,6 +33,7 @@ export class AppBootstrapper {
     materialService: MaterialService;
     uiCustomizationService: UiCustomizationService;
     decalService: DecalService;
+    zipExportService: ZipExportService;
     stateNotifier: ApplicationStateNotifier;
   } {
     const modelFactory = new ModelFactory();
@@ -65,6 +68,8 @@ export class AppBootstrapper {
     const materialService = new MaterialService(stateNotifier);
     const uiCustomizationService = new UiCustomizationService(stateNotifier);
     const decalService = new DecalService(stateNotifier);
+    const zipExportService = new ZipExportService();
+    const dataUrlConverter = new DataUrlConverter();
 
     const appController = new AppController(
       modelService,
@@ -77,7 +82,9 @@ export class AppBootstrapper {
       stateNotifier,
       materialService,
       uiCustomizationService,
-      decalService
+      decalService,
+      zipExportService,
+      dataUrlConverter
     );
 
     return {
@@ -92,6 +99,7 @@ export class AppBootstrapper {
       materialService,
       uiCustomizationService,
       decalService,
+      zipExportService,
       stateNotifier,
     };
   }
