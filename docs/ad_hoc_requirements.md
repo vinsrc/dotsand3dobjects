@@ -123,3 +123,17 @@ Add a "'3d View" button to the top most place in the side tool bar. this is the 
 # Scale button
 
 Add scale button to the side tool bar. For the main mesh, the scale button provides scale functionality. it will always scale equally in all axis.  add a handle to the four boundary corners like rotate for scaling.   this is just a way to make mesh larger or smaller . not sheer or skew it.  if decal plane is selected, this should scale the decal plane.  
+
+# Export as Zip
+add a new file menu item, Export as Zip. it should compress the wavefront obj file , material file and other texture files using in the material into one zip file and save it.
+
+# Import Zip file
+
+add a new file menu item, Import as Zip. the zip file will have the obj, mtl and texture files.
+
+
+In insert mode, adding a new vertex when another vertex is already selected , adds the new vertex in the same plane as the already selected vertex. this is an existing functionality. but in orthographic view,  if there is vertex right behind the point where the new vertex is going to be added, the vertex in the background is getting selected instead.  this stops user from adding vertex in the desired plane.   so if a vertex is already selected, show only the vertices in the currently selected plane. 
+
+for example, if im looking at XZ plane,  looking thru Y axis. if i want to add a vertex at X=3,Z=4, and if  a vertex is selected which is at Y=5,  then current functionality adds the new vertex at X=3,Z=4, Y=5. it takes Y from selected vertex.  but lets say there is a vertex at X=3,Z=4, Y=10.  this directly aligns with the new vertex position in orthographic view. if i click at X=3,Z=4, the vertex at  Y=10 gets selected instead of adding a new vertex at Y=5.  To avoid this issue,  when an vertex is selected, all vertices in planes behind or before gets hidden Y <> 5, only the Y=5 plane and its vertices are shown. then the user can add new vertices in XZ plane without accidentally clicking other vertices directly behind or infront of it.
+
+tell me if you understood the problem. 
