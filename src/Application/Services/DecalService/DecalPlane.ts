@@ -188,6 +188,36 @@ export class DecalPlane {
     );
   }
 
+  public scale(scaleFactor: number, origin?: Vector3D): DecalPlane {
+    const scaleCenter = origin ?? this.center;
+    const newCenter = origin
+      ? origin.add(this.center.subtract(origin).scaleBy(scaleFactor))
+      : this.center;
+
+    const scaleVertex = (vertex: Vector3D): Vector3D => {
+      const relative = vertex.subtract(scaleCenter);
+      return scaleCenter.add(relative.scaleBy(scaleFactor));
+    };
+
+    const newVertices = [
+      scaleVertex(this.vertices[0]),
+      scaleVertex(this.vertices[1]),
+      scaleVertex(this.vertices[2]),
+      scaleVertex(this.vertices[3]),
+    ] as const;
+
+    return new DecalPlane(
+      this.id,
+      this.parentFaceIndex,
+      newCenter,
+      this.normal,
+      this.size * scaleFactor,
+      this.rotationAngle,
+      newVertices,
+      this.materialId
+    );
+  }
+
   public calculateCenter(): Vector3D {
     return this.center;
   }

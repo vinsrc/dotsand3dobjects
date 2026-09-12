@@ -1,10 +1,11 @@
 import { MeshGeometry } from "./MeshGeometry";
 import { ModelFactory } from "./ModelFactory";
 import { ObjParser } from "./ObjParser";
-import { ObjExporter } from "./ObjExporter";
+import { ObjExporter, ExportedImageFile } from "./ObjExporter";
 import { MtlParser } from "./MtlParser";
 import { Material3D } from "../MaterialService/Material3D";
 import { ApplicationStateNotifier } from "../../Common/ApplicationStateNotifier";
+import { DecalPlane } from "../DecalService/DecalPlane";
 
 export class ModelService {
   private readonly modelFactory: ModelFactory;
@@ -67,12 +68,31 @@ export class ModelService {
     }
   }
 
-  public exportToObj(materials?: readonly Material3D[]): string {
-    return this.objExporter.export(this.currentModel, materials);
+  public exportToObj(
+    materials?: readonly Material3D[],
+    decals?: readonly DecalPlane[],
+    baseModelName: string = "model"
+  ): string {
+    return this.objExporter.export(
+      this.currentModel,
+      materials,
+      decals,
+      baseModelName
+    );
   }
 
-  public exportMtl(materials: readonly Material3D[]): string {
-    return this.objExporter.exportMtl(materials);
+  public exportMtl(
+    materials: readonly Material3D[],
+    baseModelName: string = "model"
+  ): string {
+    return this.objExporter.exportMtl(materials, baseModelName);
+  }
+
+  public exportImages(
+    materials: readonly Material3D[],
+    baseModelName: string = "model"
+  ): readonly ExportedImageFile[] {
+    return this.objExporter.exportImages(materials, baseModelName);
   }
 
   public resetToStarterModel(): void {

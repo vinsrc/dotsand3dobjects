@@ -146,6 +146,19 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     fileReader.readAsText(targetFile);
   };
 
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    const parts = dataUrl.split(",");
+    const mimeMatch = parts[0]?.match(/:(.*?);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : "image/png";
+    const b64Data = parts[1] || "";
+    const byteCharacters = atob(b64Data);
+    const byteNumbers = new Uint8Array(byteCharacters.length);
+    for (let index = 0; index < byteCharacters.length; index += 1) {
+      byteNumbers[index] = byteCharacters.charCodeAt(index);
+    }
+    return new Blob([byteNumbers], { type: mimeType });
+  };
+
   const handleExportClick = () => {
     const objContent = controller.exportModelToFile();
     const textBlob = new Blob([objContent], { type: "text/plain" });
@@ -160,7 +173,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
 
     const materials = controller.getMaterialService().getMaterials();
     if (materials.length > 0) {
-      const mtlContent = controller.exportMtlFile();
+      const mtlContent = controller.exportMtlFile("model");
       const mtlBlob = new Blob([mtlContent], { type: "text/plain" });
       const mtlDownloadUrl = URL.createObjectURL(mtlBlob);
       const mtlAnchorElement = document.createElement("a");
@@ -170,6 +183,31 @@ export const ToolBar: React.FC<ToolBarProps> = ({
       mtlAnchorElement.click();
       document.body.removeChild(mtlAnchorElement);
       URL.revokeObjectURL(mtlDownloadUrl);
+
+      const exportedImages = controller.exportImages("model");
+      for (const image of exportedImages) {
+        if (image.dataUrl.startsWith("data:")) {
+          const imgBlob = dataUrlToBlob(image.dataUrl);
+          const imgDownloadUrl = URL.createObjectURL(imgBlob);
+          const imgAnchor = document.createElement("a");
+          imgAnchor.href = imgDownloadUrl;
+          imgAnchor.download = image.fileName;
+          document.body.appendChild(imgAnchor);
+          imgAnchor.click();
+          document.body.removeChild(imgAnchor);
+          URL.revokeObjectURL(imgDownloadUrl);
+        } else if (
+          image.dataUrl.startsWith("blob:") ||
+          image.dataUrl.startsWith("http")
+        ) {
+          const imgAnchor = document.createElement("a");
+          imgAnchor.href = image.dataUrl;
+          imgAnchor.download = image.fileName;
+          document.body.appendChild(imgAnchor);
+          imgAnchor.click();
+          document.body.removeChild(imgAnchor);
+        }
+      }
     }
   };
 

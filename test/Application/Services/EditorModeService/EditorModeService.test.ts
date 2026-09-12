@@ -33,7 +33,7 @@ describe("EditorModeService", () => {
     expect(service.getMode()).toBe("FILL");
   });
 
-  it("should prevent entering TRANSLATE and ROTATE modes in perspective view and emit error", () => {
+  it("should prevent entering TRANSLATE, ROTATE, and SCALE modes in perspective view and emit error", () => {
     const notifier = new ApplicationStateNotifier();
     const errorListener = vi.fn();
     notifier.subscribe("ERROR_OCCURRED", errorListener);
@@ -51,9 +51,15 @@ describe("EditorModeService", () => {
     expect(canEnterRotate).toBe(false);
     expect(service.getMode()).toBe("DEFAULT");
     expect(errorListener).toHaveBeenCalledTimes(2);
+
+    // Attempt entering SCALE in perspective
+    const canEnterScale = service.setMode("SCALE", false);
+    expect(canEnterScale).toBe(false);
+    expect(service.getMode()).toBe("DEFAULT");
+    expect(errorListener).toHaveBeenCalledTimes(3);
   });
 
-  it("should allow entering TRANSLATE and ROTATE modes in orthographic view", () => {
+  it("should allow entering TRANSLATE, ROTATE, and SCALE modes in orthographic view", () => {
     const notifier = new ApplicationStateNotifier();
     const modeListener = vi.fn();
     notifier.subscribe("MODE_CHANGED", modeListener);
@@ -69,6 +75,11 @@ describe("EditorModeService", () => {
     expect(canEnterRotate).toBe(true);
     expect(service.getMode()).toBe("ROTATE");
     expect(modeListener).toHaveBeenCalledWith("ROTATE");
+
+    const canEnterScale = service.setMode("SCALE", true);
+    expect(canEnterScale).toBe(true);
+    expect(service.getMode()).toBe("SCALE");
+    expect(modeListener).toHaveBeenCalledWith("SCALE");
   });
 
   it("should return to DEFAULT mode on finishMode()", () => {

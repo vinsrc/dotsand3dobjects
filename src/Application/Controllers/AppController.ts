@@ -21,6 +21,7 @@ import {
 } from "../Services/UiCustomizationService/UiCustomizationService";
 import { DecalService } from "../Services/DecalService/DecalService";
 import { DecalPlane } from "../Services/DecalService/DecalPlane";
+import { ExportedImageFile } from "../Services/ModelService/ObjExporter";
 
 export class AppController {
   private readonly modelService: ModelService;
@@ -36,8 +37,11 @@ export class AppController {
   private readonly decalService: DecalService;
   private translationInitialModel: MeshGeometry | null = null;
   private rotationInitialModel: MeshGeometry | null = null;
+  private scalingInitialModel: MeshGeometry | null = null;
   private translationInitialDecal: DecalPlane | null = null;
   private rotationInitialDecal: DecalPlane | null = null;
+  private scalingInitialDecal: DecalPlane | null = null;
+  private scalingInitialDecals: readonly DecalPlane[] | null = null;
 
   public constructor(
     modelService: ModelService,
@@ -187,12 +191,28 @@ export class AppController {
     }
   }
 
-  public exportModelToFile(): string {
-    return this.modelService.exportToObj(this.materialService.getMaterials());
+  public exportModelToFile(baseModelName: string = "model"): string {
+    return this.modelService.exportToObj(
+      this.materialService.getMaterials(),
+      this.decalService.getDecals(),
+      baseModelName
+    );
   }
 
-  public exportMtlFile(): string {
-    return this.modelService.exportMtl(this.materialService.getMaterials());
+  public exportMtlFile(baseModelName: string = "model"): string {
+    return this.modelService.exportMtl(
+      this.materialService.getMaterials(),
+      baseModelName
+    );
+  }
+
+  public exportImages(
+    baseModelName: string = "model"
+  ): readonly ExportedImageFile[] {
+    return this.modelService.exportImages(
+      this.materialService.getMaterials(),
+      baseModelName
+    );
   }
 
   public getMaterialService(): MaterialService {
@@ -807,6 +827,76 @@ export class AppController {
       isSnapEnabled,
       viewDirection
     );
+  }
+
+  public beginScaling(): void {
+    this.recordSnapshot();
+    if (this.decalService.isDecalSelected()) {
+      this.scalingInitialDecal = this.decalService.getSelectedDecal();
+    } else {
+      this.scalingInitialModel = this.modelService.getCurrentModel();
+      this.scalingInitialDecals = this.decalService.getDecals();
+    }
+  }
+
+  public endScaling(): void {
+    this.scalingInitialModel = null;
+    this.scalingInitialDecal = null;
+    this.scalingInitialDecals = null;
+  }
+
+  public applyDragScaling(scaleFactor: number): void {
+    const isOrthographic = this.cameraStateService.isOrthographic();
+    if (!isOrthographic) {
+      this.stateNotifier.notify(
+        "ERROR_OCCURRED",
+        "Switch to an Orthographic view"
+      );
+      return;
+    }
+
+    const isSnapEnabled = this.editorModeService.isGridSnapEnabled();
+    let effectiveScale = scaleFactor;
+    if (isSnapEnabled) {
+      const step = 0.1;
+      effectiveScale = Math.max(0.1, Math.round(scaleFactor / step) * step);
+    } else {
+      effectiveScale = Math.max(0.05, scaleFactor);
+    }
+
+    if (this.decalService.isDecalSelected()) {
+      if (!this.scalingInitialDecal) {
+        this.scalingInitialDecal = this.decalService.getSelectedDecal();
+      }
+      if (this.scalingInitialDecal) {
+        const scaledDecal = this.scalingInitialDecal.scale(effectiveScale);
+        this.decalService.restoreState(
+          this.decalService
+            .getDecals()
+            .map((d) => (d.id === scaledDecal.id ? scaledDecal : d)),
+          scaledDecal.id
+        );
+      }
+      return;
+    }
+
+    if (!this.scalingInitialModel) {
+      this.scalingInitialModel = this.modelService.getCurrentModel();
+      this.scalingInitialDecals = this.decalService.getDecals();
+    }
+
+    this.geometryEditorService.applyScaleFromInitial(
+      this.scalingInitialModel,
+      effectiveScale
+    );
+
+    if (this.scalingInitialDecals && this.scalingInitialDecals.length > 0) {
+      const meshCenter = this.scalingInitialModel.calculateCenter();
+      const updatedDecals = this.scalingInitialDecals.map((d) =>
+        d.scale(effectiveScale, meshCenter)
+      );
+      this.decalService.restoreState(updatedDecals, null);
+    }
   }
 
   public getPlacementPlaneAnchor(): Vector3D {

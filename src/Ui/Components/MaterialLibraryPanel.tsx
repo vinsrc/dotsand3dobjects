@@ -104,14 +104,16 @@ export const MaterialLibraryPanel: React.FC = () => {
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      controller.updateMaterial(selectedMaterial.withImage(dataUrl));
+      controller.updateMaterial(
+        selectedMaterial.withImage(dataUrl, file.name)
+      );
     };
     reader.readAsDataURL(file);
   };
 
   const handleClearImage = () => {
     if (selectedMaterial) {
-      controller.updateMaterial(selectedMaterial.withImage(null));
+      controller.updateMaterial(selectedMaterial.withImage(null, null));
       if (imageInputRef.current) {
         imageInputRef.current.value = "";
       }
@@ -558,9 +560,12 @@ backgroundColor: ThemeColors.widget,
                       flex: 1,
                       fontSize: "11px",
                       color: ThemeColors.textSecondary,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    Image Set (Decal)
+                    {selectedMaterial.imageFileName || "Image Set (Decal)"}
                   </span>
                   <button
                     data-testid="clear-material-image-button"

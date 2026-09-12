@@ -233,6 +233,15 @@ export class GeometryEditorService {
     this.modelService.setCurrentModel(updatedModel);
   }
 
+  public applyScaleFromInitial(
+    initialModel: MeshGeometry,
+    scaleFactor: number
+  ): void {
+    const center = initialModel.calculateCenter();
+    const updatedModel = initialModel.scale(scaleFactor, center);
+    this.modelService.setCurrentModel(updatedModel);
+  }
+
   public insertVertexOnEdge(
     startVertexIndex: number,
     endVertexIndex: number

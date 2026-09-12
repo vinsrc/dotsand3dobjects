@@ -127,6 +127,28 @@ describe("AppController", () => {
     expect(exportedText).toContain("v ");
   });
 
+  it("should export MTL and images associated with materials", () => {
+    const { appController } = createController();
+    const material = appController.createMaterial();
+    const matWithImage = material.withImage(
+      "data:image/png;base64,ABC123",
+      "custom_badge.png"
+    );
+    appController.updateMaterial(matWithImage);
+
+    const mtlContent = appController.exportMtlFile("custom_model");
+    expect(mtlContent).toContain("newmtl");
+    expect(mtlContent).toContain("map_Kd custom_badge.png");
+    expect(mtlContent).not.toContain("base64");
+
+    const images = appController.exportImages("custom_model");
+    expect(images.length).toBe(1);
+    expect(images[0]).toEqual({
+      fileName: "custom_badge.png",
+      dataUrl: "data:image/png;base64,ABC123",
+    });
+  });
+
   it("should toggle render mode and notify", () => {
     const { appController, renderModeService, stateNotifier } =
       createController();
@@ -446,6 +468,42 @@ describe("AppController", () => {
     const redoneVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
     expect(redoneVertex.coordinateX).toBeCloseTo(rotatedVertex.coordinateX, 5);
     expect(redoneVertex.coordinateY).toBeCloseTo(rotatedVertex.coordinateY, 5);
+  });
+
+  it("should handle beginScaling, applyDragScaling, and endScaling in orthographic and reject in perspective", () => {
+    const { appController, modelService, stateNotifier } = createController();
+    const errorListener = vi.fn();
+    stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+
+    // Rejects in perspective view
+    appController.applyDragScaling(1.5);
+    expect(errorListener).toHaveBeenCalledWith("Switch to an Orthographic view");
+
+    // Switch to orthographic
+    appController.selectOrthographicView("+Z");
+    appController.beginScaling();
+
+    const initialPos = modelService.getCurrentModel().vertices[0] as Vector3D;
+
+    // Apply scale of 2.0 with snap enabled
+    appController.applyDragScaling(2.0);
+
+    const scaledVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
+    expect(Math.abs(scaledVertex.coordinateX)).toBeGreaterThan(Math.abs(initialPos.coordinateX));
+
+    appController.endScaling();
+
+    // Test undo
+    expect(appController.canUndo()).toBe(true);
+    appController.undo();
+    const undoneVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
+    expect(undoneVertex.coordinateX).toBeCloseTo(initialPos.coordinateX, 5);
+
+    // Test redo
+    expect(appController.canRedo()).toBe(true);
+    appController.redo();
+    const redoneVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
+    expect(redoneVertex.coordinateX).toBeCloseTo(scaledVertex.coordinateX, 5);
   });
 
   it("should insert vertex on edge and connect vertices", () => {
@@ -1081,6 +1139,19 @@ describe("AppController", () => {
       appController.endRotation();
 
       expect(appController.getSelectedDecal()!.rotationAngle).toBeCloseTo(Math.PI / 4, 4);
+
+      // Scale decal
+      const sizeBefore = appController.getSelectedDecal()!.size;
+      appController.beginScaling();
+      appController.applyDragScaling(1.5);
+      appController.endScaling();
+
+      expect(appController.getSelectedDecal()!.size).toBeGreaterThan(sizeBefore);
+
+      // Undo decal scaling
+      expect(appController.canUndo()).toBe(true);
+      appController.undo();
+      expect(appController.getSelectedDecal()!.size).toBeCloseTo(sizeBefore, 4);
     });
 
     it("should support undo and redo for decal creation and manipulation", () => {

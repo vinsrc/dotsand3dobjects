@@ -404,11 +404,11 @@ export class ViewportRenderer {
           });
         }
       } else {
-        // Transparent light green decal
+        // Transparent light green decal, same as face selection color (0xffaa00) when selected
         quadMat = new THREE.MeshBasicMaterial({
-          color: 0x2ecc71,
+          color: isSelected ? 0xffaa00 : 0x2ecc71,
           transparent: true,
-          opacity: isSelected ? 0.6 : 0.45,
+          opacity: isSelected ? 0.5 : 0.45,
           side: THREE.DoubleSide,
           depthTest: true,
           polygonOffset: true,
@@ -440,7 +440,7 @@ export class ViewportRenderer {
       const borderGeo = new THREE.BufferGeometry();
       borderGeo.setAttribute("position", new THREE.Float32BufferAttribute(borderPositions, 3));
       const borderMat = new THREE.LineBasicMaterial({
-        color: isSelected ? 0x2f81f7 : 0x2ecc71,
+        color: isSelected ? 0xffaa00 : 0x2ecc71,
         transparent: false,
         depthTest: true,
       });

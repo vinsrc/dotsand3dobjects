@@ -4,10 +4,11 @@ import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
 import { ViewportRenderer } from "../Common/ViewportRenderer";
 import { ViewportRaycaster } from "../Common/ViewportRaycaster";
-import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeometry";
 import { Vector3D } from "../../Application/Common/Vector3D";
+import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeometry";
 import { ThemeColors } from "../Common/Theme";
 import { RotateOverlay } from "./RotateOverlay";
+import { ScaleOverlay } from "./ScaleOverlay";
 
 export const ViewportCanvas: React.FC = () => {
   const controller = useAppController();
@@ -33,6 +34,7 @@ export const ViewportCanvas: React.FC = () => {
   const dragStartWorldPosRef = useRef<Vector3D | null>(null);
   const dragCenterScreenPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartAngleRef = useRef<number>(0);
+  const dragStartDistanceRef = useRef<number>(1);
   const clickedVertexOnDownRef = useRef<{
     index: number;
     wasSelected: boolean;
@@ -501,6 +503,28 @@ export const ViewportCanvas: React.FC = () => {
         clickY - screenCenterY,
         clickX - screenCenterX
       );
+    } else if (currentMode === "SCALE") {
+      if (hitDecalId !== null && controller.getSelectedDecalId() !== hitDecalId) {
+        controller.selectDecal(hitDecalId);
+      }
+      controller.beginScaling();
+      const center = controller.isDecalSelected()
+        ? (controller.getSelectedDecal()?.center ?? currentModel.calculateCenter())
+        : currentModel.calculateCenter();
+      const proj = new THREE.Vector3(
+        center.coordinateX,
+        center.coordinateY,
+        center.coordinateZ
+      );
+      proj.project(camera);
+      const screenCenterX = (proj.x * 0.5 + 0.5) * rect.width;
+      const screenCenterY = (-proj.y * 0.5 + 0.5) * rect.height;
+      dragCenterScreenPosRef.current = { x: screenCenterX, y: screenCenterY };
+      const initialDistance = Math.hypot(
+        clickX - screenCenterX,
+        clickY - screenCenterY
+      );
+      dragStartDistanceRef.current = Math.max(initialDistance, 10);
     }
   };
 
@@ -562,6 +586,18 @@ export const ViewportCanvas: React.FC = () => {
         const deltaAngle = currentAngle - dragStartAngleRef.current;
         controller.applyDragRotation(-deltaAngle);
       }
+    } else if (currentMode === "SCALE" && dragCenterScreenPosRef.current) {
+      if (isDraggingRef.current && canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const currentX = event.clientX - rect.left;
+        const currentY = event.clientY - rect.top;
+        const currentDist = Math.hypot(
+          currentX - dragCenterScreenPosRef.current.x,
+          currentY - dragCenterScreenPosRef.current.y
+        );
+        const scaleFactor = currentDist / dragStartDistanceRef.current;
+        controller.applyDragScaling(scaleFactor);
+      }
     } else if (isDraggingRef.current) {
       const deltaPixelX = event.clientX - lastPointerPosRef.current.x;
       const deltaPixelY = event.clientY - lastPointerPosRef.current.y;
@@ -595,12 +631,13 @@ export const ViewportCanvas: React.FC = () => {
 
     const wasDragging = isDraggingRef.current;
     const clickedVertexInfo = clickedVertexOnDownRef.current;
-
     const currentMode = controller.getEditorModeService().getMode();
     if (currentMode === "TRANSLATE") {
       controller.endTranslation();
     } else if (currentMode === "ROTATE") {
       controller.endRotation();
+    } else if (currentMode === "SCALE") {
+      controller.endScaling();
     }
 
     pointerDownPosRef.current = null;
@@ -843,12 +880,24 @@ export const ViewportCanvas: React.FC = () => {
             controller.getEditorModeService().getMode() === "TRANSLATE" ||
             controller.getEditorModeService().getMode() === "ROTATE"
               ? "grab"
+              : controller.getEditorModeService().getMode() === "SCALE"
+              ? "nwse-resize"
               : "crosshair",
         }}
       />
       {controller.getEditorModeService().getMode() === "ROTATE" &&
         controller.getCameraStateService().isOrthographic() && (
           <RotateOverlay
+            controller={controller}
+            canvasElement={canvasRef.current}
+            getActiveCamera={() =>
+              rendererRef.current?.getActiveCamera() ?? null
+            }
+          />
+        )}
+      {controller.getEditorModeService().getMode() === "SCALE" &&
+        controller.getCameraStateService().isOrthographic() && (
+          <ScaleOverlay
             controller={controller}
             canvasElement={canvasRef.current}
             getActiveCamera={() =>

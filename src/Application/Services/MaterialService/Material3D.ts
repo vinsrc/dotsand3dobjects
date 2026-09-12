@@ -5,6 +5,7 @@ export interface MaterialProperties {
   readonly roughness?: number;
   readonly metalness?: number;
   readonly imageUrl?: string | null;
+  readonly imageFileName?: string | null;
   readonly extraProperties?: readonly string[];
 }
 
@@ -15,6 +16,7 @@ export class Material3D {
   public readonly roughness: number;
   public readonly metalness: number;
   public readonly imageUrl: string | null;
+  public readonly imageFileName: string | null;
   public readonly extraProperties: readonly string[];
 
   public constructor(properties: MaterialProperties) {
@@ -24,6 +26,7 @@ export class Material3D {
     this.roughness = Math.max(0, Math.min(1, properties.roughness ?? 0.5));
     this.metalness = Math.max(0, Math.min(1, properties.metalness ?? 0.0));
     this.imageUrl = properties.imageUrl ?? null;
+    this.imageFileName = properties.imageFileName ?? null;
     this.extraProperties = properties.extraProperties
       ? [...properties.extraProperties]
       : [];
@@ -49,8 +52,20 @@ export class Material3D {
     return new Material3D({ ...this, metalness });
   }
 
-  public withImage(imageUrl: string | null): Material3D {
-    return new Material3D({ ...this, imageUrl });
+  public withImage(
+    imageUrl: string | null,
+    imageFileName?: string | null
+  ): Material3D {
+    return new Material3D({
+      ...this,
+      imageUrl,
+      imageFileName:
+        imageFileName !== undefined ? imageFileName : this.imageFileName,
+    });
+  }
+
+  public withImageFileName(imageFileName: string | null): Material3D {
+    return new Material3D({ ...this, imageFileName });
   }
 
   public withExtraProperties(extraProperties: readonly string[]): Material3D {

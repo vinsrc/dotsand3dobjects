@@ -91,4 +91,22 @@ describe("DecalPlane", () => {
     expect(decal.isChildOfFace(0)).toBe(false);
     expect(decal.isChildOfFace(1)).toBe(false);
   });
+
+  it("should scale decal plane around its center and around custom origin", () => {
+    const decal = DecalPlane.createFromFace("decal_1", 0, quadVertices);
+    const initialCenter = decal.calculateCenter();
+    const initialSize = decal.size;
+
+    // Scale by 1.5 around its center
+    const scaled = decal.scale(1.5);
+    expect(scaled.size).toBeCloseTo(initialSize * 1.5, 4);
+    expect(scaled.calculateCenter().coordinateX).toBeCloseTo(initialCenter.coordinateX, 4);
+    expect(scaled.calculateCenter().coordinateY).toBeCloseTo(initialCenter.coordinateY, 4);
+    expect(scaled.calculateCenter().coordinateZ).toBeCloseTo(initialCenter.coordinateZ, 4);
+
+    // Scale around custom origin (0, 0, 0)
+    const scaledOrigin = decal.scale(2, new Vector3D(0, 0, 0));
+    expect(scaledOrigin.size).toBeCloseTo(initialSize * 2, 4);
+    expect(scaledOrigin.calculateCenter().coordinateZ).toBeCloseTo(initialCenter.coordinateZ * 2, 4);
+  });
 });

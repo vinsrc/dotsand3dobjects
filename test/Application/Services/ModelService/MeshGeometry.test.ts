@@ -239,4 +239,29 @@ describe("MeshGeometry", () => {
     expect(rotatedZ.vertices[1].coordinateY).toBeCloseTo(0, 5);
     expect(rotatedZ.vertices[1].coordinateZ).toBeCloseTo(0, 5);
   });
+
+  it("should scale vertices around origin or specified center point", () => {
+    const vertices = [
+      new Vector3D(1, 2, 3),
+      new Vector3D(3, 4, 5),
+    ];
+    const mesh = new MeshGeometry(vertices, []);
+
+    // Scaling without centerPoint scales around origin
+    const scaledOrigin = mesh.scale(2);
+    expect(scaledOrigin.vertices[0].coordinateX).toBe(2);
+    expect(scaledOrigin.vertices[0].coordinateY).toBe(4);
+    expect(scaledOrigin.vertices[0].coordinateZ).toBe(6);
+
+    // Scaling with centerPoint (2, 3, 4) by factor 2
+    const center = new Vector3D(2, 3, 4);
+    const scaledCenter = mesh.scale(2, center);
+    expect(scaledCenter.vertices[0].coordinateX).toBe(0); // 2 + (1-2)*2 = 0
+    expect(scaledCenter.vertices[0].coordinateY).toBe(1); // 3 + (2-3)*2 = 1
+    expect(scaledCenter.vertices[0].coordinateZ).toBe(2); // 4 + (3-4)*2 = 2
+
+    expect(scaledCenter.vertices[1].coordinateX).toBe(4); // 2 + (3-2)*2 = 4
+    expect(scaledCenter.vertices[1].coordinateY).toBe(5); // 3 + (4-3)*2 = 5
+    expect(scaledCenter.vertices[1].coordinateZ).toBe(6); // 4 + (5-4)*2 = 6
+  });
 });

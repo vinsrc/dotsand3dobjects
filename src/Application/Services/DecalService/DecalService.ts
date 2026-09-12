@@ -115,7 +115,8 @@ export class DecalService {
   public applyDecalTransform(
     offset?: Vector3D,
     rotationAngle?: number,
-    rotationAxis?: Vector3D
+    rotationAxis?: Vector3D,
+    scaleFactor?: number
   ): void {
     if (!this.selectedDecalId) {
       return;
@@ -131,6 +132,10 @@ export class DecalService {
 
     if (rotationAngle !== undefined && rotationAngle !== 0) {
       decal = decal.rotate(rotationAngle, rotationAxis);
+    }
+
+    if (scaleFactor !== undefined && scaleFactor !== 1) {
+      decal = decal.scale(scaleFactor);
     }
 
     this.decalsMap.set(this.selectedDecalId, decal);

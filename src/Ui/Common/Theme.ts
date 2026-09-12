@@ -36,12 +36,14 @@ export const ThemeColors = {
   gridCenterLine: "#4e4e5a",
   edgeShaded: "#f712b2",
   edgeWireframe: "#f712b2",
-
   backdrop: "rgba(0, 0, 0, 0.5)",
   shadow: "rgba(0, 0, 0, 0.5)",
 
+  faceSelection: "#ffaa00",
+  faceSelectionTransparent: "rgba(255, 170, 0, 0.35)",
+
   decalPlane: "rgba(46, 204, 113, 0.45)",
   decalPlaneBorder: "#2ecc71",
-  decalPlaneSelected: "rgba(59, 130, 246, 0.5)",
-  decalPlaneSelectedBorder: "#2f81f7",
+  decalPlaneSelected: "rgba(255, 170, 0, 0.5)",
+  decalPlaneSelectedBorder: "#ffaa00",
 } as const;

@@ -109,6 +109,16 @@ export const SideToolBar: React.FC = () => {
       }}
     >
       <button
+        data-testid="mode-3d-view-button"
+        onClick={() => controller.finishMode()}
+        style={
+          currentMode === "DEFAULT" ? activeModeButtonStyle : buttonStyle
+        }
+      >
+        3D View
+      </button>
+
+      <button
         data-testid="undo-button"
         onClick={handleUndo}
         disabled={!canUndo}
@@ -194,6 +204,14 @@ export const SideToolBar: React.FC = () => {
         style={currentMode === "ROTATE" ? activeModeButtonStyle : buttonStyle}
       >
         Rotate
+      </button>
+
+      <button
+        data-testid="mode-scale-button"
+        onClick={() => handleEnterMode("SCALE")}
+        style={currentMode === "SCALE" ? activeModeButtonStyle : buttonStyle}
+      >
+        Scale
       </button>
 
       <button

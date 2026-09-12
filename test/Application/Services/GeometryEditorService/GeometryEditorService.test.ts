@@ -592,4 +592,25 @@ describe("GeometryEditorService", () => {
     expect(rotated[1]?.coordinateX).toBe(0);
     expect(rotated[1]?.coordinateY).toBe(1);
   });
+
+  it("should scale entire model uniformly around its center with applyScaleFromInitial", () => {
+    const { modelService, editorService } = setupService();
+    const testVertices = [
+      new Vector3D(-1, -1, -1),
+      new Vector3D(1, 1, 1),
+    ];
+    const baseModel = new MeshGeometry(testVertices, []);
+    modelService.setCurrentModel(baseModel);
+
+    // Center is (0, 0, 0), scale by factor 2
+    editorService.applyScaleFromInitial(baseModel, 2);
+
+    const scaled = modelService.getCurrentModel().vertices;
+    expect(scaled[0]?.coordinateX).toBeCloseTo(-2, 5);
+    expect(scaled[0]?.coordinateY).toBeCloseTo(-2, 5);
+    expect(scaled[0]?.coordinateZ).toBeCloseTo(-2, 5);
+    expect(scaled[1]?.coordinateX).toBeCloseTo(2, 5);
+    expect(scaled[1]?.coordinateY).toBeCloseTo(2, 5);
+    expect(scaled[1]?.coordinateZ).toBeCloseTo(2, 5);
+  });
 });

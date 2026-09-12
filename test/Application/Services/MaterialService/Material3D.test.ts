@@ -76,9 +76,16 @@ describe("Material3D", () => {
     const updatedMetalness = initial.withMetalness(0.4);
     expect(updatedMetalness.metalness).toBe(0.4);
 
-    const updatedImage = initial.withImage("data:image/png;base64,xyz");
+    const updatedImage = initial.withImage(
+      "data:image/png;base64,xyz",
+      "custom_decal.png"
+    );
     expect(updatedImage.imageUrl).toBe("data:image/png;base64,xyz");
+    expect(updatedImage.imageFileName).toBe("custom_decal.png");
     expect(updatedImage.hasImage()).toBe(true);
+
+    const updatedImageFileNameOnly = initial.withImageFileName("new_name.png");
+    expect(updatedImageFileNameOnly.imageFileName).toBe("new_name.png");
 
     const updatedExtra = initial.withExtraProperties(["map_Bump normal.png", "illum 2"]);
     expect(updatedExtra.extraProperties).toEqual(["map_Bump normal.png", "illum 2"]);

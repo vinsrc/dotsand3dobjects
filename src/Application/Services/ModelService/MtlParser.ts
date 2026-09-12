@@ -7,6 +7,7 @@ interface MutableMaterialData {
   roughness: number;
   metalness: number;
   imageUrl: string | null;
+  imageFileName: string | null;
   extraProperties: string[];
 }
 
@@ -26,6 +27,7 @@ export class MtlParser {
             roughness: activeMaterial.roughness,
             metalness: activeMaterial.metalness,
             imageUrl: activeMaterial.imageUrl,
+            imageFileName: activeMaterial.imageFileName,
             extraProperties: activeMaterial.extraProperties,
           })
         );
@@ -52,6 +54,7 @@ export class MtlParser {
           roughness: 0.5,
           metalness: 0.0,
           imageUrl: null,
+          imageFileName: null,
           extraProperties: [],
         };
       } else if (!activeMaterial) {
@@ -78,6 +81,7 @@ export class MtlParser {
       } else if (commandKey === "map_kd") {
         const imagePath = trimmedLine.substring("map_kd".length).trim();
         activeMaterial.imageUrl = imagePath.length > 0 ? imagePath : null;
+        activeMaterial.imageFileName = imagePath.length > 0 ? imagePath : null;
       } else {
         // Retain any other property (e.g. map_Bump, norm, bump, Ka, Ks, Ns, d, Tr, illum, Ke)
         activeMaterial.extraProperties.push(trimmedLine);

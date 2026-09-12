@@ -12,6 +12,11 @@ on selecting a face,  add a clear material button to the top tool bar. its a con
 
 The user can tap any decal plane and select it. also, double tap the decal plane to switch to the face orthographic view of the decal plane. the user use rotate mode, translate mode to adjust the decal plane.  he cannot use insert mode, fill mode, delete vertex, center object.  the user can assign a material to a decal plane, this is most likely an image material but we will allow any material.
 
+
+# Delete Decal Button
+
+Add a Delete Decal Plane Button when a decal is selected. on clicking it, the decal needs to be deleted.  another change is ,  Decal plane can be selected only in the face orthographic view of its parent face.  if a decal plane is touched or double tapped, always select the face or switch to face orthographic view. this reinforces the idea that the decal plane is conceptually a sticker on the face ( a child of the face). refactor code if needed to establish the parent child relationship in the code base.
+
 # Material Library
 Add a new top tool bar button called Material Library (use icon). Update the Help screen.
 
@@ -19,22 +24,22 @@ On clicking the button, the Material Library Panel will be shown. On Toggling th
 
 the 3d view port will show the Material Library Panel on the left side of the 3d view port by default. The user can drag it to the right side by using UI customization button. if both Side Tool bar and Material Library are docked to the same side, the side tool bar will be on left or right most place followed by Material Library Panel.
 
-Material Library Panel Design:
+## Material Library Panel Design:
 
 The Material Library Panel has two sub views, stacked vertically.
 
-Material list view:
+### Material list view:
 Shows the list of materials used. there are two buttons, + (Add) and X (delete ) in the top most row of the list . clicking + will add a new material, generate name automatically as "Material #" . autogenerate number. on clicking "X" button, it will delete the currently selected material. Disable delete (X) button when no material is selected. show a confirmation dialog for deletion.
 
-Material detail view:
+### Material detail view:
 On selecting the material on the Material list view, the detail view will show the details of the material and allows the user to modify the material. The detail view below the Material List view. the 4 properties shown are Material Name, Base Color (Albedo), Roughness, Metal ness. Any modification is saved automatically. On editing the Material name, it should change in the list view also. The Material detail view has an image file property. the user can set an image to it. A material with image cannot have Base Color, Roughness and Metalness. so disable them if image is set. Enable them if image is unset. Provide a X (Clear) button to clear the image.
 
-Assigning Material To Faces
+## Assigning Material To Faces
 The user will be able to select a face by tapping the face, once a face is selected, the material library panel will be shown if its not toggled already. Clicking the multiselect mode will allow the user to select more than one face and assign same material to all of them.
 
 When assigning a material with image, the image is applied on the face using a decal plane i.e. Use a plane to simulate a decal. The user will have to enter the face orthographic view to resize or rotate the decal plane.
 
-Export To Obj Files
+## Export To Obj Files
 Use Obj PBR extensions to export PBR materials.
 
 * Show X,Y,Z axis in the view. use same colors are 3d gizmo
@@ -111,3 +116,10 @@ in a face orthographic view, add a button to the top tool bar called set front. 
 in insert mode, if a vertice is already selected and if another existing vertex is selected and auto connect is ON, then both vertices should connect. and the last selected vertex remains selected. this is like filling the polygon.
 
 if two vertices are already and selected and the user enters fill mode, these vertices should be automatically connected with an edge. this is like capturing the intent of the user better. he enters fill mode to start connecting vertices.
+
+# 3d View button 
+Add a "'3d View" button to the top most place in the side tool bar. this is the default view.  when user is in translate mode or any other mode, he can click the 3d view button to return to default view.  
+
+# Scale button
+
+Add scale button to the side tool bar. For the main mesh, the scale button provides scale functionality. it will always scale equally in all axis.  add a handle to the four boundary corners like rotate for scaling.   this is just a way to make mesh larger or smaller . not sheer or skew it.  if decal plane is selected, this should scale the decal plane.  

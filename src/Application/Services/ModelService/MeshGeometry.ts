@@ -157,10 +157,17 @@ export class MeshGeometry {
     return new MeshGeometry(rotatedVertices, this.faces, this.explicitEdges);
   }
 
-  public scale(scalarFactor: number): MeshGeometry {
-    const scaledVertices = this.vertices.map((currentVertex) =>
-      currentVertex.scaleBy(scalarFactor)
-    );
+  public scale(scalarFactor: number, centerPoint?: Vector3D): MeshGeometry {
+    if (!centerPoint) {
+      const scaledVertices = this.vertices.map((currentVertex) =>
+        currentVertex.scaleBy(scalarFactor)
+      );
+      return new MeshGeometry(scaledVertices, this.faces, this.explicitEdges);
+    }
+    const scaledVertices = this.vertices.map((currentVertex) => {
+      const relativeVector = currentVertex.subtract(centerPoint);
+      return centerPoint.add(relativeVector.scaleBy(scalarFactor));
+    });
     return new MeshGeometry(scaledVertices, this.faces, this.explicitEdges);
   }
 
