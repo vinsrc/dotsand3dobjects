@@ -96,6 +96,37 @@ export class GeometryTransformService {
     this.modelService.setCurrentModel(updatedModel);
   }
 
+  public applyModelTranslationFromInitial(
+    initialModel: MeshGeometry,
+    totalOffset: Vector3D,
+    gridPlane: GridPlaneType,
+    snapEnabled: boolean
+  ): Vector3D {
+    let effectiveOffset = totalOffset;
+    if (snapEnabled && initialModel.vertices.length > 0) {
+      const center = initialModel.calculateCenter();
+      const candidateCenter = center.add(totalOffset);
+      const snappedCenter = this.geometryEditorService.snapToGridOnPlane(
+        candidateCenter,
+        gridPlane
+      );
+      effectiveOffset = snappedCenter.subtract(center);
+    }
+
+    const updatedVertices = initialModel.vertices.map((currentVertex) =>
+      currentVertex.add(effectiveOffset)
+    );
+
+    const updatedModel = new MeshGeometry(
+      updatedVertices,
+      initialModel.faces,
+      initialModel.explicitEdges
+    );
+
+    this.modelService.setCurrentModel(updatedModel);
+    return effectiveOffset;
+  }
+
   public applyRotationFromInitial(
     initialModel: MeshGeometry,
     angleRadians: number,

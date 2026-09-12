@@ -7,7 +7,8 @@ export type UiMode =
   | "ROTATE"
   | "SCALE"
   | "INSERT"
-  | "FILL";
+  | "FILL"
+  | "TRANSFORM";
 
 export class EditorModeService {
   private readonly stateNotifier: ApplicationStateNotifier;
@@ -30,7 +31,8 @@ export class EditorModeService {
     if (
       (targetMode === "TRANSLATE" ||
         targetMode === "ROTATE" ||
-        targetMode === "SCALE") &&
+        targetMode === "SCALE" ||
+        targetMode === "TRANSFORM") &&
       !isOrthographic
     ) {
       this.stateNotifier.notify(

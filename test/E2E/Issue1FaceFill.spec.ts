@@ -6,23 +6,23 @@ test.describe("WireframeVibe3D Issue #1 Face Fill Functional Tests", () => {
     await page.waitForSelector("[data-testid='viewport-canvas-container']");
   });
 
-  test("Face Fill button is visible only when Fill Mode is selected", async ({
+  test("Face Fill button is always visible in Side Tool Bar", async ({
     page,
   }) => {
-    // Initially in Default Mode: Face Fill button must not be visible
-    await expect(page.getByTestId("face-fill-button")).not.toBeVisible();
+    // Initially in Default Mode: Face Fill button must be visible
+    await expect(page.getByTestId("face-fill-button")).toBeVisible();
 
-    // Switch to Multi Select Mode: still not visible
+    // Switch to Multi Select Mode: still visible
     await page.getByTestId("mode-multi-select-button").click();
-    await expect(page.getByTestId("face-fill-button")).not.toBeVisible();
+    await expect(page.getByTestId("face-fill-button")).toBeVisible();
 
-    // Switch to Fill Mode: Face Fill button must now be visible
+    // Switch to Fill Mode: still visible
     await page.getByTestId("mode-fill-button").click();
     await expect(page.getByTestId("face-fill-button")).toBeVisible();
 
-    // Switch to Insert Mode: Face Fill button should disappear
+    // Switch to Insert Mode: still visible
     await page.getByTestId("mode-insert-button").click();
-    await expect(page.getByTestId("face-fill-button")).not.toBeVisible();
+    await expect(page.getByTestId("face-fill-button")).toBeVisible();
   });
 
   test("Face Fill button is disabled when fewer than 3 vertices are selected", async ({
@@ -31,8 +31,7 @@ test.describe("WireframeVibe3D Issue #1 Face Fill Functional Tests", () => {
     // Switch to orthographic +Z view
     await page.getByTestId("gizmo-axis-+Z").click();
 
-    // Enter Fill Mode with 0 selected vertices
-    await page.getByTestId("mode-fill-button").click();
+    // With 0 selected vertices
     await expect(page.getByTestId("face-fill-button")).toBeVisible();
     await expect(page.getByTestId("face-fill-button")).toBeDisabled();
 

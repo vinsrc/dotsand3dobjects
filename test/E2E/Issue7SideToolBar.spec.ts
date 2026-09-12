@@ -110,19 +110,14 @@ test.describe("WireframeVibe3D Issue #7 Side Tool Bar Functional Tests", () => {
     await expect(autoConnectButton).not.toBeVisible();
   });
 
-  test("Face Fill button is shown only in Fill Mode and enabled only when at least 3 vertices are selected", async ({
+  test("Face Fill button is always shown and enabled only when at least 3 vertices are selected", async ({
     page,
   }) => {
     const sideToolbar = page.getByTestId("side-toolbar");
     const faceFillButton = page.getByTestId("face-fill-button");
 
-    // Initially in default mode, Face Fill is not shown
-    await expect(faceFillButton).not.toBeVisible();
-
-    // Enter Fill Mode
-    await sideToolbar.getByTestId("mode-fill-button").click();
+    // Initially in default mode, Face Fill is visible but disabled (0 vertices selected)
     await expect(faceFillButton).toBeVisible();
-    // With 0 vertices selected, it must be disabled
     await expect(faceFillButton).toBeDisabled();
 
     // Switch to orthographic view for precise picking
@@ -140,26 +135,20 @@ test.describe("WireframeVibe3D Issue #7 Side Tool Bar Functional Tests", () => {
 
     // Pick vertex 1 (1, 1, 1)
     await page.mouse.click(centerX + 100, centerY - 100);
-    // Switch to Fill mode to check Face Fill
-    await sideToolbar.getByTestId("mode-fill-button").click();
     await expect(faceFillButton).toBeDisabled();
 
     // Select vertex 2 (-1, 1, 1)
-    await sideToolbar.getByTestId("mode-multi-select-button").click();
     await page.mouse.click(centerX - 100, centerY - 100);
-    await sideToolbar.getByTestId("mode-fill-button").click();
     await expect(faceFillButton).toBeDisabled();
 
     // Select vertex 3 (-1, -1, 1)
-    await sideToolbar.getByTestId("mode-multi-select-button").click();
     await page.mouse.click(centerX - 100, centerY + 100);
-    await sideToolbar.getByTestId("mode-fill-button").click();
 
     // With 3 vertices selected, Face Fill must be enabled!
     await expect(faceFillButton).toBeEnabled();
 
-    // Exit Fill mode
-    await sideToolbar.getByTestId("mode-fill-button").click();
-    await expect(faceFillButton).not.toBeVisible();
+    // Clear selection disables it again
+    await sideToolbar.getByTestId("clear-selection-button").click();
+    await expect(faceFillButton).toBeDisabled();
   });
 });

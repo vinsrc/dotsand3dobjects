@@ -315,4 +315,56 @@ describe("GeometryTransformService", () => {
     expect(scaled[1]?.coordinateY).toBeCloseTo(2, 5);
     expect(scaled[1]?.coordinateZ).toBeCloseTo(2, 5);
   });
+
+  it("should translate entire model with applyModelTranslationFromInitial without snap", () => {
+    const { modelService, transformService } = setupService();
+    const testVertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(2, 2, 2),
+    ];
+    const baseModel = new MeshGeometry(testVertices, []);
+    modelService.setCurrentModel(baseModel);
+
+    const offset = transformService.applyModelTranslationFromInitial(
+      baseModel,
+      new Vector3D(1, 2, 3),
+      "XY",
+      false
+    );
+
+    expect(offset.coordinateX).toBe(1);
+    expect(offset.coordinateY).toBe(2);
+    expect(offset.coordinateZ).toBe(3);
+
+    const translated = modelService.getCurrentModel().vertices;
+    expect(translated[0]?.coordinateX).toBe(1);
+    expect(translated[0]?.coordinateY).toBe(2);
+    expect(translated[0]?.coordinateZ).toBe(3);
+    expect(translated[1]?.coordinateX).toBe(3);
+    expect(translated[1]?.coordinateY).toBe(4);
+    expect(translated[1]?.coordinateZ).toBe(5);
+  });
+
+  it("should translate entire model with applyModelTranslationFromInitial with grid snap", () => {
+    const { modelService, transformService } = setupService();
+    const testVertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(2, 2, 2),
+    ];
+    const baseModel = new MeshGeometry(testVertices, []);
+    modelService.setCurrentModel(baseModel);
+
+    // Model center is (1, 1, 1). Offset (0.24, 0.49, 0) -> candidate center (1.24, 1.49, 1).
+    // Snaps to (1, 1, 1) if grid step is 1, so effectiveOffset is (0, 0, 0).
+    const offset = transformService.applyModelTranslationFromInitial(
+      baseModel,
+      new Vector3D(0.24, 0.49, 0),
+      "XY",
+      true
+    );
+
+    const translated = modelService.getCurrentModel().vertices;
+    expect(translated[0]?.coordinateX).toBe(0);
+    expect(translated[0]?.coordinateY).toBe(0);
+  });
 });

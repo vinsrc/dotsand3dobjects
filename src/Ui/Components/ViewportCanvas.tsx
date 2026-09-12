@@ -9,6 +9,7 @@ import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeomet
 import { ThemeColors } from "../Common/Theme";
 import { RotateOverlay } from "./RotateOverlay";
 import { ScaleOverlay } from "./ScaleOverlay";
+import { TransformOverlay } from "./TransformOverlay";
 
 const calculatePanFactor = (
   cameraDistance: number,
@@ -528,12 +529,8 @@ export const ViewportCanvas: React.FC = () => {
         dragStartWorldPosRef.current = startWorldPos;
       }
     } else if (currentMode === "TRANSLATE") {
-      if (hitDecalId !== null && controller.getSelectedDecalId() !== hitDecalId) {
-        controller.selectDecal(hitDecalId);
-      }
       if (
-        controller.getSelectionService().getSelectedIndices().length > 0 ||
-        controller.isDecalSelected()
+        controller.getSelectionService().getSelectedIndices().length > 0
       ) {
         controller.beginTranslation();
         const gridPlane = controller
@@ -1037,9 +1034,21 @@ export const ViewportCanvas: React.FC = () => {
               ? "grab"
               : controller.getEditorModeService().getMode() === "SCALE"
               ? "nwse-resize"
+              : controller.getEditorModeService().getMode() === "TRANSFORM"
+              ? "default"
               : "crosshair",
         }}
       />
+      {controller.getEditorModeService().getMode() === "TRANSFORM" &&
+        controller.getCameraStateService().isOrthographic() && (
+          <TransformOverlay
+            controller={controller}
+            canvasElement={canvasRef.current}
+            getActiveCamera={() =>
+              rendererRef.current?.getActiveCamera() ?? null
+            }
+          />
+        )}
       {controller.getEditorModeService().getMode() === "ROTATE" &&
         controller.getCameraStateService().isOrthographic() && (
           <RotateOverlay

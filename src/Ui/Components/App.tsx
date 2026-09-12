@@ -12,11 +12,13 @@ import { CustomizeUiModal } from "./CustomizeUiModal";
 
 import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
+import { useKeyboardShortcuts } from "../Common/UseKeyboardShortcuts";
 import { ThemeColors } from "../Common/Theme";
 
 const AppContent: React.FC = () => {
   const controller = useAppController();
   useApplicationState(["MATERIAL_PANEL_CHANGED", "UI_CUSTOMIZATION_CHANGED"]);
+  useKeyboardShortcuts();
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [isCustomizeUiOpen, setIsCustomizeUiOpen] = useState<boolean>(false);
 
@@ -57,7 +59,6 @@ const AppContent: React.FC = () => {
           flexDirection: "row",
         }}
       >
-        {/* Left-docked components: SideToolBar is outermost (left-most) */}
         {sideToolBarDock === "left" && <SideToolBar />}
         {materialLibraryDock === "left" && <MaterialLibraryPanel />}
 
@@ -73,7 +74,6 @@ const AppContent: React.FC = () => {
           <AxisGizmo />
         </div>
 
-        {/* Right-docked components: SideToolBar is outermost (right-most) */}
         {materialLibraryDock === "right" && <MaterialLibraryPanel />}
         {sideToolBarDock === "right" && <SideToolBar />}
       </div>
@@ -96,7 +96,10 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <ApplicationProvider controller={applicationInstances.appController}>
+    <ApplicationProvider
+      controller={applicationInstances.appController}
+      keyboardShortcutService={applicationInstances.keyboardShortcutService}
+    >
       <AppContent />
     </ApplicationProvider>
   );

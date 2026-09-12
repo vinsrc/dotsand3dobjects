@@ -27,6 +27,7 @@ export const SideToolBar: React.FC = () => {
     .getSelectedIndices().length;
 
   const hasSelectedVertex = selectedVertexCount > 0;
+  const canFillFace = selectedVertexCount >= 3;
 
   const handleCenterObject = () => {
     controller.centerObject();
@@ -48,6 +49,10 @@ export const SideToolBar: React.FC = () => {
     controller.deleteSelectedVertices();
   };
 
+  const handleFaceFill = () => {
+    controller.createFaceFromSelectedVertices();
+  };
+
   const handleEnterMode = (mode: UiMode) => {
     if (currentMode === mode) {
       controller.finishMode();
@@ -58,6 +63,7 @@ export const SideToolBar: React.FC = () => {
 
   const handleToggleGridSnap = () => {
     controller.toggleGridSnap();
+
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -191,27 +197,26 @@ export const SideToolBar: React.FC = () => {
       <button
         data-testid="mode-translate-button"
         onClick={() => handleEnterMode("TRANSLATE")}
+        disabled={isDecalSelected}
         style={
-          currentMode === "TRANSLATE" ? activeModeButtonStyle : buttonStyle
+          isDecalSelected
+            ? disabledButtonStyle
+            : currentMode === "TRANSLATE"
+            ? activeModeButtonStyle
+            : buttonStyle
         }
       >
-        Translate
+        Move Vertex
       </button>
 
       <button
-        data-testid="mode-rotate-button"
-        onClick={() => handleEnterMode("ROTATE")}
-        style={currentMode === "ROTATE" ? activeModeButtonStyle : buttonStyle}
+        data-testid="mode-transform-button"
+        onClick={() => handleEnterMode("TRANSFORM")}
+        style={
+          currentMode === "TRANSFORM" ? activeModeButtonStyle : buttonStyle
+        }
       >
-        Rotate
-      </button>
-
-      <button
-        data-testid="mode-scale-button"
-        onClick={() => handleEnterMode("SCALE")}
-        style={currentMode === "SCALE" ? activeModeButtonStyle : buttonStyle}
-      >
-        Scale
+        Transform
       </button>
 
       <button
@@ -226,7 +231,18 @@ export const SideToolBar: React.FC = () => {
             : buttonStyle
         }
       >
-        Fill
+        Draw Edge
+      </button>
+
+      <button
+        data-testid="face-fill-button"
+        onClick={handleFaceFill}
+        disabled={!canFillFace || isDecalSelected}
+        style={
+          canFillFace && !isDecalSelected ? buttonStyle : disabledButtonStyle
+        }
+      >
+        Face Fill
       </button>
 
       <button

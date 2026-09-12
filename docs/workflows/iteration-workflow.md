@@ -15,7 +15,8 @@ An Issue may be a bug or a new feature.
 
 5. **Spec Freeze**: Once the review passes, Ask the user to check functionality. if the user has more changes, update the iteration spec with changes. if the functionality has achieved desired state, then spec is finalized, Check if the iteration spec matches the implementation and proceed to write Functional test cases based on the spec into in @docs/wip/<issue_number>.tests.spec.md
 
-6. **Functional Testing Task**: Run the functional testing task using `fast-subagent` per `docs/workflows/tasks/func-testing-task.md` and ensure all functional and E2E tests pass.
+6. **Functional Testing Task**: This task is disabled. Do not run. 
+<!-- Run the functional testing task using `fast-subagent` per `docs/workflows/tasks/func-testing-task.md` and ensure all functional and E2E tests pass. -->
 
 7. Attach @docs/wip/<issue_number>.tests.spec.md and @docs/wip/<issue_number>.plan.md to the issue in github and delete the local wip files.
 

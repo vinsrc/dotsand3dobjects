@@ -1209,14 +1209,14 @@ describe("AppController", () => {
       expect(fillResult).toBe(false);
       expect(appController.getEditorModeService().getMode()).toBe("DEFAULT");
 
-      // TRANSLATE and ROTATE should succeed
+      // TRANSLATE (Move Vertex) should be rejected when decal is selected
       const translateResult = appController.enterMode("TRANSLATE");
-      expect(translateResult).toBe(true);
-      expect(appController.getEditorModeService().getMode()).toBe("TRANSLATE");
+      expect(translateResult).toBe(false);
+      expect(appController.getEditorModeService().getMode()).toBe("DEFAULT");
 
-      const rotateResult = appController.enterMode("ROTATE");
-      expect(rotateResult).toBe(true);
-      expect(appController.getEditorModeService().getMode()).toBe("ROTATE");
+      const transformResult = appController.enterMode("TRANSFORM");
+      expect(transformResult).toBe(true);
+      expect(appController.getEditorModeService().getMode()).toBe("TRANSFORM");
     });
 
     it("should prevent deleteSelectedVertices and centerObject when decal is selected", () => {
@@ -1249,13 +1249,12 @@ describe("AppController", () => {
 
     it("should assign and clear material on selected decal plane", () => {
       const { appController } = createController();
-      const material = appController.createMaterial();
-
       appController.selectFace(0);
       appController.addDecalPlaneToSelectedFace();
 
-      // Assign material to decal
+      const material = appController.createMaterial();
       appController.assignMaterialToSelectedFaces(material.id);
+
       expect(appController.getSelectedDecal()?.materialId).toBe(material.id);
 
       // Clear material on decal
@@ -1270,10 +1269,10 @@ describe("AppController", () => {
       appController.addDecalPlaneToSelectedFace();
       const initialCenter = appController.getSelectedDecal()!.center;
 
-      // Translate decal
-      appController.beginTranslation();
-      appController.applyDragTranslation(new Vector3D(1, 2, 0));
-      appController.endTranslation();
+      // Translate decal via transform translation
+      appController.beginTransformTranslation();
+      appController.applyTransformTranslation(new Vector3D(1, 2, 0));
+      appController.endTransformTranslation();
 
       const translatedCenter = appController.getSelectedDecal()!.center;
       expect(translatedCenter.coordinateX).toBeCloseTo(initialCenter.coordinateX + 1, 4);
@@ -1533,6 +1532,80 @@ describe("AppController", () => {
       expect(appController.getEdgeLineWidth()).toBe(5);
       expect(uiCustomizationService.getSideToolBarDock()).toBe("left");
       expect(uiCustomizationService.getMaterialLibraryDock()).toBe("left");
+    });
+  });
+
+  describe("Transform & Move Vertex", () => {
+    it("should disallow enterMode('TRANSLATE') when decal is selected", () => {
+      const { appController, decalService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+
+      expect(decalService.isDecalSelected()).toBe(true);
+
+      const canEnter = appController.enterMode("TRANSLATE");
+      expect(canEnter).toBe(false);
+      expect(appController.getEditorModeService().getMode()).not.toBe("TRANSLATE");
+    });
+
+    it("should allow enterMode('TRANSFORM') in orthographic view and disallow in perspective view", () => {
+      const { appController } = createController();
+
+      // Perspective view -> fails
+      const inPerspective = appController.enterMode("TRANSFORM");
+      expect(inPerspective).toBe(false);
+
+      // Orthographic view -> succeeds
+      appController.selectOrthographicView("+Z");
+      const inOrtho = appController.enterMode("TRANSFORM");
+      expect(inOrtho).toBe(true);
+      expect(appController.getEditorModeService().getMode()).toBe("TRANSFORM");
+    });
+
+    it("should translate entire model in orthographic view via transform translation", () => {
+      const { appController, modelService } = createController();
+      appController.selectOrthographicView("+Z");
+      if (appController.isGridSnapEnabled()) {
+        appController.toggleGridSnap();
+      }
+
+      const initialCenter = modelService.getCurrentModel().calculateCenter();
+
+      appController.beginTransformTranslation();
+      appController.applyTransformTranslation(new Vector3D(1, 2, 0));
+      appController.endTransformTranslation();
+
+      const newCenter = modelService.getCurrentModel().calculateCenter();
+      expect(newCenter.coordinateX).toBeCloseTo(initialCenter.coordinateX + 1, 5);
+      expect(newCenter.coordinateY).toBeCloseTo(initialCenter.coordinateY + 2, 5);
+    });
+
+    it("should translate selected decal via transform translation", () => {
+      const { appController, decalService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+
+      const selectedDecal = decalService.getSelectedDecal()!;
+      const initialCenter = selectedDecal.center;
+
+      appController.beginTransformTranslation();
+      appController.applyTransformTranslation(new Vector3D(0.5, 0.5, 0));
+      appController.endTransformTranslation();
+
+      const updatedDecal = decalService.getSelectedDecal()!;
+      expect(updatedDecal.center.coordinateX).toBeCloseTo(initialCenter.coordinateX + 0.5, 5);
+      expect(updatedDecal.center.coordinateY).toBeCloseTo(initialCenter.coordinateY + 0.5, 5);
+    });
+
+    it("should emit error when applying transform translation in perspective view", () => {
+      const { appController, stateNotifier } = createController();
+      const errorListener = vi.fn();
+      stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+
+      appController.applyTransformTranslation(new Vector3D(1, 0, 0));
+      expect(errorListener).toHaveBeenCalledWith("Switch to an Orthographic view");
     });
   });
 });

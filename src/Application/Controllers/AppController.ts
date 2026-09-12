@@ -47,10 +47,12 @@ export class AppController {
   private translationInitialModel: MeshGeometry | null = null;
   private rotationInitialModel: MeshGeometry | null = null;
   private scalingInitialModel: MeshGeometry | null = null;
-  private translationInitialDecal: DecalPlane | null = null;
   private rotationInitialDecal: DecalPlane | null = null;
   private scalingInitialDecal: DecalPlane | null = null;
   private scalingInitialDecals: readonly DecalPlane[] | null = null;
+  private transformInitialModel: MeshGeometry | null = null;
+  private transformInitialDecal: DecalPlane | null = null;
+  private transformInitialDecals: readonly DecalPlane[] | null = null;
 
   public constructor(
     modelService: ModelService,
@@ -768,7 +770,11 @@ export class AppController {
 
   public enterMode(targetMode: UiMode): boolean {
     if (this.decalService.isDecalSelected()) {
-      if (targetMode === "INSERT" || targetMode === "FILL") {
+      if (
+        targetMode === "INSERT" ||
+        targetMode === "FILL" ||
+        targetMode === "TRANSLATE"
+      ) {
         return false;
       }
     }
@@ -920,16 +926,11 @@ export class AppController {
 
   public beginTranslation(): void {
     this.recordSnapshot();
-    if (this.decalService.isDecalSelected()) {
-      this.translationInitialDecal = this.decalService.getSelectedDecal();
-    } else {
-      this.translationInitialModel = this.modelService.getCurrentModel();
-    }
+    this.translationInitialModel = this.modelService.getCurrentModel();
   }
 
   public endTranslation(): void {
     this.translationInitialModel = null;
-    this.translationInitialDecal = null;
   }
 
   public applyDragTranslation(totalDragOffset: Vector3D): void {
@@ -939,20 +940,6 @@ export class AppController {
         "ERROR_OCCURRED",
         "Switch to an Orthographic view"
       );
-      return;
-    }
-
-    if (this.decalService.isDecalSelected()) {
-      if (!this.translationInitialDecal) {
-        this.translationInitialDecal = this.decalService.getSelectedDecal();
-      }
-      if (this.translationInitialDecal) {
-        const translatedDecal = this.translationInitialDecal.translate(totalDragOffset);
-        this.decalService.restoreState(
-          this.decalService.getDecals().map((d) => (d.id === translatedDecal.id ? translatedDecal : d)),
-          translatedDecal.id
-        );
-      }
       return;
     }
 
@@ -971,6 +958,76 @@ export class AppController {
       activeGridPlane,
       isSnapEnabled
     );
+  }
+
+  public beginTransformTranslation(): void {
+    this.recordSnapshot();
+    if (this.decalService.isDecalSelected()) {
+      this.transformInitialDecal = this.decalService.getSelectedDecal();
+      this.transformInitialModel = null;
+      this.transformInitialDecals = null;
+    } else {
+      this.transformInitialModel = this.modelService.getCurrentModel();
+      this.transformInitialDecal = null;
+      this.transformInitialDecals = [...this.decalService.getDecals()];
+    }
+  }
+
+  public endTransformTranslation(): void {
+    this.transformInitialModel = null;
+    this.transformInitialDecal = null;
+    this.transformInitialDecals = null;
+  }
+
+  public applyTransformTranslation(totalDragOffset: Vector3D): void {
+    const isOrthographic = this.cameraStateService.isOrthographic();
+    if (!isOrthographic) {
+      this.stateNotifier.notify(
+        "ERROR_OCCURRED",
+        "Switch to an Orthographic view"
+      );
+      return;
+    }
+
+    if (this.decalService.isDecalSelected()) {
+      if (!this.transformInitialDecal) {
+        this.transformInitialDecal = this.decalService.getSelectedDecal();
+      }
+      if (this.transformInitialDecal) {
+        const translatedDecal = this.transformInitialDecal.translate(totalDragOffset);
+        this.decalService.restoreState(
+          this.decalService
+            .getDecals()
+            .map((d) => (d.id === translatedDecal.id ? translatedDecal : d)),
+          translatedDecal.id
+        );
+      }
+      return;
+    }
+
+    if (!this.transformInitialModel) {
+      this.transformInitialModel = this.modelService.getCurrentModel();
+    }
+
+    const activeGridPlane = this.cameraStateService
+      .getActiveStrategy()
+      .getGridPlane();
+    const isSnapEnabled = this.editorModeService.isGridSnapEnabled();
+
+    const effectiveOffset =
+      this.geometryTransformService.applyModelTranslationFromInitial(
+        this.transformInitialModel,
+        totalDragOffset,
+        activeGridPlane,
+        isSnapEnabled
+      );
+
+    if (this.transformInitialDecals && this.transformInitialDecals.length > 0) {
+      const updatedDecals = this.transformInitialDecals.map((d) =>
+        d.translate(effectiveOffset)
+      );
+      this.decalService.restoreState(updatedDecals, null);
+    }
   }
 
   public beginRotation(): void {

@@ -21,6 +21,7 @@ import { DecalService } from "./Services/DecalService/DecalService";
 import { ZipExportService } from "./Services/ZipExportService/ZipExportService";
 import { ZipImportService } from "./Services/ZipExportService/ZipImportService";
 import { DataUrlConverter } from "./Common/DataUrlConverter";
+import { KeyboardShortcutService } from "./Services/KeyboardShortcutService/KeyboardShortcutService";
 
 export class AppBootstrapper {
   public static createApplication(): {
@@ -39,6 +40,7 @@ export class AppBootstrapper {
     zipExportService: ZipExportService;
     zipImportService: ZipImportService;
     stateNotifier: ApplicationStateNotifier;
+    keyboardShortcutService: KeyboardShortcutService;
   } {
     const modelFactory = new ModelFactory();
     const objParser = new ObjParser(modelFactory);
@@ -99,6 +101,8 @@ export class AppBootstrapper {
       zipImportService
     );
 
+    const keyboardShortcutService = new KeyboardShortcutService(appController);
+
     return {
       appController,
       modelService,
@@ -115,6 +119,7 @@ export class AppBootstrapper {
       zipExportService,
       zipImportService,
       stateNotifier,
+      keyboardShortcutService,
     };
   }
 }

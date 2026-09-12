@@ -33,10 +33,6 @@ export const ToolBar: React.FC<ToolBarProps> = ({
   const isFaceOrthographic = controller.isFaceOrthographicView();
   const currentMode = controller.getEditorModeService().getMode();
   const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
-  const selectedVertexCount = controller
-    .getSelectionService()
-    .getSelectedIndices().length;
-  const canFillFace = selectedVertexCount >= 3;
   const selectedFaceCount =
     controller.getSelectedFaceIndices().length ||
     (controller.getSelectedFaceIndex() !== null ? 1 : 0);
@@ -57,10 +53,6 @@ export const ToolBar: React.FC<ToolBarProps> = ({
 
   const handleSetFront = () => {
     controller.setFaceFront();
-  };
-
-  const handleFaceFill = () => {
-    controller.createFaceFromSelectedVertices();
   };
 
   const handleLoadClick = () => {
@@ -464,16 +456,6 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           </button>
         )}
 
-        {currentMode === "FILL" && (
-          <button
-            data-testid="face-fill-button"
-            onClick={handleFaceFill}
-            disabled={!canFillFace}
-            style={canFillFace ? buttonStyle : disabledButtonStyle}
-          >
-            Face Fill
-          </button>
-        )}
       </div>
     </header>
   );
