@@ -8,7 +8,10 @@ function makeMockController(
   currentMode: string = "DEFAULT",
   selectedCount: number = 0,
   autoConnectEnabled: boolean = false,
-  decalSelected: boolean = false
+  decalSelected: boolean = false,
+  selectedFaceIndex: number | null = null,
+  selectedDecal: { id: string; parentFaceIndex: number } | null = null,
+  isFaceOrtho: boolean = false
 ): AppController {
   let mode = currentMode;
 
@@ -25,6 +28,12 @@ function makeMockController(
     getEditorModeService: vi.fn().mockReturnValue(editorModeService),
     getSelectionService: vi.fn().mockReturnValue(selectionService),
     isDecalSelected: vi.fn().mockReturnValue(decalSelected),
+    getSelectedDecal: vi.fn().mockReturnValue(selectedDecal),
+    isFaceOrthographicViewOf: vi.fn().mockReturnValue(isFaceOrtho),
+    setDecalOrthographicView: vi.fn().mockReturnValue(true),
+    getSelectedFaceIndex: vi.fn().mockReturnValue(selectedFaceIndex),
+    setFaceOrthographicView: vi.fn(),
+    switchToClosestOrthographicView: vi.fn(),
     enterMode: vi.fn().mockImplementation((newMode: string) => {
       mode = newMode;
       return true;
@@ -283,6 +292,67 @@ describe("KeyboardShortcutService", () => {
       service.handleKeyDown("G");
 
       expect(controller.createFaceFromSelectedVertices).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("handleKeyDown — V (View Shortcut)", () => {
+    it("should switch to closest orthographic view when V is pressed with no face or decal selected", () => {
+      const controller = makeMockController("DEFAULT");
+      const service = new KeyboardShortcutService(controller);
+
+      const consumed = service.handleKeyDown("V");
+
+      expect(consumed).toBe(true);
+      expect(controller.switchToClosestOrthographicView).toHaveBeenCalled();
+      expect(controller.setFaceOrthographicView).not.toHaveBeenCalled();
+    });
+
+    it("should switch to face orthographic view when V is pressed with a face selected", () => {
+      const controller = makeMockController("DEFAULT", 0, false, false, 2);
+      const service = new KeyboardShortcutService(controller);
+
+      const consumed = service.handleKeyDown("V");
+
+      expect(consumed).toBe(true);
+      expect(controller.setFaceOrthographicView).toHaveBeenCalledWith(2);
+      expect(controller.switchToClosestOrthographicView).not.toHaveBeenCalled();
+    });
+
+    it("should switch to decal parent face orthographic view when V is pressed and decal is selected but face view is not active", () => {
+      const decal = { id: "decal-1", parentFaceIndex: 3 };
+      const controller = makeMockController("DEFAULT", 0, false, true, null, decal, false);
+      const service = new KeyboardShortcutService(controller);
+
+      const consumed = service.handleKeyDown("V");
+
+      expect(consumed).toBe(true);
+      expect(controller.isFaceOrthographicViewOf).toHaveBeenCalledWith(3);
+      expect(controller.setFaceOrthographicView).toHaveBeenCalledWith(3);
+      expect(controller.setDecalOrthographicView).not.toHaveBeenCalled();
+      expect(controller.switchToClosestOrthographicView).not.toHaveBeenCalled();
+    });
+
+    it("should switch to decal orthographic view when V is pressed and decal is selected and face view is already active", () => {
+      const decal = { id: "decal-1", parentFaceIndex: 3 };
+      const controller = makeMockController("DEFAULT", 0, false, true, null, decal, true);
+      const service = new KeyboardShortcutService(controller);
+
+      const consumed = service.handleKeyDown("V");
+
+      expect(consumed).toBe(true);
+      expect(controller.isFaceOrthographicViewOf).toHaveBeenCalledWith(3);
+      expect(controller.setDecalOrthographicView).toHaveBeenCalledWith("decal-1");
+      expect(controller.switchToClosestOrthographicView).not.toHaveBeenCalled();
+    });
+
+    it("should fallback to face view check if decal is marked selected but getSelectedDecal returns null", () => {
+      const controller = makeMockController("DEFAULT", 0, false, true, 1, null, false);
+      const service = new KeyboardShortcutService(controller);
+
+      const consumed = service.handleKeyDown("V");
+
+      expect(consumed).toBe(true);
+      expect(controller.setFaceOrthographicView).toHaveBeenCalledWith(1);
     });
   });
 

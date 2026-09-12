@@ -55,6 +55,7 @@ export class KeyboardShortcutService {
       ["E", () => this.controller.clearSelection()],
       ["Q", () => this.handleAutoConnect()],
       ["G", () => this.handleFaceFill()],
+      ["V", () => this.handleViewShortcut()],
       ["ESCAPE", () => this.controller.finishMode()],
     ]);
   }
@@ -125,5 +126,25 @@ export class KeyboardShortcutService {
       return;
     }
     this.controller.createFaceFromSelectedVertices();
+  }
+
+  private handleViewShortcut(): void {
+    if (this.controller.isDecalSelected()) {
+      const decal = this.controller.getSelectedDecal();
+      if (decal) {
+        if (this.controller.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
+          this.controller.setDecalOrthographicView(decal.id);
+        } else {
+          this.controller.setFaceOrthographicView(decal.parentFaceIndex);
+        }
+        return;
+      }
+    }
+    const selectedFaceIndex = this.controller.getSelectedFaceIndex();
+    if (selectedFaceIndex !== null) {
+      this.controller.setFaceOrthographicView(selectedFaceIndex);
+    } else {
+      this.controller.switchToClosestOrthographicView();
+    }
   }
 }
