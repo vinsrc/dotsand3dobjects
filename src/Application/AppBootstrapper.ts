@@ -17,6 +17,7 @@ import { AppController } from "./Controllers/AppController";
 
 import { MaterialService } from "./Services/MaterialService/MaterialService";
 import { UiCustomizationService } from "./Services/UiCustomizationService/UiCustomizationService";
+import { LocalStorageUiCustomizationStorage } from "./Services/UiCustomizationService/LocalStorageUiCustomizationStorage";
 import { DecalService } from "./Services/DecalService/DecalService";
 import { ZipExportService } from "./Services/ZipExportService/ZipExportService";
 import { ZipImportService } from "./Services/ZipExportService/ZipImportService";
@@ -76,8 +77,18 @@ export class AppBootstrapper {
       geometryEditorService
     );
     const undoRedoService = new UndoRedoService(stateNotifier);
-    const materialService = new MaterialService(stateNotifier);
-    const uiCustomizationService = new UiCustomizationService(stateNotifier);
+    const uiCustomizationStorage = new LocalStorageUiCustomizationStorage();
+    const uiCustomizationService = new UiCustomizationService(
+      stateNotifier,
+      "right",
+      "right",
+      2,
+      uiCustomizationStorage
+    );
+    const materialService = new MaterialService(
+      stateNotifier,
+      uiCustomizationService.getMaterialLibraryDock()
+    );
     const decalService = new DecalService(stateNotifier);
     const zipExportService = new ZipExportService();
     const dataUrlConverter = new DataUrlConverter();

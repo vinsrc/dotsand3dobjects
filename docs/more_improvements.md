@@ -14,3 +14,5 @@ Move the face fill button below fill button.
 
 * Provide the ability to select edges (single click and multi-select), highlight selected edges in the viewport, and add a Delete Edge button grouped with Delete Vertex and Delete Face in the side toolbar.
 Edge Deletion Constraint: If an edge is part of a face, deletion is disallowed and raises an error via ERROR_OCCURRED: "Face should be deleted before deleting Edge". Only standalone edges (e.g. created with Draw Edge or remaining after a face is deleted) can be deleted. Vertices remain intact.
+
+* the UI Customization settings are lost every time i refresh the page.  persist it

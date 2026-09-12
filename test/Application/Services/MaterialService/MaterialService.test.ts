@@ -15,6 +15,13 @@ describe("MaterialService", () => {
     expect(service.getDockSide()).toBe("left");
   });
 
+  it("should initialize with custom initial dock side", () => {
+    const stateNotifier = new ApplicationStateNotifier();
+    const service = new MaterialService(stateNotifier, "right");
+
+    expect(service.getDockSide()).toBe("right");
+  });
+
   it("should create material with autoincrementing name and select it", () => {
     const stateNotifier = new ApplicationStateNotifier();
     const materialListener = vi.fn();

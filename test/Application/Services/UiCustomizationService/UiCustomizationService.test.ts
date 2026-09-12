@@ -132,4 +132,75 @@ describe("UiCustomizationService", () => {
       edgeLineWidth: 4,
     });
   });
+
+  describe("storage integration", () => {
+    it("should initialize from storage if stored settings exist", () => {
+      const notifier = new ApplicationStateNotifier();
+      const mockStorage = {
+        load: vi.fn(() => ({
+          sideToolBarDock: "left" as const,
+          materialLibraryDock: "left" as const,
+          edgeLineWidth: 5,
+        })),
+        save: vi.fn(),
+      };
+
+      const service = new UiCustomizationService(
+        notifier,
+        "right",
+        "right",
+        2,
+        mockStorage
+      );
+
+      expect(mockStorage.load).toHaveBeenCalled();
+      expect(service.getSideToolBarDock()).toBe("left");
+      expect(service.getMaterialLibraryDock()).toBe("left");
+      expect(service.getEdgeLineWidth()).toBe(5);
+    });
+
+    it("should persist changes to storage when settings are updated", () => {
+      const notifier = new ApplicationStateNotifier();
+      const mockStorage = {
+        load: vi.fn(() => null),
+        save: vi.fn(),
+      };
+
+      const service = new UiCustomizationService(
+        notifier,
+        "right",
+        "right",
+        2,
+        mockStorage
+      );
+
+      service.setSideToolBarDock("left");
+      expect(mockStorage.save).toHaveBeenCalledWith({
+        sideToolBarDock: "left",
+        materialLibraryDock: "right",
+        edgeLineWidth: 2,
+      });
+
+      service.setMaterialLibraryDock("left");
+      expect(mockStorage.save).toHaveBeenCalledWith({
+        sideToolBarDock: "left",
+        materialLibraryDock: "left",
+        edgeLineWidth: 2,
+      });
+
+      service.setEdgeLineWidth(4);
+      expect(mockStorage.save).toHaveBeenCalledWith({
+        sideToolBarDock: "left",
+        materialLibraryDock: "left",
+        edgeLineWidth: 4,
+      });
+
+      service.setCustomization("right", "right", 1);
+      expect(mockStorage.save).toHaveBeenCalledWith({
+        sideToolBarDock: "right",
+        materialLibraryDock: "right",
+        edgeLineWidth: 1,
+      });
+    });
+  });
 });

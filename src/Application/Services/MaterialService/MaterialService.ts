@@ -11,8 +11,12 @@ export class MaterialService {
   private dockSide: PanelDockSide = "left";
   private nextMaterialNumber: number = 1;
 
-  public constructor(stateNotifier: ApplicationStateNotifier) {
+  public constructor(
+    stateNotifier: ApplicationStateNotifier,
+    initialDockSide: PanelDockSide = "left"
+  ) {
     this.stateNotifier = stateNotifier;
+    this.dockSide = initialDockSide;
   }
 
   public getMaterials(): readonly Material3D[] {
