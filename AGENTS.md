@@ -52,9 +52,11 @@ Create a separate folder for each service. and group related classes into it. Av
 
 # Coding Guidelines:
 
-Follow typescript standard.  Name files with pascal case.
-if statements should not have more than 4 levels of nesting.
-variable names should reflect their purpose, dont name them with single letters.
+* Follow typescript standard.  Name files with pascal case.
+* if statements should not have more than 4 levels of nesting.
+* Variable names should reflect their purpose, dont name them with single letters.
+* Don't ever have a file with more than 500 lines of code. Decompose into logical units. 
+if its a facade class like controller. the facade class itself can have many functions, but those functions should delegate functionality to sub units to keep number of lines per file to less than 500.
 
 # Unit Tests :
 
