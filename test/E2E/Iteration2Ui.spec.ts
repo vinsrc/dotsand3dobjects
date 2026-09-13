@@ -190,9 +190,9 @@ test.describe("WireframeVibe3D Iteration 2 Functional Tests", () => {
   test("Vertices are rendered in front of the model in shaded mode", async ({
     page,
   }) => {
-    // Default is Shaded View
+    // Default is Shaded View (button displays "Wireframe")
     const toggleButton = page.getByTestId("toggle-view-button");
-    await expect(toggleButton).toHaveText("Shaded View");
+    await expect(toggleButton).toHaveText("Wireframe");
 
     const canvas = page.getByTestId("viewport-canvas");
     const screenshot = await canvas.screenshot();

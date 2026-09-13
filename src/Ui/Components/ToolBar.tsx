@@ -433,13 +433,17 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         <button
           data-testid="toggle-view-button"
           onClick={handleToggleRenderMode}
+          title="Toggle Wireframe"
           style={{
             ...buttonStyle,
             backgroundColor: isWireframe ? ThemeColors.accent : ThemeColors.widget,
             color: isWireframe ? "#ffffff" : ThemeColors.textPrimary,
+            borderColor: isWireframe
+              ? ThemeColors.accentBorder
+              : ThemeColors.borderStrong,
           }}
         >
-          {isWireframe ? "Wireframe View" : "Shaded View"}
+          Wireframe
         </button>
         <button
           data-testid="material-library-button"

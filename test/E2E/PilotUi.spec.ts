@@ -130,13 +130,13 @@ test.describe("WireframeVibe3D Pilot Functional Tests", () => {
     const toggleButton = page.getByTestId("toggle-view-button");
     const canvas = page.getByTestId("viewport-canvas");
 
-    // Default mode is Shaded View
-    await expect(toggleButton).toHaveText("Shaded View");
+    // Default mode is Shaded View (button displays "Wireframe")
+    await expect(toggleButton).toHaveText("Wireframe");
     await expect(canvas).toBeVisible();
 
     // Click toggle to switch to Wireframe View
     await toggleButton.click();
-    await expect(toggleButton).toHaveText("Wireframe View");
+    await expect(toggleButton).toHaveText("Wireframe");
 
     // Ensure the wireframe view renders without a blank canvas (object is visible)
     const wireframeScreenshot = await canvas.screenshot();
@@ -144,7 +144,7 @@ test.describe("WireframeVibe3D Pilot Functional Tests", () => {
 
     // Click toggle to switch back to Shaded View
     await toggleButton.click();
-    await expect(toggleButton).toHaveText("Shaded View");
+    await expect(toggleButton).toHaveText("Wireframe");
 
     const shadedScreenshot = await canvas.screenshot();
     expect(shadedScreenshot.byteLength).toBeGreaterThan(1000);
