@@ -63,9 +63,12 @@ test.describe("Issue #12: Face Orthographic View", () => {
     expect(canvasBox).not.toBeNull();
     const centerX = (canvasBox?.x ?? 0) + (canvasBox?.width ?? 0) / 2;
     const centerY = (canvasBox?.y ?? 0) + (canvasBox?.height ?? 0) / 2;
-
-    // Select the front face of the default cube, then click Nearest Orthographic View button
+    // Switch to +Z to select the front face of the default cube
+    await page.getByTestId("gizmo-axis-+Z").click();
     await page.mouse.click(centerX, centerY);
+    // Switch to perspective view
+    await page.getByTestId("perspective-view-button").click();
+    // With front face selected, click Nearest Orthographic View button
     await page.getByTestId("nearest-ortho-view-button").click();
 
     // The viewport should now be in orthographic view
@@ -152,3 +155,4 @@ test.describe("Issue #12: Face Orthographic View", () => {
     expect(Math.abs(newXLeft - initialXLeft)).toBeGreaterThan(3);
   });
 });
+

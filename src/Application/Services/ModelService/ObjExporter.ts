@@ -153,6 +153,18 @@ export class ObjExporter {
       "# OBJ PBR Extensions",
     ];
 
+    const hasExplicitDefault = materials.some(
+      (material) => material.name.replace(/\s+/g, "_").toLowerCase() === "default"
+    );
+
+    if (!hasExplicitDefault) {
+      lines.push("newmtl default");
+      lines.push("Kd 0.800000 0.800000 0.800000");
+      lines.push("Pr 0.700000");
+      lines.push("Pm 0.100000");
+      lines.push("");
+    }
+
     const materialsWithImages = materials.filter(
       (mat) => mat.hasImage() && mat.imageUrl !== null
     );

@@ -379,6 +379,34 @@ describe("AppController", () => {
     expect(editorModeService.getMode()).toBe("DEFAULT");
   });
 
+  it("should switch to default perspective view and finish mode", () => {
+    const { appController, editorModeService, cameraStateService } = createController();
+    appController.selectOrthographicView("+X");
+    expect(cameraStateService.isOrthographic()).toBe(true);
+
+    const entered = appController.enterMode("TRANSFORM");
+    expect(entered).toBe(true);
+    expect(editorModeService.getMode()).toBe("TRANSFORM");
+
+    appController.switchToDefaultPerspectiveView();
+    expect(editorModeService.getMode()).toBe("DEFAULT");
+    expect(cameraStateService.isOrthographic()).toBe(false);
+    expect(cameraStateService.getActiveStrategy().getAxisLabel()).toBe("Perspective");
+    expect(cameraStateService.getAzimuth()).toBeCloseTo(Math.PI / 4);
+    expect(cameraStateService.getElevation()).toBeCloseTo(Math.PI / 6);
+  });
+
+  it("should deselect decal when switching to default perspective view", () => {
+    const { appController } = createController();
+    appController.selectFace(0);
+    appController.addDecalPlaneToSelectedFace();
+    expect(appController.isDecalSelected()).toBe(true);
+
+    appController.switchToDefaultPerspectiveView();
+    expect(appController.isDecalSelected()).toBe(false);
+    expect(appController.getCameraStateService().isOrthographic()).toBe(false);
+  });
+
   it("should toggle auto connect", () => {
     const { appController, editorModeService } = createController();
     expect(editorModeService.isAutoConnectEnabled()).toBe(false);

@@ -677,6 +677,15 @@ export class AppController {
     }
   }
 
+  public switchToDefaultPerspectiveView(): void {
+    if (this.decalService.isDecalSelected()) {
+      this.decalService.selectDecal(null);
+    }
+    this.finishMode();
+    this.cameraStateService.switchToDefaultPerspectiveView();
+    this.stateNotifier.notify("VIEW_CHANGED");
+  }
+
   public selectFace(faceIndex: number): void {
     if (this.decalService.isDecalSelected()) {
       this.decalService.selectDecal(null);

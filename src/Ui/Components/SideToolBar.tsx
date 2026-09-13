@@ -12,6 +12,7 @@ export const SideToolBar: React.FC = () => {
     "SELECTION_CHANGED",
     "UI_CUSTOMIZATION_CHANGED",
     "DECALS_CHANGED",
+    "VIEW_CHANGED",
   ]);
 
   const dockSide = controller.getUiCustomizationService().getSideToolBarDock();
@@ -104,16 +105,6 @@ export const SideToolBar: React.FC = () => {
         zIndex: 10,
       }}
     >
-      <button
-        data-testid="mode-3d-view-button"
-        onClick={() => controller.finishMode()}
-        style={
-          currentMode === "DEFAULT" ? activeModeButtonStyle : buttonStyle
-        }
-      >
-        3D View
-      </button>
-
       <button
         data-testid="center-object-button"
         onClick={handleCenterObject}

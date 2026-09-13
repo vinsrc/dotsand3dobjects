@@ -33,6 +33,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
   const isWireframe = controller.getRenderModeService().isWireframe();
   const isMaterialPanelOpen = controller.isMaterialLibraryPanelOpen();
   const isFaceOrthographic = controller.isFaceOrthographicView();
+  const isPerspectiveView = !controller.getCameraStateService().isOrthographic();
   const currentMode = controller.getEditorModeService().getMode();
   const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
   const isGridSnap = controller.isGridSnapEnabled();
@@ -429,6 +430,21 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           style={buttonStyle}
         >
           Nearest Orthographic View
+        </button>
+        <button
+          data-testid="perspective-view-button"
+          onClick={() => controller.switchToDefaultPerspectiveView()}
+          title="Perspective View"
+          style={{
+            ...buttonStyle,
+            backgroundColor: isPerspectiveView ? ThemeColors.accent : ThemeColors.widget,
+            color: isPerspectiveView ? "#ffffff" : ThemeColors.textPrimary,
+            borderColor: isPerspectiveView
+              ? ThemeColors.accentBorder
+              : ThemeColors.borderStrong,
+          }}
+        >
+          Perspective View
         </button>
         <button
           data-testid="toggle-view-button"

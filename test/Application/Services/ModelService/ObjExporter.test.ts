@@ -96,6 +96,10 @@ describe("ObjExporter", () => {
     const exporter = new ObjExporter();
     const exportedMtl = exporter.exportMtl(materials);
 
+    expect(exportedMtl).toContain("newmtl default");
+    expect(exportedMtl).toContain("Kd 0.800000 0.800000 0.800000");
+    expect(exportedMtl).toContain("Pr 0.700000");
+    expect(exportedMtl).toContain("Pm 0.100000");
     expect(exportedMtl).toContain("newmtl Shiny_Gold");
     expect(exportedMtl).toContain("Pr 0.150000");
     expect(exportedMtl).toContain("Pm 0.950000");
@@ -104,6 +108,24 @@ describe("ObjExporter", () => {
     expect(exportedMtl).toContain("map_Kd wood.png");
 
     expect(exportedMtl).toContain("newmtl Fallback");
+  });
+
+  it("should not duplicate newmtl default if a material named default is already present", () => {
+    const materials = [
+      new Material3D({
+        id: "mat_def",
+        name: "default",
+        baseColor: "#112233",
+        roughness: 0.4,
+        metalness: 0.2,
+      }),
+    ];
+
+    const exporter = new ObjExporter();
+    const exportedMtl = exporter.exportMtl(materials);
+
+    const occurrences = exportedMtl.split("newmtl default").length - 1;
+    expect(occurrences).toBe(1);
   });
 
   it("should preserve extraProperties verbatim when exporting MTL", () => {

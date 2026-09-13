@@ -217,5 +217,20 @@ describe("CameraStateService", () => {
       new Vector3D(0, 0, 1)
     );
   });
+
+  it("should switch back to default perspective view from orthographic axis", () => {
+    const factory = new OrthographicViewStrategyFactory();
+    const cameraService = new CameraStateService(factory);
+
+    cameraService.setOrthographicAxis("+X");
+    expect(cameraService.isOrthographic()).toBe(true);
+    expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("+X");
+
+    cameraService.switchToDefaultPerspectiveView();
+    expect(cameraService.isOrthographic()).toBe(false);
+    expect(cameraService.getActiveStrategy().getAxisLabel()).toBe("Perspective");
+    expect(cameraService.getAzimuth()).toBeCloseTo(Math.PI / 4);
+    expect(cameraService.getElevation()).toBeCloseTo(Math.PI / 6);
+  });
 });
 

@@ -130,6 +130,15 @@ export class CameraStateService {
     return closestAxis;
   }
 
+  public switchToDefaultPerspectiveView(): void {
+    this.azimuthRadians = Math.PI / 4;
+    this.elevationRadians = Math.PI / 6;
+    this.currentStrategy = new PerspectiveViewStrategy(
+      this.azimuthRadians,
+      this.elevationRadians
+    );
+  }
+
   public setFaceOrthographicView(
     faceIndex: number,
     faceNormal: Vector3D,

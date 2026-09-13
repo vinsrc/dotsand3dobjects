@@ -22,7 +22,6 @@ test.describe("WireframeVibe3D Issue #7 Side Tool Bar Functional Tests", () => {
 
     // Verify all side-toolbar buttons are present in order
     const buttonTestIds = [
-      "mode-3d-view-button",
       "center-object-button",
       "mode-transform-button",
       "delete-vertex-button",
@@ -151,4 +150,34 @@ test.describe("WireframeVibe3D Issue #7 Side Tool Bar Functional Tests", () => {
     await page.getByTestId("clear-selection-button").click();
     await expect(faceFillButton).toBeDisabled();
   });
+
+  test("Perspective View button in top toolbar switches from orthographic view back to default perspective view and finishes mode", async ({
+    page,
+  }) => {
+    const topToolbar = page.getByTestId("toolbar");
+    const perspectiveViewButton = topToolbar.getByTestId("perspective-view-button");
+    const sideToolbar = page.getByTestId("side-toolbar");
+
+    await expect(perspectiveViewButton).toBeVisible();
+    await expect(perspectiveViewButton).toHaveText("Perspective View");
+
+    // Switch to +Z orthographic view via gizmo
+    await page.getByTestId("gizmo-axis-+Z").click();
+    await page.waitForTimeout(300);
+
+    // Enter Transform mode (which requires orthographic view)
+    await sideToolbar.getByTestId("mode-transform-button").click();
+
+    // Clicking Perspective View button exits Transform mode and switches to default perspective view
+    await perspectiveViewButton.click();
+    await page.waitForTimeout(300);
+
+    // Now clicking Transform in perspective view should trigger the orthographic requirement error dialog
+    await sideToolbar.getByTestId("mode-transform-button").click();
+    const errorDialog = page.getByTestId("error-dialog");
+    await expect(errorDialog).toBeVisible();
+    await expect(errorDialog).toContainText("Switch to an Orthographic view");
+    await page.getByTestId("error-dismiss-button").click();
+  });
 });
+
