@@ -33,6 +33,7 @@ export const ThemeColors = {
 
   viewportBackground: "#141417",
   gridLine: "#2c2c34",
+  gridSubLine: "#1f1f26",
   gridCenterLine: "#4e4e5a",
   edgeShaded: "#f712b2",
   edgeWireframe: "#f712b2",

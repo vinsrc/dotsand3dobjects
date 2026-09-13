@@ -16,3 +16,13 @@ Move the face fill button below fill button.
 Edge Deletion Constraint: If an edge is part of a face, deletion is disallowed and raises an error via ERROR_OCCURRED: "Face should be deleted before deleting Edge". Only standalone edges (e.g. created with Draw Edge or remaining after a face is deleted) can be deleted. Vertices remain intact.
 
 * the UI Customization settings are lost every time i refresh the page.  persist it
+
+* if i move a vertex to a point where there is another vertex, merge the current vertex with existing one.  plan first
+
+* Show sub grid lines. 1/4. snapping to snap to 1/4 lines. the grid unit is still 1. this is to make sure finer move vertex with grid snapping on.
+
+* Grid Snapping - it should snap to the near grid. now its just jumping one unit during move vertex or other translations. not really a snap.
+
+* Add a button to Top tool called, Show Orthographic View - this button does the orienting to nearest orthographic view, the V shortcut or double clicking provides this functionality. More clearer for tablet users. Remove the double click or double tap to orthographic view. its causing selections to go away. Desktop users can use V key instead.
+
+* Move the following buttons to top tool bar - Undo,Redo, Multi Selection, Clear Selection, Grid Snap . They are no specific to the mesh. global functionalities.

@@ -129,22 +129,6 @@ export class KeyboardShortcutService {
   }
 
   private handleViewShortcut(): void {
-    if (this.controller.isDecalSelected()) {
-      const decal = this.controller.getSelectedDecal();
-      if (decal) {
-        if (this.controller.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
-          this.controller.setDecalOrthographicView(decal.id);
-        } else {
-          this.controller.setFaceOrthographicView(decal.parentFaceIndex);
-        }
-        return;
-      }
-    }
-    const selectedFaceIndex = this.controller.getSelectedFaceIndex();
-    if (selectedFaceIndex !== null) {
-      this.controller.setFaceOrthographicView(selectedFaceIndex);
-    } else {
-      this.controller.switchToClosestOrthographicView();
-    }
+    this.controller.orientToNearestOrthographicView();
   }
 }

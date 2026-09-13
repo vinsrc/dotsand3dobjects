@@ -52,13 +52,9 @@ export const ViewportCanvas: React.FC = () => {
     index: number;
     wasSelected: boolean;
   } | null>(null);
-  const lastTapTimeRef = useRef<number>(0);
-  const lastTapPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const lastDoubleActionTimeRef = useRef<number>(0);
-  const pendingErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isTouchDoubleTapRef = useRef<boolean>(false);
   const isRightClickPanningRef = useRef<boolean>(false);
   const lastMultiTouchTimeRef = useRef<number>(0);
+  const pendingErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const findHitDecal = (clickX: number, clickY: number): string | null => {
     if (!rendererRef.current || !canvasRef.current) {
@@ -93,63 +89,7 @@ export const ViewportCanvas: React.FC = () => {
     return null;
   };
 
-  const triggerDoubleActionOrthographicView = (
-    clientX?: number,
-    clientY?: number
-  ) => {
-    const currentTime = Date.now();
-    if (currentTime - lastDoubleActionTimeRef.current < 250) {
-      return;
-    }
-    lastDoubleActionTimeRef.current = currentTime;
 
-    if (pendingErrorTimerRef.current !== null) {
-      clearTimeout(pendingErrorTimerRef.current);
-      pendingErrorTimerRef.current = null;
-    }
-
-    if (
-      clientX !== undefined &&
-      clientY !== undefined &&
-      rendererRef.current &&
-      canvasRef.current
-    ) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const clickX = clientX - rect.left;
-      const clickY = clientY - rect.top;
-
-      const hitDecalId = findHitDecal(clickX, clickY);
-      if (hitDecalId !== null) {
-        const decal = controller.getDecalService().getDecal(hitDecalId);
-        if (decal) {
-          if (controller.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
-            controller.setDecalOrthographicView(hitDecalId);
-          } else {
-            controller.setFaceOrthographicView(decal.parentFaceIndex);
-          }
-          return;
-        }
-      }
-
-      const camera = rendererRef.current.getActiveCamera();
-      const currentModel = controller.getModelService().getCurrentModel();
-      const nearestFace = raycasterRef.current.findNearestFace(
-        clickX,
-        clickY,
-        currentModel,
-        camera,
-        rect.width,
-        rect.height
-      );
-
-      if (nearestFace !== null) {
-        controller.setFaceOrthographicView(nearestFace);
-        return;
-      }
-    }
-
-    controller.switchToClosestOrthographicView();
-  };
 
   // Manage ViewportRenderer lifecycle and domain event subscriptions
   useEffect(() => {
@@ -219,7 +159,6 @@ export const ViewportCanvas: React.FC = () => {
             measuredHeight,
             controller.getVisibleVertexIndices()
           );
-          renderOverlay();
         }
       }
     });
@@ -456,29 +395,6 @@ export const ViewportCanvas: React.FC = () => {
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
     } catch {
       // Ignored if capture unsupported
-    }
-
-    if (event.pointerType === "touch") {
-      const currentTime = Date.now();
-      const timeSinceLastTap = currentTime - lastTapTimeRef.current;
-      const distanceFromLastTap = Math.hypot(
-        event.clientX - lastTapPosRef.current.x,
-        event.clientY - lastTapPosRef.current.y
-      );
-
-      if (
-        timeSinceLastTap > 0 &&
-        timeSinceLastTap < 300 &&
-        distanceFromLastTap < 25
-      ) {
-        lastTapTimeRef.current = 0;
-        isTouchDoubleTapRef.current = true;
-        triggerDoubleActionOrthographicView(event.clientX, event.clientY);
-      } else {
-        isTouchDoubleTapRef.current = false;
-        lastTapTimeRef.current = currentTime;
-        lastTapPosRef.current = { x: event.clientX, y: event.clientY };
-      }
     }
 
     pointerDownPosRef.current = { x: event.clientX, y: event.clientY };
@@ -768,12 +684,6 @@ export const ViewportCanvas: React.FC = () => {
       return;
     }
 
-    if (isTouchDoubleTapRef.current) {
-      isTouchDoubleTapRef.current = false;
-      resetDragSession();
-      return;
-    }
-
     // Suppress tap/click if pointerDown was cleared (e.g. multi-touch) or recent two-finger gesture (< 350ms)
     const isRecentMultiTouch = Date.now() - lastMultiTouchTimeRef.current < 350;
     if (!pointerDownPosRef.current || isRecentMultiTouch) {
@@ -1059,9 +969,6 @@ export const ViewportCanvas: React.FC = () => {
         onPointerCancel={handlePointerCancel}
         onLostPointerCapture={handlePointerCancel}
         onContextMenu={(event) => event.preventDefault()}
-        onDoubleClick={(event) =>
-          triggerDoubleActionOrthographicView(event.clientX, event.clientY)
-        }
         style={{
           width: "100%",
           height: "100%",

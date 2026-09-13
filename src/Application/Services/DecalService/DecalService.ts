@@ -115,6 +115,26 @@ export class DecalService {
     }
   }
 
+  public remapFaceIndices(faceIndexMap: ReadonlyMap<number, number | null>): void {
+    let changed = false;
+    for (const [id, decal] of Array.from(this.decalsMap.entries())) {
+      const newIndex = faceIndexMap.get(decal.parentFaceIndex);
+      if (newIndex === null) {
+        this.decalsMap.delete(id);
+        if (this.selectedDecalId === id) {
+          this.selectedDecalId = null;
+        }
+        changed = true;
+      } else if (newIndex !== undefined && newIndex !== decal.parentFaceIndex) {
+        this.decalsMap.set(id, decal.withParentFaceIndex(newIndex));
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.notifyDecalsChanged();
+    }
+  }
+
   public assignMaterialToSelectedDecal(materialId: string | null): void {
     if (!this.selectedDecalId) {
       return;

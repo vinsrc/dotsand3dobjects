@@ -23,6 +23,8 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     "VIEW_CHANGED",
     "MODEL_CHANGED",
     "DECALS_CHANGED",
+    "GRID_SNAP_CHANGED",
+    "UNDO_REDO_STATE_CHANGED",
   ]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,11 +35,48 @@ export const ToolBar: React.FC<ToolBarProps> = ({
   const isFaceOrthographic = controller.isFaceOrthographicView();
   const currentMode = controller.getEditorModeService().getMode();
   const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
+  const isGridSnap = controller.isGridSnapEnabled();
+  const canUndo = controller.canUndo();
+  const canRedo = controller.canRedo();
+  const selectedVertexCount = controller
+    .getSelectionService()
+    .getSelectedIndices().length;
   const selectedFaceCount =
     controller.getSelectedFaceIndices().length ||
     (controller.getSelectedFaceIndex() !== null ? 1 : 0);
   const hasSelectedFace = selectedFaceCount > 0;
   const isDecalSelected = controller.isDecalSelected();
+  const selectedEdgeCount = controller.getSelectedEdges().length;
+  const hasSelectedEdge = selectedEdgeCount > 0 && !isDecalSelected;
+  const canClearSelection =
+    selectedVertexCount > 0 ||
+    hasSelectedEdge ||
+    hasSelectedFace ||
+    isDecalSelected;
+
+  const handleUndo = () => {
+    controller.undo();
+  };
+
+  const handleRedo = () => {
+    controller.redo();
+  };
+
+  const handleToggleGridSnap = () => {
+    controller.toggleGridSnap();
+  };
+
+  const handleClearSelection = () => {
+    controller.clearSelection();
+  };
+
+  const handleToggleMultiSelect = () => {
+    if (currentMode === "MULTI_SELECT") {
+      controller.finishMode();
+    } else {
+      controller.enterMode("MULTI_SELECT");
+    }
+  };
 
   const handleClearMaterial = () => {
     controller.clearMaterialOnSelectedFaces();
@@ -324,6 +363,73 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           onExportZipClick={handleExportZipClick}
           onCustomizeUiClick={onOpenCustomizeUi}
         />
+        <button
+          data-testid="undo-button"
+          onClick={handleUndo}
+          disabled={!canUndo}
+          title="Undo (Ctrl+Z)"
+          style={canUndo ? buttonStyle : disabledButtonStyle}
+        >
+          Undo
+        </button>
+        <button
+          data-testid="redo-button"
+          onClick={handleRedo}
+          disabled={!canRedo}
+          title="Redo (Ctrl+Y)"
+          style={canRedo ? buttonStyle : disabledButtonStyle}
+        >
+          Redo
+        </button>
+        <button
+          data-testid="grid-snap-toggle-button"
+          onClick={handleToggleGridSnap}
+          title="Toggle Grid Snap"
+          style={{
+            ...buttonStyle,
+            backgroundColor: isGridSnap ? ThemeColors.success : ThemeColors.widget,
+            color: isGridSnap ? "#ffffff" : ThemeColors.textPrimary,
+            borderColor: isGridSnap
+              ? ThemeColors.successBorder
+              : ThemeColors.borderStrong,
+          }}
+        >
+          {isGridSnap ? "Grid Snap: ON" : "Grid Snap: OFF"}
+        </button>
+        <button
+          data-testid="mode-multi-select-button"
+          onClick={handleToggleMultiSelect}
+          title="Multi selection"
+          style={
+            currentMode === "MULTI_SELECT"
+              ? {
+                  ...buttonStyle,
+                  backgroundColor: ThemeColors.accent,
+                  color: "#ffffff",
+                  borderColor: ThemeColors.accentBorder,
+                }
+              : buttonStyle
+          }
+        >
+          Multi selection
+        </button>
+        <button
+          data-testid="clear-selection-button"
+          onClick={handleClearSelection}
+          disabled={!canClearSelection}
+          title="Clear selection"
+          style={canClearSelection ? buttonStyle : disabledButtonStyle}
+        >
+          Clear selection
+        </button>
+        <button
+          data-testid="nearest-ortho-view-button"
+          onClick={() => controller.orientToNearestOrthographicView()}
+          title="Nearest Orthographic View (V)"
+          style={buttonStyle}
+        >
+          Nearest Orthographic View
+        </button>
         <button
           data-testid="toggle-view-button"
           onClick={handleToggleRenderMode}

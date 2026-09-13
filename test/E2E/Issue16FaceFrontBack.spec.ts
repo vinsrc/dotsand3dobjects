@@ -31,7 +31,8 @@ test.describe("Issue #16: Setting face front or back", () => {
     const centerX = (canvasBox?.x ?? 0) + (canvasBox?.width ?? 0) / 2;
     const centerY = (canvasBox?.y ?? 0) + (canvasBox?.height ?? 0) / 2;
 
-    await page.mouse.dblclick(centerX, centerY);
+    await page.mouse.click(centerX, centerY);
+    await page.getByTestId("nearest-ortho-view-button").click();
 
     // Now in Face orthographic view: Set Front button must be visible!
     await expect(setFrontButton).toBeVisible();
@@ -59,8 +60,9 @@ test.describe("Issue #16: Setting face front or back", () => {
     const centerX = (canvasBox?.x ?? 0) + (canvasBox?.width ?? 0) / 2;
     const centerY = (canvasBox?.y ?? 0) + (canvasBox?.height ?? 0) / 2;
 
-    // Double-click front face to enter face orthographic view
-    await page.mouse.dblclick(centerX, centerY);
+    // Click front face and switch to face orthographic view via Nearest Orthographic View button
+    await page.mouse.click(centerX, centerY);
+    await page.getByTestId("nearest-ortho-view-button").click();
 
     const setFrontButton = page.getByTestId("set-front-button");
     await expect(setFrontButton).toBeVisible();

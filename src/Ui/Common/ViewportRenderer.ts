@@ -840,7 +840,9 @@ export class ViewportRenderer {
       gridSize,
       gridDivisions,
       ThemeColors.gridCenterLine,
-      ThemeColors.gridLine
+      ThemeColors.gridLine,
+      ThemeColors.gridSubLine,
+      4
     );
     this.gridHelperInstance.position.set(0, 0, 0);
     this.gridHelperInstance.visible = true;

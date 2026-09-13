@@ -17,7 +17,7 @@ export class GeometryEditorService {
     this.selectionService = selectionService;
   }
 
-  public snapToGrid(worldPosition: Vector3D, gridSize: number = 1.0): Vector3D {
+  public snapToGrid(worldPosition: Vector3D, gridSize: number = 0.25): Vector3D {
     const snappedCoordinateX =
       Math.round(worldPosition.coordinateX / gridSize) * gridSize;
     const snappedCoordinateY =
@@ -30,7 +30,7 @@ export class GeometryEditorService {
   public snapToGridOnPlane(
     worldPosition: Vector3D,
     gridPlane: GridPlaneType,
-    gridSize: number = 1.0
+    gridSize: number = 0.25
   ): Vector3D {
     const snappedCoordinateX =
       Math.round(worldPosition.coordinateX / gridSize) * gridSize;

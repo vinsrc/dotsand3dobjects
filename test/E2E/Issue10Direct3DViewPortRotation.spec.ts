@@ -53,34 +53,43 @@ test.describe("Issue #10: Direct 3D View Port Rotation", () => {
     expect(Math.abs(newYTop - initialYTop)).toBeGreaterThan(3);
   });
 
-  test("Double-clicking 3D viewport in perspective view switches to the closest orthographic view", async ({
+  test("Clicking Nearest Orthographic View button or pressing V switches to the closest orthographic view", async ({
     page,
   }) => {
     const canvas = page.getByTestId("viewport-canvas");
+    const nearestOrthoBtn = page.getByTestId("nearest-ortho-view-button");
+    await expect(nearestOrthoBtn).toBeVisible();
 
     // Initially in perspective view
-    const initialIsOrtho = await canvas.evaluate((el) => {
+    let isOrtho = await canvas.evaluate((el) => {
       const renderer = (el as any).__viewportRenderer;
       return renderer?.getActiveCamera().isOrthographicCamera === true;
     });
-    expect(initialIsOrtho).toBe(false);
+    expect(isOrtho).toBe(false);
 
-    // Double click the 3D viewport canvas
+    // Double clicking the 3D viewport canvas should NOT switch to orthographic
     await canvas.dblclick({ position: { x: 300, y: 300 } });
-
-    // Should now be in orthographic projection
-    const afterDblClickIsOrtho = await canvas.evaluate((el) => {
+    isOrtho = await canvas.evaluate((el) => {
       const renderer = (el as any).__viewportRenderer;
       return renderer?.getActiveCamera().isOrthographicCamera === true;
     });
-    expect(afterDblClickIsOrtho).toBe(true);
+    expect(isOrtho).toBe(false);
+
+    // Clicking Nearest Orthographic View button switches to orthographic
+    await nearestOrthoBtn.click();
+    isOrtho = await canvas.evaluate((el) => {
+      const renderer = (el as any).__viewportRenderer;
+      return renderer?.getActiveCamera().isOrthographicCamera === true;
+    });
+    expect(isOrtho).toBe(true);
   });
 
-  test("Double-clicking switches to closest orthographic view corresponding to camera tilt", async ({
+  test("Nearest Orthographic View switches to closest orthographic view corresponding to camera tilt", async ({
     page,
   }) => {
     const canvas = page.getByTestId("viewport-canvas");
     const axisYButton = page.getByTestId("gizmo-axis-+Y");
+    const nearestOrthoBtn = page.getByTestId("nearest-ortho-view-button");
 
     // First select +Y orthographic view via gizmo
     await axisYButton.click();
@@ -108,8 +117,8 @@ test.describe("Issue #10: Direct 3D View Port Rotation", () => {
     });
     expect(isOrtho).toBe(false);
 
-    // Double click to snap to closest orthographic view (which should be +Y)
-    await canvas.dblclick({ position: { x: 300, y: 300 } });
+    // Click Nearest Orthographic View to snap to closest orthographic view (which should be +Y)
+    await nearestOrthoBtn.click();
 
     // Should be orthographic again
     isOrtho = await canvas.evaluate((el) => {
@@ -174,7 +183,7 @@ test.describe("Issue #10: Direct 3D View Port Rotation", () => {
     await expect(clearSelectionButton).toBeDisabled();
   });
 
-  test("In Insert mode in perspective view, double-clicking switches to closest orthographic view without error dialog", async ({
+  test("In Insert mode in perspective view, clicking Nearest Orthographic View switches to closest orthographic view without error dialog", async ({
     page,
   }) => {
     const insertModeButton = page.getByTestId("mode-insert-button");
@@ -182,9 +191,10 @@ test.describe("Issue #10: Direct 3D View Port Rotation", () => {
 
     const canvas = page.getByTestId("viewport-canvas");
     const errorDialog = page.getByTestId("error-dialog");
+    const nearestOrthoBtn = page.getByTestId("nearest-ortho-view-button");
 
-    // Double-click on open space in the 3D viewport
-    await canvas.dblclick({ position: { x: 250, y: 250 } });
+    // Click Nearest Orthographic View button
+    await nearestOrthoBtn.click();
 
     // Ensure error dialog is NOT visible
     await expect(errorDialog).not.toBeVisible();

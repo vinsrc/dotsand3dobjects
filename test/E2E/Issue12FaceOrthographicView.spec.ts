@@ -64,8 +64,9 @@ test.describe("Issue #12: Face Orthographic View", () => {
     const centerX = (canvasBox?.x ?? 0) + (canvasBox?.width ?? 0) / 2;
     const centerY = (canvasBox?.y ?? 0) + (canvasBox?.height ?? 0) / 2;
 
-    // Double-click on the front face of the default cube in the center of the viewport
-    await page.mouse.dblclick(centerX, centerY);
+    // Select the front face of the default cube, then click Nearest Orthographic View button
+    await page.mouse.click(centerX, centerY);
+    await page.getByTestId("nearest-ortho-view-button").click();
 
     // The viewport should now be in orthographic view
     isOrtho = await canvas.evaluate((el) => {
@@ -95,8 +96,9 @@ test.describe("Issue #12: Face Orthographic View", () => {
     const centerX = (canvasBox?.x ?? 0) + (canvasBox?.width ?? 0) / 2;
     const centerY = (canvasBox?.y ?? 0) + (canvasBox?.height ?? 0) / 2;
 
-    // Double-click on the front face to rotate to face orthographic view
-    await page.mouse.dblclick(centerX, centerY);
+    // Select the front face and rotate to face orthographic view
+    await page.mouse.click(centerX, centerY);
+    await page.getByTestId("nearest-ortho-view-button").click();
 
     // Switch to Insert mode
     await insertModeButton.click();

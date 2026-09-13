@@ -23,6 +23,7 @@ import { ZipExportService } from "./Services/ZipExportService/ZipExportService";
 import { ZipImportService } from "./Services/ZipExportService/ZipImportService";
 import { DataUrlConverter } from "./Common/DataUrlConverter";
 import { KeyboardShortcutService } from "./Services/KeyboardShortcutService/KeyboardShortcutService";
+import { VertexMergeService } from "./Services/VertexMergeService/VertexMergeService";
 
 export class AppBootstrapper {
   public static createApplication(): {
@@ -40,6 +41,7 @@ export class AppBootstrapper {
     decalService: DecalService;
     zipExportService: ZipExportService;
     zipImportService: ZipImportService;
+    vertexMergeService: VertexMergeService;
     stateNotifier: ApplicationStateNotifier;
     keyboardShortcutService: KeyboardShortcutService;
   } {
@@ -93,6 +95,11 @@ export class AppBootstrapper {
     const zipExportService = new ZipExportService();
     const dataUrlConverter = new DataUrlConverter();
     const zipImportService = new ZipImportService(dataUrlConverter);
+    const vertexMergeService = new VertexMergeService(
+      modelService,
+      selectionService,
+      decalService
+    );
 
     const appController = new AppController(
       modelService,
@@ -109,7 +116,8 @@ export class AppBootstrapper {
       decalService,
       zipExportService,
       dataUrlConverter,
-      zipImportService
+      zipImportService,
+      vertexMergeService
     );
 
     const keyboardShortcutService = new KeyboardShortcutService(appController);
@@ -129,6 +137,7 @@ export class AppBootstrapper {
       decalService,
       zipExportService,
       zipImportService,
+      vertexMergeService,
       stateNotifier,
       keyboardShortcutService,
     };

@@ -65,9 +65,9 @@ test.describe("WireframeVibe3D Issue #6 Grid Snap as Option Functional Tests", (
     });
 
     expect(addedVertex).not.toBeNull();
-    // In XY grid plane, X and Y should snap to integers
-    expect(Math.abs(addedVertex!.coordinateX - Math.round(addedVertex!.coordinateX))).toBeLessThan(0.0001);
-    expect(Math.abs(addedVertex!.coordinateY - Math.round(addedVertex!.coordinateY))).toBeLessThan(0.0001);
+    // In XY grid plane, X and Y should snap to 1/4 (0.25) sub-grid increments
+    expect(Math.abs(addedVertex!.coordinateX * 4 - Math.round(addedVertex!.coordinateX * 4))).toBeLessThan(0.0001);
+    expect(Math.abs(addedVertex!.coordinateY * 4 - Math.round(addedVertex!.coordinateY * 4))).toBeLessThan(0.0001);
   });
 
   test("In +Z orthographic view with Grid Snap OFF, adding vertex places it at continuous float coordinates", async ({
@@ -180,9 +180,9 @@ test.describe("WireframeVibe3D Issue #6 Grid Snap as Option Functional Tests", (
     });
 
     expect(translatedVertex).not.toBeNull();
-    // Grid snap on XY plane ensures X and Y are exact integers
-    expect(Math.abs(translatedVertex!.coordinateX - Math.round(translatedVertex!.coordinateX))).toBeLessThan(0.0001);
-    expect(Math.abs(translatedVertex!.coordinateY - Math.round(translatedVertex!.coordinateY))).toBeLessThan(0.0001);
+    // Grid snap on XY plane ensures X and Y are on 1/4 (0.25) sub-grid increments
+    expect(Math.abs(translatedVertex!.coordinateX * 4 - Math.round(translatedVertex!.coordinateX * 4))).toBeLessThan(0.0001);
+    expect(Math.abs(translatedVertex!.coordinateY * 4 - Math.round(translatedVertex!.coordinateY * 4))).toBeLessThan(0.0001);
   });
 
   test("In +Z orthographic view with Grid Snap OFF, translating vertex moves to continuous float coordinates", async ({

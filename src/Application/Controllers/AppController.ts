@@ -27,6 +27,7 @@ import { ZipImportService } from "../Services/ZipExportService/ZipImportService"
 import { ZipFileEntry } from "../Services/ZipExportService/ZipFileEntry";
 import { DataUrlConverter } from "../Common/DataUrlConverter";
 import { GeometryTransformService } from "../Services/GeometryTransformService/GeometryTransformService";
+import { VertexMergeService } from "../Services/VertexMergeService/VertexMergeService";
 
 export class AppController {
   private readonly modelService: ModelService;
@@ -44,6 +45,7 @@ export class AppController {
   private readonly zipExportService: ZipExportService;
   private readonly zipImportService: ZipImportService;
   private readonly dataUrlConverter: DataUrlConverter;
+  private readonly vertexMergeService: VertexMergeService;
   private translationInitialModel: MeshGeometry | null = null;
   private rotationInitialModel: MeshGeometry | null = null;
   private scalingInitialModel: MeshGeometry | null = null;
@@ -69,7 +71,8 @@ export class AppController {
     decalService: DecalService,
     zipExportService: ZipExportService,
     dataUrlConverter: DataUrlConverter,
-    zipImportService: ZipImportService
+    zipImportService: ZipImportService,
+    vertexMergeService?: VertexMergeService
   ) {
     this.modelService = modelService;
     this.cameraStateService = cameraStateService;
@@ -86,6 +89,13 @@ export class AppController {
     this.zipExportService = zipExportService;
     this.dataUrlConverter = dataUrlConverter;
     this.zipImportService = zipImportService;
+    this.vertexMergeService =
+      vertexMergeService ??
+      new VertexMergeService(modelService, selectionService, decalService);
+  }
+
+  public getVertexMergeService(): VertexMergeService {
+    return this.vertexMergeService;
   }
 
   public getModelService(): ModelService {
@@ -647,6 +657,26 @@ export class AppController {
     return closestAxis;
   }
 
+  public orientToNearestOrthographicView(): void {
+    if (this.isDecalSelected()) {
+      const decal = this.getSelectedDecal();
+      if (decal) {
+        if (this.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
+          this.setDecalOrthographicView(decal.id);
+        } else {
+          this.setFaceOrthographicView(decal.parentFaceIndex);
+        }
+        return;
+      }
+    }
+    const selectedFaceIndex = this.getSelectedFaceIndex();
+    if (selectedFaceIndex !== null) {
+      this.setFaceOrthographicView(selectedFaceIndex);
+    } else {
+      this.switchToClosestOrthographicView();
+    }
+  }
+
   public selectFace(faceIndex: number): void {
     if (this.decalService.isDecalSelected()) {
       this.decalService.selectDecal(null);
@@ -1038,6 +1068,29 @@ export class AppController {
   }
 
   public endTranslation(): void {
+    if (this.translationInitialModel) {
+      const currentModel = this.modelService.getCurrentModel();
+      const initialVertices = this.translationInitialModel.vertices;
+      const currentVertices = currentModel.vertices;
+      const movedIndices: number[] = [];
+      const count = Math.min(initialVertices.length, currentVertices.length);
+
+      for (let index = 0; index < count; index += 1) {
+        const initialVertex = initialVertices[index];
+        const currentVertex = currentVertices[index];
+        if (
+          initialVertex &&
+          currentVertex &&
+          !initialVertex.equals(currentVertex, 0.00001)
+        ) {
+          movedIndices.push(index);
+        }
+      }
+
+      if (movedIndices.length > 0) {
+        this.vertexMergeService.mergeCoincidentVertices(0.001, movedIndices);
+      }
+    }
     this.translationInitialModel = null;
   }
 
@@ -1368,7 +1421,16 @@ export class AppController {
       );
     }
 
+    const selectedIndices = this.selectionService.getSelectedIndices();
     this.geometryTransformService.translateSelected(effectiveOffset);
+
+    if (
+      effectiveOffset.coordinateX !== 0 ||
+      effectiveOffset.coordinateY !== 0 ||
+      effectiveOffset.coordinateZ !== 0
+    ) {
+      this.vertexMergeService.mergeCoincidentVertices(0.001, selectedIndices);
+    }
   }
 
   public insertVertexOnEdge(startVertexIndex: number, endVertexIndex: number): void {

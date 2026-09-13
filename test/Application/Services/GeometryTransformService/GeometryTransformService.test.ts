@@ -138,10 +138,10 @@ describe("GeometryTransformService", () => {
     );
 
     const resultVertices = modelService.getCurrentModel().vertices;
-    expect(resultVertices[0]?.coordinateX).toBe(2);
-    expect(resultVertices[0]?.coordinateY).toBe(2);
-    expect(resultVertices[1]?.coordinateX).toBe(3);
-    expect(resultVertices[1]?.coordinateY).toBe(2);
+    expect(resultVertices[0]?.coordinateX).toBe(2.25);
+    expect(resultVertices[0]?.coordinateY).toBe(1.75);
+    expect(resultVertices[1]?.coordinateX).toBe(3.25);
+    expect(resultVertices[1]?.coordinateY).toBe(1.75);
     expect(resultVertices[2]?.coordinateX).toBe(3);
     expect(resultVertices[2]?.coordinateY).toBe(3);
   });
@@ -354,11 +354,11 @@ describe("GeometryTransformService", () => {
     const baseModel = new MeshGeometry(testVertices, []);
     modelService.setCurrentModel(baseModel);
 
-    // Model center is (1, 1, 1). Offset (0.24, 0.49, 0) -> candidate center (1.24, 1.49, 1).
-    // Snaps to (1, 1, 1) if grid step is 1, so effectiveOffset is (0, 0, 0).
+    // Model center is (1, 1, 1). Offset (0.1, 0.1, 0) -> candidate center (1.1, 1.1, 1).
+    // Snaps to (1.0, 1.0, 1) on 0.25 sub-grid, so effectiveOffset is (0, 0, 0).
     const offset = transformService.applyModelTranslationFromInitial(
       baseModel,
-      new Vector3D(0.24, 0.49, 0),
+      new Vector3D(0.1, 0.1, 0),
       "XY",
       true
     );

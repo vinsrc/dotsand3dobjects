@@ -9,18 +9,13 @@ export const SideToolBar: React.FC = () => {
   useApplicationState([
     "MODEL_CHANGED",
     "MODE_CHANGED",
-    "GRID_SNAP_CHANGED",
     "SELECTION_CHANGED",
-    "UNDO_REDO_STATE_CHANGED",
     "UI_CUSTOMIZATION_CHANGED",
     "DECALS_CHANGED",
   ]);
 
   const dockSide = controller.getUiCustomizationService().getSideToolBarDock();
   const currentMode = controller.getEditorModeService().getMode();
-  const isGridSnap = controller.isGridSnapEnabled();
-  const canUndo = controller.canUndo();
-  const canRedo = controller.canRedo();
   const isDecalSelected = controller.isDecalSelected();
   const selectedVertexCount = controller
     .getSelectionService()
@@ -35,18 +30,6 @@ export const SideToolBar: React.FC = () => {
 
   const handleCenterObject = () => {
     controller.centerObject();
-  };
-
-  const handleUndo = () => {
-    controller.undo();
-  };
-
-  const handleRedo = () => {
-    controller.redo();
-  };
-
-  const handleClearSelection = () => {
-    controller.clearSelection();
   };
 
   const handleDeleteVertex = () => {
@@ -71,11 +54,6 @@ export const SideToolBar: React.FC = () => {
     } else {
       controller.enterMode(mode);
     }
-  };
-
-  const handleToggleGridSnap = () => {
-    controller.toggleGridSnap();
-
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -137,39 +115,6 @@ export const SideToolBar: React.FC = () => {
       </button>
 
       <button
-        data-testid="undo-button"
-        onClick={handleUndo}
-        disabled={!canUndo}
-        style={canUndo ? buttonStyle : disabledButtonStyle}
-      >
-        Undo
-      </button>
-
-      <button
-        data-testid="redo-button"
-        onClick={handleRedo}
-        disabled={!canRedo}
-        style={canRedo ? buttonStyle : disabledButtonStyle}
-      >
-        Redo
-      </button>
-
-      <button
-        data-testid="grid-snap-toggle-button"
-        onClick={handleToggleGridSnap}
-        style={{
-          ...buttonStyle,
-          backgroundColor: isGridSnap ? ThemeColors.success : ThemeColors.widget,
-          color: isGridSnap ? "#ffffff" : ThemeColors.textPrimary,
-          borderColor: isGridSnap
-            ? ThemeColors.successBorder
-            : ThemeColors.borderStrong,
-        }}
-      >
-        {isGridSnap ? "Grid Snap: ON" : "Grid Snap: OFF"}
-      </button>
-
-      <button
         data-testid="center-object-button"
         onClick={handleCenterObject}
         disabled={isDecalSelected}
@@ -186,25 +131,6 @@ export const SideToolBar: React.FC = () => {
         }
       >
         Transform
-      </button>
-
-      <button
-        data-testid="mode-multi-select-button"
-        onClick={() => handleEnterMode("MULTI_SELECT")}
-        style={
-          currentMode === "MULTI_SELECT" ? activeModeButtonStyle : buttonStyle
-        }
-      >
-        Multi selection
-      </button>
-
-      <button
-        data-testid="clear-selection-button"
-        onClick={handleClearSelection}
-        disabled={!hasSelectedVertex && !hasSelectedEdge && !hasSelectedFace && !isDecalSelected}
-        style={hasSelectedVertex || hasSelectedEdge || hasSelectedFace || isDecalSelected ? buttonStyle : disabledButtonStyle}
-      >
-        Clear selection
       </button>
 
       <button

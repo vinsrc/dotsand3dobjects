@@ -5,40 +5,49 @@ export class ViewportGrid {
     gridSize: number = 100,
     gridDivisions: number = 100,
     centerLineColor: string | number,
-    gridLineColor: string | number
+    gridLineColor: string | number,
+    subGridLineColor?: string | number,
+    subDivisions: number = 4
   ): THREE.LineSegments {
     const primaryCenterColor = new THREE.Color(centerLineColor);
     const standardGridColor = new THREE.Color(gridLineColor);
+    const subtleSubGridColor = new THREE.Color(
+      subGridLineColor ?? standardGridColor
+    );
 
     const halfSize = gridSize / 2;
-    const stepSize = gridSize / gridDivisions;
-    const centerDivisionIndex = Math.round(gridDivisions / 2);
+    const totalStepCount = gridDivisions * subDivisions;
+    const subStepSize = gridSize / totalStepCount;
+    const centerStepIndex = Math.round(totalStepCount / 2);
+    const lineSegmentLength = 1.0;
 
     const lineVertices: number[] = [];
     const lineColors: number[] = [];
 
-    for (
-      let divisionIndex = 0;
-      divisionIndex <= gridDivisions;
-      divisionIndex += 1
-    ) {
-      const fixedCoordinate = -halfSize + divisionIndex * stepSize;
-      const activeColor =
-        divisionIndex === centerDivisionIndex
-          ? primaryCenterColor
-          : standardGridColor;
+    for (let stepIndex = 0; stepIndex <= totalStepCount; stepIndex += 1) {
+      const fixedCoordinate = -halfSize + stepIndex * subStepSize;
+      let activeColor: THREE.Color;
+
+      if (stepIndex === centerStepIndex) {
+        activeColor = primaryCenterColor;
+      } else if (stepIndex % subDivisions === 0) {
+        activeColor = standardGridColor;
+      } else {
+        activeColor = subtleSubGridColor;
+      }
 
       // Lines along X axis, segmented into 1-step increments to prevent WebGL line-clipping drops
       for (
         let segmentStart = -halfSize;
         segmentStart < halfSize;
-        segmentStart += stepSize
+        segmentStart += lineSegmentLength
       ) {
+        const segmentEnd = Math.min(segmentStart + lineSegmentLength, halfSize);
         lineVertices.push(
           segmentStart,
           0,
           fixedCoordinate,
-          segmentStart + stepSize,
+          segmentEnd,
           0,
           fixedCoordinate
         );
@@ -56,15 +65,16 @@ export class ViewportGrid {
       for (
         let segmentStart = -halfSize;
         segmentStart < halfSize;
-        segmentStart += stepSize
+        segmentStart += lineSegmentLength
       ) {
+        const segmentEnd = Math.min(segmentStart + lineSegmentLength, halfSize);
         lineVertices.push(
           fixedCoordinate,
           0,
           segmentStart,
           fixedCoordinate,
           0,
-          segmentStart + stepSize
+          segmentEnd
         );
         lineColors.push(
           activeColor.r,

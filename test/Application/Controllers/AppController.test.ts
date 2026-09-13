@@ -456,29 +456,29 @@ describe("AppController", () => {
   it("should preserve view axis coordinate when adding vertex in orthographic view", () => {
     const { appController, modelService } = createController();
 
-    // In +Z view (gridPlane = XY): view axis is Z, Z is preserved while X and Y snap
+    // In +Z view (gridPlane = XY): view axis is Z, Z is preserved while X and Y snap to 0.25
     appController.selectOrthographicView("+Z");
     appController.addVertexAtPosition(new Vector3D(2.1, 3.8, 5.432));
     const addedZVertex = modelService.getCurrentModel().vertices.slice(-1)[0] as Vector3D;
     expect(addedZVertex.coordinateX).toBe(2);
-    expect(addedZVertex.coordinateY).toBe(4);
+    expect(addedZVertex.coordinateY).toBe(3.75);
     expect(addedZVertex.coordinateZ).toBe(5.432);
 
-    // In +Y view (gridPlane = XZ): view axis is Y, Y is preserved while X and Z snap
+    // In +Y view (gridPlane = XZ): view axis is Y, Y is preserved while X and Z snap to 0.25
     appController.selectOrthographicView("+Y");
     appController.addVertexAtPosition(new Vector3D(4.2, 7.891, 1.9));
     const addedYVertex = modelService.getCurrentModel().vertices.slice(-1)[0] as Vector3D;
-    expect(addedYVertex.coordinateX).toBe(4);
+    expect(addedYVertex.coordinateX).toBe(4.25);
     expect(addedYVertex.coordinateY).toBe(7.891);
     expect(addedYVertex.coordinateZ).toBe(2);
 
-    // In +X view (gridPlane = YZ): view axis is X, X is preserved while Y and Z snap
+    // In +X view (gridPlane = YZ): view axis is X, X is preserved while Y and Z snap to 0.25
     appController.selectOrthographicView("+X");
     appController.addVertexAtPosition(new Vector3D(9.123, 2.2, 8.7));
     const addedXVertex = modelService.getCurrentModel().vertices.slice(-1)[0] as Vector3D;
     expect(addedXVertex.coordinateX).toBe(9.123);
-    expect(addedXVertex.coordinateY).toBe(2);
-    expect(addedXVertex.coordinateZ).toBe(9);
+    expect(addedXVertex.coordinateY).toBe(2.25);
+    expect(addedXVertex.coordinateZ).toBe(8.75);
   });
 
   it("should translate selected vertices in orthographic view but reject in perspective", () => {
@@ -545,19 +545,19 @@ describe("AppController", () => {
     appController.beginTranslation();
     const initialPos = modelService.getCurrentModel().vertices[0] as Vector3D;
 
-    // Drag by small offset (0.2, 0.1, 0) -> candidate stays at integer, effective delta is 0
-    appController.applyDragTranslation(new Vector3D(0.2, 0.1, 0));
+    // Drag by small offset (0.05, 0.05, 0) -> candidate stays at position on 0.25 sub-grid
+    appController.applyDragTranslation(new Vector3D(0.05, 0.05, 0));
     expect(modelService.getCurrentModel().vertices[0]?.coordinateX).toBe(
       initialPos.coordinateX
     );
 
-    // Drag past 0.5 threshold (0.8, 1.1, 0) -> candidate snaps to +1 on X, +1 on Y
-    appController.applyDragTranslation(new Vector3D(0.8, 1.1, 0));
+    // Drag past 0.25 threshold (0.26, 0.51, 0) -> candidate snaps to +0.25 on X, +0.50 on Y
+    appController.applyDragTranslation(new Vector3D(0.26, 0.51, 0));
     expect(modelService.getCurrentModel().vertices[0]?.coordinateX).toBe(
-      initialPos.coordinateX + 1
+      initialPos.coordinateX + 0.25
     );
     expect(modelService.getCurrentModel().vertices[0]?.coordinateY).toBe(
-      initialPos.coordinateY + 1
+      initialPos.coordinateY + 0.5
     );
 
     appController.endTranslation();
@@ -568,11 +568,11 @@ describe("AppController", () => {
     appController.applyDragTranslation(new Vector3D(0.35, -0.45, 0));
     const continuousVertex = modelService.getCurrentModel().vertices[0] as Vector3D;
     expect(continuousVertex.coordinateX).toBeCloseTo(
-      initialPos.coordinateX + 1 + 0.35,
+      initialPos.coordinateX + 0.25 + 0.35,
       5
     );
     expect(continuousVertex.coordinateY).toBeCloseTo(
-      initialPos.coordinateY + 1 - 0.45,
+      initialPos.coordinateY + 0.5 - 0.45,
       5
     );
     appController.endTranslation();
@@ -815,6 +815,29 @@ describe("AppController", () => {
     expect(
       appController.getCameraStateService().getActiveStrategy().getAxisLabel()
     ).toBe(closestAxis);
+  });
+
+  it("should orient to nearest orthographic view with no selection, face selection, or decal selection", () => {
+    const { appController } = createController();
+
+    // 1. With no selection, orients to closest orthographic view
+    appController.rotateCamera(0.4, 0.2);
+    expect(appController.getCameraStateService().isOrthographic()).toBe(false);
+    appController.orientToNearestOrthographicView();
+    expect(appController.getCameraStateService().isOrthographic()).toBe(true);
+
+    // 2. With face selected, orients to face orthographic view
+    appController.selectFace(0);
+    appController.orientToNearestOrthographicView();
+    expect(appController.getCameraStateService().isFaceOrthographicView()).toBe(true);
+    expect(appController.getCameraStateService().getActiveFaceIndex()).toBe(0);
+
+    // 3. With decal selected, orients to decal view
+    appController.addDecalPlaneToSelectedFace();
+    const decalId = appController.getSelectedDecalId();
+    expect(decalId).not.toBeNull();
+    appController.orientToNearestOrthographicView();
+    expect(appController.isDecalSelected()).toBe(true);
   });
 
   it("should select face and vertices, and support getSelectedFaceIndex", () => {
@@ -1794,6 +1817,107 @@ describe("AppController", () => {
 
       appController.toggleEdgeSelection([1, 2]);
       expect(appController.getSelectedEdges()).toEqual([]);
+    });
+  });
+
+  describe("Vertex Merging on Move", () => {
+    it("should merge moved vertex into existing vertex when dragging ends", () => {
+      const { appController, modelService, selectionService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSLATE");
+
+      // Starter cube: vertices 0 is (-1, -1, -1), vertex 1 is (1, -1, -1)
+      const initialVertices = modelService.getCurrentModel().vertices;
+      const vertex0 = initialVertices[0]!;
+      const vertex1 = initialVertices[1]!;
+      const deltaToVertex1 = vertex1.subtract(vertex0);
+
+      // Select vertex 0
+      selectionService.selectSingle(0);
+      appController.beginTranslation();
+
+      // Drag vertex 0 to vertex 1's position
+      appController.applyDragTranslation(deltaToVertex1);
+      expect(modelService.getCurrentModel().getVertexCount()).toBe(8); // during drag, still 8
+
+      // Finish drag
+      appController.endTranslation();
+
+      // Now merged! Vertex count decreased from 8 to 7
+      const mergedModel = modelService.getCurrentModel();
+      expect(mergedModel.getVertexCount()).toBe(7);
+
+      // The merged vertex at that position remains selected
+      const selectedIndices = selectionService.getSelectedIndices();
+      expect(selectedIndices.length).toBe(1);
+      const selectedCoord = mergedModel.vertices[selectedIndices[0]!]!;
+      expect(selectedCoord.equals(vertex1, 0.001)).toBe(true);
+    });
+
+    it("should merge moved vertex via translateSelectedVertices and support undo/redo", () => {
+      const { appController, modelService, selectionService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSLATE");
+
+      const vertex0 = modelService.getCurrentModel().vertices[0]!;
+      const vertex1 = modelService.getCurrentModel().vertices[1]!;
+      const delta = vertex1.subtract(vertex0);
+
+      selectionService.selectSingle(0);
+      appController.beginTranslation(); // Record snapshot for undo
+      appController.translateSelectedVertices(delta);
+
+      expect(modelService.getCurrentModel().getVertexCount()).toBe(7);
+
+      // Undo restores original 8 vertices
+      appController.undo();
+      expect(modelService.getCurrentModel().getVertexCount()).toBe(8);
+
+      // Redo restores 7 merged vertices
+      appController.redo();
+      expect(modelService.getCurrentModel().getVertexCount()).toBe(7);
+    });
+
+    it("should collapse quad face into triangle when adjacent vertex merges", () => {
+      const { appController, modelService, selectionService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSLATE");
+
+      const vertex0 = modelService.getCurrentModel().vertices[0]!;
+      const vertex1 = modelService.getCurrentModel().vertices[1]!;
+      const delta = vertex1.subtract(vertex0);
+
+      selectionService.selectSingle(0);
+      appController.beginTranslation();
+      appController.applyDragTranslation(delta);
+      appController.endTranslation();
+
+      const faces = modelService.getCurrentModel().faces;
+      // The faces that had edge (0, 1) now become triangles (< 4 vertices)
+      const triangleFaces = faces.filter((f) => f.vertexIndices.length === 3);
+      expect(triangleFaces.length).toBeGreaterThan(0);
+    });
+
+    it("should not merge if vertex was moved to an empty coordinate", () => {
+      const { appController, modelService, selectionService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSLATE");
+
+      selectionService.selectSingle(0);
+      appController.beginTranslation();
+      appController.applyDragTranslation(new Vector3D(0, 10, 0));
+      appController.endTranslation();
+
+      expect(modelService.getCurrentModel().getVertexCount()).toBe(8);
+    });
+
+    it("should not merge if translation ended without moving", () => {
+      const { appController, modelService, selectionService } = createController();
+      selectionService.selectSingle(0);
+      appController.beginTranslation();
+      appController.endTranslation();
+
+      expect(modelService.getCurrentModel().getVertexCount()).toBe(8);
     });
   });
 });

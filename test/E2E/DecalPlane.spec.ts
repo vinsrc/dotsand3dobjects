@@ -211,8 +211,8 @@ test.describe("Decal Plane Functional Tests", () => {
     await expect(page.getByTestId("add-decal-plane-button")).toBeVisible();
     await expect(page.getByTestId("delete-decal-plane-button")).toHaveCount(0);
 
-    // Double-click on decal plane in perspective view switches to face orthographic view
-    await page.mouse.dblclick(decalX, decalY);
+    // Click Nearest Orthographic View button to switch to face orthographic view of selected parent face
+    await page.getByTestId("nearest-ortho-view-button").click();
     await expect(page.getByTestId("set-front-button")).toBeVisible();
 
     await page.waitForTimeout(350);

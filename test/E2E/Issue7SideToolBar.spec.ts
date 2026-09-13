@@ -20,18 +20,18 @@ test.describe("WireframeVibe3D Issue #7 Side Tool Bar Functional Tests", () => {
     expect(viewportSize).not.toBeNull();
     expect(sideBox!.x + sideBox!.width).toBeCloseTo(viewportSize!.width, 0);
 
-    // Verify all 10 required buttons are present inside side-toolbar in order
+    // Verify all side-toolbar buttons are present in order
     const buttonTestIds = [
-      "undo-button",
-      "redo-button",
+      "mode-3d-view-button",
       "center-object-button",
-      "mode-multi-select-button",
-      "clear-selection-button",
+      "mode-transform-button",
       "delete-vertex-button",
+      "delete-edge-button",
+      "face-delete-button",
       "mode-insert-button",
       "mode-translate-button",
       "mode-fill-button",
-      "grid-snap-toggle-button",
+      "face-fill-button",
     ];
 
     for (const testId of buttonTestIds) {
@@ -57,7 +57,7 @@ test.describe("WireframeVibe3D Issue #7 Side Tool Bar Functional Tests", () => {
     page,
   }) => {
     const sideToolbar = page.getByTestId("side-toolbar");
-    const clearSelectionButton = sideToolbar.getByTestId("clear-selection-button");
+    const clearSelectionButton = page.getByTestId("clear-selection-button");
     const deleteVertexButton = sideToolbar.getByTestId("delete-vertex-button");
 
     // Initially with no vertices selected, both buttons must be disabled
@@ -131,7 +131,7 @@ test.describe("WireframeVibe3D Issue #7 Side Tool Bar Functional Tests", () => {
     const centerY = canvasBox!.y + canvasBox!.height / 2;
 
     // Enable multi-select to select multiple vertices
-    await sideToolbar.getByTestId("mode-multi-select-button").click();
+    await page.getByTestId("mode-multi-select-button").click();
 
     // Pick vertex 1 (1, 1, 1)
     await page.mouse.click(centerX + 100, centerY - 100);
@@ -148,7 +148,7 @@ test.describe("WireframeVibe3D Issue #7 Side Tool Bar Functional Tests", () => {
     await expect(faceFillButton).toBeEnabled();
 
     // Clear selection disables it again
-    await sideToolbar.getByTestId("clear-selection-button").click();
+    await page.getByTestId("clear-selection-button").click();
     await expect(faceFillButton).toBeDisabled();
   });
 });

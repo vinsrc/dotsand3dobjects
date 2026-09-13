@@ -30,52 +30,58 @@ describe("GeometryEditorService", () => {
     return { modelService, selectionService, editorService, notifier };
   };
 
-  it("should snap coordinates to nearest 1.0 unit grid", () => {
+  it("should snap coordinates to nearest 1/4 (0.25) sub-grid line by default", () => {
     const { editorService } = setupService();
 
     const input1 = new Vector3D(1.2, 2.7, -3.4);
     const snapped1 = editorService.snapToGrid(input1);
-    expect(snapped1.coordinateX).toBe(1);
-    expect(snapped1.coordinateY).toBe(3);
-    expect(snapped1.coordinateZ).toBe(-3);
+    expect(snapped1.coordinateX).toBe(1.25);
+    expect(snapped1.coordinateY).toBe(2.75);
+    expect(snapped1.coordinateZ).toBe(-3.5);
 
-    const input2 = new Vector3D(-0.49, 0.5, 0.51);
+    const input2 = new Vector3D(-0.49, 0.53, 0.63);
     const snapped2 = editorService.snapToGrid(input2);
-    expect(snapped2.coordinateX).toBe(-0);
-    expect(snapped2.coordinateY).toBe(1);
-    expect(snapped2.coordinateZ).toBe(1);
+    expect(snapped2.coordinateX).toBe(-0.5);
+    expect(snapped2.coordinateY).toBe(0.5);
+    expect(snapped2.coordinateZ).toBe(0.75);
+
+    // Custom 1.0 grid size
+    const customSnapped = editorService.snapToGrid(input1, 1.0);
+    expect(customSnapped.coordinateX).toBe(1);
+    expect(customSnapped.coordinateY).toBe(3);
+    expect(customSnapped.coordinateZ).toBe(-3);
   });
 
-  it("should snap coordinates on plane preserving perpendicular view axis", () => {
+  it("should snap coordinates on plane preserving perpendicular view axis to 1/4 lines", () => {
     const { editorService } = setupService();
 
-    // On XY plane (looking from Z axis): X and Y snap, Z is preserved exactly
+    // On XY plane (looking from Z axis): X and Y snap to 0.25, Z is preserved exactly
     const positionForXY = new Vector3D(1.2, 2.7, 3.456);
     const snappedOnXY = editorService.snapToGridOnPlane(positionForXY, "XY");
-    expect(snappedOnXY.coordinateX).toBe(1);
-    expect(snappedOnXY.coordinateY).toBe(3);
+    expect(snappedOnXY.coordinateX).toBe(1.25);
+    expect(snappedOnXY.coordinateY).toBe(2.75);
     expect(snappedOnXY.coordinateZ).toBe(3.456);
 
-    // On XZ plane (looking from Y axis): X and Z snap, Y is preserved exactly
+    // On XZ plane (looking from Y axis): X and Z snap to 0.25, Y is preserved exactly
     const positionForXZ = new Vector3D(1.2, 2.789, 4.6);
     const snappedOnXZ = editorService.snapToGridOnPlane(positionForXZ, "XZ");
-    expect(snappedOnXZ.coordinateX).toBe(1);
+    expect(snappedOnXZ.coordinateX).toBe(1.25);
     expect(snappedOnXZ.coordinateY).toBe(2.789);
-    expect(snappedOnXZ.coordinateZ).toBe(5);
+    expect(snappedOnXZ.coordinateZ).toBe(4.5);
 
-    // On YZ plane (looking from X axis): Y and Z snap, X is preserved exactly
+    // On YZ plane (looking from X axis): Y and Z snap to 0.25, X is preserved exactly
     const positionForYZ = new Vector3D(0.123, 2.7, 4.6);
     const snappedOnYZ = editorService.snapToGridOnPlane(positionForYZ, "YZ");
     expect(snappedOnYZ.coordinateX).toBe(0.123);
-    expect(snappedOnYZ.coordinateY).toBe(3);
-    expect(snappedOnYZ.coordinateZ).toBe(5);
+    expect(snappedOnYZ.coordinateY).toBe(2.75);
+    expect(snappedOnYZ.coordinateZ).toBe(4.5);
 
-    // Fallback/NONE plane: snaps all coordinates
+    // Fallback/NONE plane: snaps all coordinates to 0.25
     const positionDefault = new Vector3D(1.2, 2.7, 3.4);
     const snappedDefault = editorService.snapToGridOnPlane(positionDefault, "NONE");
-    expect(snappedDefault.coordinateX).toBe(1);
-    expect(snappedDefault.coordinateY).toBe(3);
-    expect(snappedDefault.coordinateZ).toBe(3);
+    expect(snappedDefault.coordinateX).toBe(1.25);
+    expect(snappedDefault.coordinateY).toBe(2.75);
+    expect(snappedDefault.coordinateZ).toBe(3.5);
   });
 
   it("should add vertex without auto-connect", () => {
