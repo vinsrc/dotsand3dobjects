@@ -14,6 +14,7 @@ import { ObjParser } from "../../../src/Application/Services/ModelService/ObjPar
 import { ObjExporter } from "../../../src/Application/Services/ModelService/ObjExporter";
 import { OrthographicViewStrategyFactory } from "../../../src/Application/Services/CameraService/OrthographicViewStrategy";
 import { Vector3D } from "../../../src/Application/Common/Vector3D";
+import { MeshGeometry } from "../../../src/Application/Services/ModelService/MeshGeometry";
 import { MaterialService } from "../../../src/Application/Services/MaterialService/MaterialService";
 import { GeometryTransformService } from "../../../src/Application/Services/GeometryTransformService/GeometryTransformService";
 import { UiCustomizationService } from "../../../src/Application/Services/UiCustomizationService/UiCustomizationService";
@@ -1946,6 +1947,165 @@ describe("AppController", () => {
       appController.endTranslation();
 
       expect(modelService.getCurrentModel().getVertexCount()).toBe(8);
+    });
+  });
+
+  describe("exact dimensions in transform mode", () => {
+    it("should return model dimensions matching bounding box", () => {
+      const { appController } = createController();
+      // Default cube is 2x2x2
+      const dims = appController.getModelDimensions();
+      expect(dims.x).toBeCloseTo(2, 5);
+      expect(dims.y).toBeCloseTo(2, 5);
+      expect(dims.z).toBeCloseTo(2, 5);
+    });
+
+    it("should return zero dimensions if model is empty", () => {
+      const { appController, modelService } = createController();
+      modelService.setCurrentModel(new MeshGeometry([], []));
+      const dims = appController.getModelDimensions();
+      expect(dims).toEqual({ x: 0, y: 0, z: 0 });
+    });
+
+    it("should reject setExactDimensions if any dimension is <= 0", () => {
+      const { appController } = createController();
+      expect(appController.setExactDimensions(0, 2, 2)).toBe(false);
+      expect(appController.setExactDimensions(2, -1, 2)).toBe(false);
+      expect(appController.setExactDimensions(2, 2, 0)).toBe(false);
+    });
+
+    it("should reject setExactDimensions if model is empty", () => {
+      const { appController, modelService } = createController();
+      modelService.setCurrentModel(new MeshGeometry([], []));
+      expect(appController.setExactDimensions(5, 5, 5)).toBe(false);
+    });
+
+    it("should scale model to exact dimensions and support undo/redo", () => {
+      const { appController, modelService } = createController();
+      const initialCenter = modelService.getCurrentModel().calculateCenter();
+
+      const success = appController.setExactDimensions(4, 6, 8);
+      expect(success).toBe(true);
+
+      const dims = appController.getModelDimensions();
+      expect(dims.x).toBeCloseTo(4, 5);
+      expect(dims.y).toBeCloseTo(6, 5);
+      expect(dims.z).toBeCloseTo(8, 5);
+
+      // Geometric center should be preserved
+      const newCenter = modelService.getCurrentModel().calculateCenter();
+      expect(newCenter.coordinateX).toBeCloseTo(initialCenter.coordinateX, 5);
+      expect(newCenter.coordinateY).toBeCloseTo(initialCenter.coordinateY, 5);
+      expect(newCenter.coordinateZ).toBeCloseTo(initialCenter.coordinateZ, 5);
+
+      // Undo restores 2x2x2
+      appController.undo();
+      const undoneDims = appController.getModelDimensions();
+      expect(undoneDims.x).toBeCloseTo(2, 5);
+      expect(undoneDims.y).toBeCloseTo(2, 5);
+      expect(undoneDims.z).toBeCloseTo(2, 5);
+
+      // Redo restores 4x6x8
+      appController.redo();
+      const redoneDims = appController.getModelDimensions();
+      expect(redoneDims.x).toBeCloseTo(4, 5);
+      expect(redoneDims.y).toBeCloseTo(6, 5);
+      expect(redoneDims.z).toBeCloseTo(8, 5);
+    });
+
+    it("should scale decals proportionally when exact dimensions are set on model", () => {
+      const { appController, decalService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+
+      const initialDecals = decalService.getDecals();
+      expect(initialDecals.length).toBe(1);
+      const initialDecalSize = initialDecals[0]!.size;
+
+      // Double the dimensions from 2 to 4 in all axes
+      appController.setExactDimensions(4, 4, 4);
+
+      const updatedDecals = decalService.getDecals();
+      expect(updatedDecals.length).toBe(1);
+      expect(updatedDecals[0]!.size).toBeCloseTo(initialDecalSize * 2, 5);
+    });
+
+    it("should handle getSelectedDecalSize and setExactDecalSize", () => {
+      const { appController, decalService } = createController();
+      expect(appController.getSelectedDecalSize()).toBeNull();
+
+      appController.selectOrthographicView("+Z");
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+
+      const initialSize = appController.getSelectedDecalSize();
+      expect(initialSize).not.toBeNull();
+      expect(initialSize!).toBeGreaterThan(0);
+
+      // Invalid size rejected
+      expect(appController.setExactDecalSize(0)).toBe(false);
+      expect(appController.setExactDecalSize(-1)).toBe(false);
+
+      // Valid size updated
+      const newSize = initialSize! * 1.5;
+      const success = appController.setExactDecalSize(newSize);
+      expect(success).toBe(true);
+      expect(appController.getSelectedDecalSize()).toBeCloseTo(newSize, 5);
+
+      // Undo
+      appController.undo();
+      expect(appController.getSelectedDecalSize()).toBeCloseTo(initialSize!, 5);
+    });
+  });
+
+  describe("exiting orthographic modes on camera rotation", () => {
+    it("should exit TRANSFORM mode when camera rotates into perspective view", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSFORM");
+      expect(appController.getEditorModeService().getMode()).toBe("TRANSFORM");
+
+      appController.rotateCamera(0.1, 0.2);
+
+      expect(appController.getCameraStateService().isOrthographic()).toBe(false);
+      expect(appController.getEditorModeService().getMode()).toBe("DEFAULT");
+    });
+
+    it("should exit TRANSLATE (Move Vertex) mode when camera rotates into perspective view", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSLATE");
+      expect(appController.getEditorModeService().getMode()).toBe("TRANSLATE");
+
+      appController.rotateCamera(0.1, 0.2);
+
+      expect(appController.getCameraStateService().isOrthographic()).toBe(false);
+      expect(appController.getEditorModeService().getMode()).toBe("DEFAULT");
+    });
+
+    it("should exit ROTATE and SCALE modes when camera rotates into perspective view", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("ROTATE");
+      expect(appController.getEditorModeService().getMode()).toBe("ROTATE");
+      appController.rotateCamera(0.1, 0.2);
+      expect(appController.getEditorModeService().getMode()).toBe("DEFAULT");
+
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("SCALE");
+      expect(appController.getEditorModeService().getMode()).toBe("SCALE");
+      appController.rotateCamera(0.1, 0.2);
+      expect(appController.getEditorModeService().getMode()).toBe("DEFAULT");
+    });
+
+    it("should preserve MULTI_SELECT mode when camera rotates", () => {
+      const { appController } = createController();
+      appController.enterMode("MULTI_SELECT");
+      expect(appController.getEditorModeService().getMode()).toBe("MULTI_SELECT");
+
+      appController.rotateCamera(0.1, 0.2);
+      expect(appController.getEditorModeService().getMode()).toBe("MULTI_SELECT");
     });
   });
 });

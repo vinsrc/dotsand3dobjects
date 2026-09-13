@@ -264,4 +264,33 @@ describe("MeshGeometry", () => {
     expect(scaledCenter.vertices[1].coordinateY).toBe(5); // 3 + (4-3)*2 = 5
     expect(scaledCenter.vertices[1].coordinateZ).toBe(6); // 4 + (5-4)*2 = 6
   });
+
+  it("should scale axes independently with scaleAxes", () => {
+    const vertices = [
+      new Vector3D(1, 2, 3),
+      new Vector3D(3, 4, 5),
+    ];
+    const mesh = new MeshGeometry(vertices, []);
+
+    // Center of mesh is (2, 3, 4)
+    // Scale X by 2, Y by 3, Z by 4 around center
+    const scaled = mesh.scaleAxes(2, 3, 4);
+
+    // vertex 0: relative (-1, -1, -1) -> center + (-2, -3, -4) = (0, 0, 0)
+    expect(scaled.vertices[0].coordinateX).toBe(0);
+    expect(scaled.vertices[0].coordinateY).toBe(0);
+    expect(scaled.vertices[0].coordinateZ).toBe(0);
+
+    // vertex 1: relative (1, 1, 1) -> center + (2, 3, 4) = (4, 6, 8)
+    expect(scaled.vertices[1].coordinateX).toBe(4);
+    expect(scaled.vertices[1].coordinateY).toBe(6);
+    expect(scaled.vertices[1].coordinateZ).toBe(8);
+
+    // Test with explicit centerPoint
+    const customCenter = new Vector3D(0, 0, 0);
+    const scaledCustom = mesh.scaleAxes(2, 0.5, 3, customCenter);
+    expect(scaledCustom.vertices[0].coordinateX).toBe(2);
+    expect(scaledCustom.vertices[0].coordinateY).toBe(1);
+    expect(scaledCustom.vertices[0].coordinateZ).toBe(9);
+  });
 });

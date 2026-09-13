@@ -26,3 +26,8 @@ Edge Deletion Constraint: If an edge is part of a face, deletion is disallowed a
 * Add a button to Top tool called, Show Orthographic View - this button does the orienting to nearest orthographic view, the V shortcut or double clicking provides this functionality. More clearer for tablet users. Remove the double click or double tap to orthographic view. its causing selections to go away. Desktop users can use V key instead.
 
 * Move the following buttons to top tool bar - Undo,Redo, Multi Selection, Clear Selection, Grid Snap . They are no specific to the mesh. global functionalities.
+
+* allow to set exact size in transform mode. In transform mode, show a floating dialog where user can set  X,Y,Z size in units.
+
+* Rotating the viewport with the mouse or dragging the Axis Gizmo while in Transform or Move Vertex mode automatically exits the mode and unsets the button in the Side Tool Bar.
+The Transform overlay and dimension dialog unmount immediately when the camera leaves orthographic view.

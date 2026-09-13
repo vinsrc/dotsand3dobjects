@@ -779,6 +779,9 @@ export class AppController {
     if (this.decalService.isDecalSelected()) {
       this.decalService.selectDecal(null);
     }
+    if (this.editorModeService.isOrthographicRequired()) {
+      this.finishMode();
+    }
     this.cameraStateService.orbit(deltaAzimuth, deltaElevation);
     this.stateNotifier.notify("VIEW_CHANGED");
   }
@@ -840,6 +843,10 @@ export class AppController {
   }
 
   public finishMode(): void {
+    this.translationInitialModel = null;
+    this.transformInitialModel = null;
+    this.transformInitialDecal = null;
+    this.transformInitialDecals = null;
     this.editorModeService.finishMode();
   }
 
@@ -1331,6 +1338,85 @@ export class AppController {
       );
       this.decalService.restoreState(updatedDecals, null);
     }
+  }
+
+  public getModelDimensions(): { x: number; y: number; z: number } {
+    const currentModel = this.modelService.getCurrentModel();
+    if (currentModel.isEmpty()) {
+      return { x: 0, y: 0, z: 0 };
+    }
+    const boundingBox = currentModel.calculateBoundingBox();
+    return {
+      x: boundingBox.maximum.coordinateX - boundingBox.minimum.coordinateX,
+      y: boundingBox.maximum.coordinateY - boundingBox.minimum.coordinateY,
+      z: boundingBox.maximum.coordinateZ - boundingBox.minimum.coordinateZ,
+    };
+  }
+
+  public setExactDimensions(
+    sizeX: number,
+    sizeY: number,
+    sizeZ: number
+  ): boolean {
+    if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
+      return false;
+    }
+    const currentModel = this.modelService.getCurrentModel();
+    if (currentModel.isEmpty()) {
+      return false;
+    }
+
+    this.recordSnapshot();
+    const result = this.geometryTransformService.setExactModelDimensions(
+      sizeX,
+      sizeY,
+      sizeZ
+    );
+
+    if (result) {
+      const existingDecals = this.decalService.getDecals();
+      if (existingDecals.length > 0) {
+        const averageScale =
+          (result.scaleX + result.scaleY + result.scaleZ) / 3;
+        const updatedDecals = existingDecals.map((decal) =>
+          decal.scale(averageScale, result.center)
+        );
+        this.decalService.restoreState(
+          updatedDecals,
+          this.decalService.getSelectedDecalId()
+        );
+      }
+      this.stateNotifier.notify("MODEL_CHANGED");
+      return true;
+    }
+    return false;
+  }
+
+  public getSelectedDecalSize(): number | null {
+    const decal = this.decalService.getSelectedDecal();
+    return decal ? decal.size : null;
+  }
+
+  public setExactDecalSize(targetSize: number): boolean {
+    if (targetSize <= 0) {
+      return false;
+    }
+    const decal = this.decalService.getSelectedDecal();
+    if (!decal || decal.size <= 1e-6) {
+      return false;
+    }
+
+    this.recordSnapshot();
+    const scaleFactor = targetSize / decal.size;
+    const scaledDecal = decal.scale(scaleFactor);
+    this.decalService.restoreState(
+      this.decalService
+        .getDecals()
+        .map((d) => (d.id === scaledDecal.id ? scaledDecal : d)),
+      scaledDecal.id
+    );
+    this.stateNotifier.notify("DECALS_CHANGED");
+    return true;
   }
 
   public getPlacementPlaneAnchor(): Vector3D {

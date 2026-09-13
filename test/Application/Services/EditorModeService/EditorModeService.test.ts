@@ -148,4 +148,24 @@ describe("EditorModeService", () => {
     expect(service.isGridSnapEnabled()).toBe(true);
     expect(gridSnapListener).toHaveBeenCalledWith(true);
   });
+
+  it("should correctly identify modes requiring orthographic view", () => {
+    const notifier = new ApplicationStateNotifier();
+    const service = new EditorModeService(notifier);
+
+    expect(service.isOrthographicRequired("TRANSLATE")).toBe(true);
+    expect(service.isOrthographicRequired("ROTATE")).toBe(true);
+    expect(service.isOrthographicRequired("SCALE")).toBe(true);
+    expect(service.isOrthographicRequired("TRANSFORM")).toBe(true);
+
+    expect(service.isOrthographicRequired("DEFAULT")).toBe(false);
+    expect(service.isOrthographicRequired("MULTI_SELECT")).toBe(false);
+    expect(service.isOrthographicRequired("INSERT")).toBe(false);
+    expect(service.isOrthographicRequired("FILL")).toBe(false);
+
+    // Using active mode (defaults to DEFAULT)
+    expect(service.isOrthographicRequired()).toBe(false);
+    service.setMode("TRANSFORM", true);
+    expect(service.isOrthographicRequired()).toBe(true);
+  });
 });

@@ -27,14 +27,17 @@ export class EditorModeService {
     return this.currentMode;
   }
 
+  public isOrthographicRequired(mode: UiMode = this.currentMode): boolean {
+    return (
+      mode === "TRANSLATE" ||
+      mode === "ROTATE" ||
+      mode === "SCALE" ||
+      mode === "TRANSFORM"
+    );
+  }
+
   public setMode(targetMode: UiMode, isOrthographic: boolean): boolean {
-    if (
-      (targetMode === "TRANSLATE" ||
-        targetMode === "ROTATE" ||
-        targetMode === "SCALE" ||
-        targetMode === "TRANSFORM") &&
-      !isOrthographic
-    ) {
+    if (this.isOrthographicRequired(targetMode) && !isOrthographic) {
       this.stateNotifier.notify(
         "ERROR_OCCURRED",
         "Switch to an Orthographic view"

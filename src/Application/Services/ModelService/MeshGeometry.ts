@@ -171,6 +171,26 @@ export class MeshGeometry {
     return new MeshGeometry(scaledVertices, this.faces, this.explicitEdges);
   }
 
+  public scaleAxes(
+    scaleX: number,
+    scaleY: number,
+    scaleZ: number,
+    centerPoint?: Vector3D
+  ): MeshGeometry {
+    const center = centerPoint ?? this.calculateCenter();
+    const scaledVertices = this.vertices.map((currentVertex) => {
+      const relativeX = currentVertex.coordinateX - center.coordinateX;
+      const relativeY = currentVertex.coordinateY - center.coordinateY;
+      const relativeZ = currentVertex.coordinateZ - center.coordinateZ;
+      return new Vector3D(
+        center.coordinateX + relativeX * scaleX,
+        center.coordinateY + relativeY * scaleY,
+        center.coordinateZ + relativeZ * scaleZ
+      );
+    });
+    return new MeshGeometry(scaledVertices, this.faces, this.explicitEdges);
+  }
+
   public fitToDimension(targetMaxDimension: number = 2.0): MeshGeometry {
     if (this.vertices.length === 0) {
       return this;

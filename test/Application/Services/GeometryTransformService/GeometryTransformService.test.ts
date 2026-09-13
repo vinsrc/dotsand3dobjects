@@ -367,4 +367,64 @@ describe("GeometryTransformService", () => {
     expect(translated[0]?.coordinateX).toBe(0);
     expect(translated[0]?.coordinateY).toBe(0);
   });
+
+  describe("setExactModelDimensions", () => {
+    it("should return null if model is empty", () => {
+      const { modelService, transformService } = setupService();
+      modelService.setCurrentModel(new MeshGeometry([], []));
+
+      const result = transformService.setExactModelDimensions(10, 10, 10);
+      expect(result).toBeNull();
+    });
+
+    it("should scale model to target dimensions along X, Y, Z", () => {
+      const { modelService, transformService } = setupService();
+      // Cube from (0, 0, 0) to (2, 4, 6) -> size is (2, 4, 6), center is (1, 2, 3)
+      const testVertices = [
+        new Vector3D(0, 0, 0),
+        new Vector3D(2, 4, 6),
+      ];
+      modelService.setCurrentModel(new MeshGeometry(testVertices, []));
+
+      const result = transformService.setExactModelDimensions(6, 8, 12);
+      expect(result).not.toBeNull();
+      expect(result?.scaleX).toBeCloseTo(3, 5); // 6 / 2
+      expect(result?.scaleY).toBeCloseTo(2, 5); // 8 / 4
+      expect(result?.scaleZ).toBeCloseTo(2, 5); // 12 / 6
+      expect(result?.center.coordinateX).toBeCloseTo(1, 5);
+      expect(result?.center.coordinateY).toBeCloseTo(2, 5);
+      expect(result?.center.coordinateZ).toBeCloseTo(3, 5);
+
+      const updatedModel = modelService.getCurrentModel();
+      const bbox = updatedModel.calculateBoundingBox();
+      const updatedSizeX = bbox.maximum.coordinateX - bbox.minimum.coordinateX;
+      const updatedSizeY = bbox.maximum.coordinateY - bbox.minimum.coordinateY;
+      const updatedSizeZ = bbox.maximum.coordinateZ - bbox.minimum.coordinateZ;
+
+      expect(updatedSizeX).toBeCloseTo(6, 5);
+      expect(updatedSizeY).toBeCloseTo(8, 5);
+      expect(updatedSizeZ).toBeCloseTo(12, 5);
+      // Center should remain (1, 2, 3)
+      const newCenter = updatedModel.calculateCenter();
+      expect(newCenter.coordinateX).toBeCloseTo(1, 5);
+      expect(newCenter.coordinateY).toBeCloseTo(2, 5);
+      expect(newCenter.coordinateZ).toBeCloseTo(3, 5);
+    });
+
+    it("should handle 0-dimension (flat axis) gracefully by keeping scale 1", () => {
+      const { modelService, transformService } = setupService();
+      // Flat plane in XY at Z = 0
+      const testVertices = [
+        new Vector3D(0, 0, 0),
+        new Vector3D(2, 2, 0),
+      ];
+      modelService.setCurrentModel(new MeshGeometry(testVertices, []));
+
+      const result = transformService.setExactModelDimensions(4, 4, 10);
+      expect(result).not.toBeNull();
+      expect(result?.scaleX).toBeCloseTo(2, 5);
+      expect(result?.scaleY).toBeCloseTo(2, 5);
+      expect(result?.scaleZ).toBe(1);
+    });
+  });
 });

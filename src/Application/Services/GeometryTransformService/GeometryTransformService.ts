@@ -192,4 +192,33 @@ export class GeometryTransformService {
     const updatedModel = initialModel.scale(scaleFactor, center);
     this.modelService.setCurrentModel(updatedModel);
   }
+
+  public setExactModelDimensions(
+    targetSizeX: number,
+    targetSizeY: number,
+    targetSizeZ: number
+  ): { scaleX: number; scaleY: number; scaleZ: number; center: Vector3D } | null {
+    const currentModel = this.modelService.getCurrentModel();
+    if (currentModel.isEmpty()) {
+      return null;
+    }
+
+    const boundingBox = currentModel.calculateBoundingBox();
+    const currentSizeX =
+      boundingBox.maximum.coordinateX - boundingBox.minimum.coordinateX;
+    const currentSizeY =
+      boundingBox.maximum.coordinateY - boundingBox.minimum.coordinateY;
+    const currentSizeZ =
+      boundingBox.maximum.coordinateZ - boundingBox.minimum.coordinateZ;
+
+    const scaleX = currentSizeX > 1e-6 ? targetSizeX / currentSizeX : 1;
+    const scaleY = currentSizeY > 1e-6 ? targetSizeY / currentSizeY : 1;
+    const scaleZ = currentSizeZ > 1e-6 ? targetSizeZ / currentSizeZ : 1;
+
+    const center = currentModel.calculateCenter();
+    const updatedModel = currentModel.scaleAxes(scaleX, scaleY, scaleZ, center);
+    this.modelService.setCurrentModel(updatedModel);
+
+    return { scaleX, scaleY, scaleZ, center };
+  }
 }

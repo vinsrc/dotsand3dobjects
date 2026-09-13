@@ -10,6 +10,7 @@ import { ThemeColors } from "../Common/Theme";
 import { RotateOverlay } from "./RotateOverlay";
 import { ScaleOverlay } from "./ScaleOverlay";
 import { TransformOverlay } from "./TransformOverlay";
+import { TransformDimensionDialog } from "./TransformDimensionDialog";
 
 const calculatePanFactor = (
   cameraDistance: number,
@@ -986,13 +987,16 @@ export const ViewportCanvas: React.FC = () => {
       />
       {controller.getEditorModeService().getMode() === "TRANSFORM" &&
         controller.getCameraStateService().isOrthographic() && (
-          <TransformOverlay
-            controller={controller}
-            canvasElement={canvasRef.current}
-            getActiveCamera={() =>
-              rendererRef.current?.getActiveCamera() ?? null
-            }
-          />
+          <>
+            <TransformOverlay
+              controller={controller}
+              canvasElement={canvasRef.current}
+              getActiveCamera={() =>
+                rendererRef.current?.getActiveCamera() ?? null
+              }
+            />
+            <TransformDimensionDialog />
+          </>
         )}
       {controller.getEditorModeService().getMode() === "ROTATE" &&
         controller.getCameraStateService().isOrthographic() && (
