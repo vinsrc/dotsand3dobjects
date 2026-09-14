@@ -3,6 +3,7 @@ import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
 import { FileMenu } from "./FileMenu";
 import { ThemeColors } from "../Common/Theme";
+import { UndoIcon, RedoIcon, HelpIcon } from "./ToolBarIcons";
 
 export interface ToolBarProps {
   onOpenHelp?: () => void;
@@ -322,9 +323,12 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         alignItems: "center",
         justifyContent: "space-between",
         minHeight: "48px",
+        flexShrink: 0,
         backgroundColor: ThemeColors.toolbarBackground,
         borderBottom: `1px solid ${ThemeColors.border}`,
-        padding: "0 12px",
+        padding: "4px 12px",
+        paddingTop: "max(6px, env(safe-area-inset-top, 6px))",
+        paddingBottom: "6px",
         boxSizing: "border-box",
         userSelect: "none",
         overflow: "visible",
@@ -379,18 +383,32 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           onClick={handleUndo}
           disabled={!canUndo}
           title="Undo (Ctrl+Z)"
-          style={canUndo ? buttonStyle : disabledButtonStyle}
+          aria-label="Undo"
+          style={{
+            ...(canUndo ? buttonStyle : disabledButtonStyle),
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "6px 10px",
+          }}
         >
-          Undo
+          <UndoIcon />
         </button>
         <button
           data-testid="redo-button"
           onClick={handleRedo}
           disabled={!canRedo}
           title="Redo (Ctrl+Y)"
-          style={canRedo ? buttonStyle : disabledButtonStyle}
+          aria-label="Redo"
+          style={{
+            ...(canRedo ? buttonStyle : disabledButtonStyle),
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "6px 10px",
+          }}
         >
-          Redo
+          <RedoIcon />
         </button>
         <button
           data-testid="grid-snap-toggle-button"
@@ -495,13 +513,16 @@ export const ToolBar: React.FC<ToolBarProps> = ({
             data-testid="help-button"
             onClick={onOpenHelp}
             title="Help & User Guide"
+            aria-label="Help"
             style={{
               ...buttonStyle,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
               padding: "6px 10px",
-              fontWeight: 700,
             }}
           >
-            ? Help
+            <HelpIcon />
           </button>
         )}
         {isFaceOrthographic && (

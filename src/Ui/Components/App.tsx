@@ -33,8 +33,9 @@ const AppContent: React.FC = () => {
       style={{
         display: "flex",
         flexDirection: "column",
-        width: "100vw",
-        height: "100vh",
+        width: "100%",
+        height: "100%",
+        maxHeight: "100dvh",
         margin: 0,
         padding: 0,
         overflow: "hidden",

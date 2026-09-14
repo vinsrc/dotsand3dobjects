@@ -179,7 +179,7 @@ export const TransformDimensionDialog: React.FC = () => {
         left: `${dialogPosition.x}px`,
         top: `${dialogPosition.y}px`,
       }
-    : { position: "absolute", top: "16px", right: "16px" };
+    : { position: "absolute", top: "140px", right: "16px" };
 
   return (
     <div

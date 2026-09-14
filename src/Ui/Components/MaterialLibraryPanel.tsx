@@ -153,6 +153,7 @@ export const MaterialLibraryPanel: React.FC = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexShrink: 0,
           padding: "10px 14px",
           backgroundColor: ThemeColors.panelHeaderBackground,
           borderBottom: `1px solid ${ThemeColors.border}`,
@@ -267,7 +268,9 @@ export const MaterialLibraryPanel: React.FC = () => {
       <div
         data-testid="material-list-view"
         style={{
-          flex: "0 0 140px",
+          flex: "0 1 140px",
+          maxHeight: "140px",
+          minHeight: "70px",
           overflowY: "auto",
           borderBottom: `1px solid ${ThemeColors.border}`,
           backgroundColor: ThemeColors.surface,
@@ -622,8 +625,10 @@ backgroundColor: ThemeColors.widget,
               data-testid="assign-button-anchor"
               style={{
                 padding: "12px",
+                paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))",
                 borderTop: `1px solid ${ThemeColors.borderSubtle}`,
                 backgroundColor: ThemeColors.panelBackground,
+                flexShrink: 0,
               }}
             >
               <button

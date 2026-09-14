@@ -83,7 +83,7 @@ export class AppBootstrapper {
     const uiCustomizationService = new UiCustomizationService(
       stateNotifier,
       "right",
-      "right",
+      "left",
       2,
       uiCustomizationStorage
     );

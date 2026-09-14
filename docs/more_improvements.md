@@ -31,3 +31,5 @@ Edge Deletion Constraint: If an edge is part of a face, deletion is disallowed a
 
 * Rotating the viewport with the mouse or dragging the Axis Gizmo while in Transform or Move Vertex mode automatically exits the mode and unsets the button in the Side Tool Bar.
 The Transform overlay and dimension dialog unmount immediately when the camera leaves orthographic view.
+
+* use icons for undo and redo button. use icon for help button . no text

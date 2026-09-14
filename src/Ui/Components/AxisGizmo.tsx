@@ -171,7 +171,7 @@ export const AxisGizmo: React.FC = () => {
       onPointerUp={handlePointerUp}
       style={{
         position: "absolute",
-        bottom: "20px",
+        top: "20px",
         right: "20px",
         width: "110px",
         height: "110px",
