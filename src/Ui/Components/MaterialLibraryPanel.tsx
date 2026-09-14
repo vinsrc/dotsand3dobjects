@@ -346,15 +346,26 @@ export const MaterialLibraryPanel: React.FC = () => {
         data-testid="material-detail-view"
         style={{
           flex: 1,
-          overflowY: "auto",
-          padding: "12px",
+          minHeight: 0,
           display: "flex",
           flexDirection: "column",
-          gap: "12px",
+          overflow: "hidden",
         }}
       >
         {selectedMaterial ? (
           <>
+            <div
+              data-testid="material-detail-scroll"
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                padding: "12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+              }}
+            >
             {/* Material Name */}
             <div>
               <label
@@ -604,9 +615,17 @@ backgroundColor: ThemeColors.widget,
                 </button>
               )}
             </div>
+            </div>
 
             {/* Assign to Selected Face(s) / Decal */}
-            <div style={{ marginTop: "auto", paddingTop: "12px" }}>
+            <div
+              data-testid="assign-button-anchor"
+              style={{
+                padding: "12px",
+                borderTop: `1px solid ${ThemeColors.borderSubtle}`,
+                backgroundColor: ThemeColors.panelBackground,
+              }}
+            >
               <button
                 data-testid="assign-material-button"
                 onClick={handleAssignToFace}
@@ -645,6 +664,7 @@ backgroundColor: ThemeColors.widget,
               color: ThemeColors.textMuted,
               fontSize: "12px",
               margin: "auto 0",
+              padding: "12px",
             }}
           >
             Select a material above to edit its properties.

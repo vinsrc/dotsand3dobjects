@@ -953,8 +953,9 @@ export const ViewportCanvas: React.FC = () => {
       onContextMenu={(event) => event.preventDefault()}
       style={{
         flex: 1,
+        minWidth: 0,
         width: "100%",
-        height: "calc(100vh - 48px)",
+        height: "100%",
         position: "relative",
         backgroundColor: ThemeColors.viewportBackground,
         overflow: "hidden",
