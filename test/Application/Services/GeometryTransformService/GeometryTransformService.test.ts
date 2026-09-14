@@ -273,7 +273,7 @@ describe("GeometryTransformService", () => {
     expect(rotated[0]?.coordinateY).toBeCloseTo(expectedY, 5);
   });
 
-  it("should rotate only selected vertices if vertices are selected", () => {
+  it("should rotate entire mesh even if vertices are selected", () => {
     const { modelService, selectionService, transformService } = setupService();
     const testVertices = [
       new Vector3D(1, 0, 0),
@@ -292,8 +292,12 @@ describe("GeometryTransformService", () => {
     );
 
     const rotated = modelService.getCurrentModel().vertices;
-    expect(rotated[1]?.coordinateX).toBe(0);
-    expect(rotated[1]?.coordinateY).toBe(1);
+    const center = baseModel.calculateCenter();
+    const expected = baseModel.rotateAroundAxis(center, new Vector3D(0, 0, 1), Math.PI / 2);
+    expect(rotated[0]?.coordinateX).toBeCloseTo(expected.vertices[0]!.coordinateX, 5);
+    expect(rotated[0]?.coordinateY).toBeCloseTo(expected.vertices[0]!.coordinateY, 5);
+    expect(rotated[1]?.coordinateX).toBeCloseTo(expected.vertices[1]!.coordinateX, 5);
+    expect(rotated[1]?.coordinateY).toBeCloseTo(expected.vertices[1]!.coordinateY, 5);
   });
 
   it("should scale entire model uniformly around its center with applyScaleFromInitial", () => {

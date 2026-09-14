@@ -160,27 +160,7 @@ export class GeometryTransformService {
       }
     }
 
-    const selectedIndices = this.selectionService.getSelectedIndices();
-    let updatedModel: MeshGeometry;
-
-    if (selectedIndices.length > 0) {
-      const selectedSet = new Set(selectedIndices);
-      const rotatedFull = initialModel.rotateAroundAxis(center, axis, effectiveAngle);
-      const updatedVertices = initialModel.vertices.map((curVertex, index) => {
-        if (selectedSet.has(index)) {
-          return rotatedFull.vertices[index] as Vector3D;
-        }
-        return curVertex;
-      });
-      updatedModel = new MeshGeometry(
-        updatedVertices,
-        initialModel.faces,
-        initialModel.explicitEdges
-      );
-    } else {
-      updatedModel = initialModel.rotateAroundAxis(center, axis, effectiveAngle);
-    }
-
+    const updatedModel = initialModel.rotateAroundAxis(center, axis, effectiveAngle);
     this.modelService.setCurrentModel(updatedModel);
   }
 
