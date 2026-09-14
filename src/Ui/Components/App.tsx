@@ -51,10 +51,10 @@ const AppContent: React.FC = () => {
       <div
         style={{
           flex: 1,
+          minHeight: 0,
           position: "relative",
           zIndex: 1,
           width: "100%",
-          height: "calc(100vh - 48px)",
           display: "flex",
           flexDirection: "row",
         }}

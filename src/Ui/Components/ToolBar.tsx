@@ -318,19 +318,29 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         position: "relative",
         zIndex: 100,
         display: "flex",
+        flexWrap: "wrap",
         alignItems: "center",
         justifyContent: "space-between",
-        height: "48px",
+        minHeight: "48px",
         backgroundColor: ThemeColors.toolbarBackground,
         borderBottom: `1px solid ${ThemeColors.border}`,
         padding: "0 12px",
         boxSizing: "border-box",
         userSelect: "none",
         overflow: "visible",
-        gap: "12px",
+        gap: "4px 12px",
       }}
     >
-      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          flex: "1 1 auto",
+          minWidth: 0,
+          flexWrap: "wrap",
+          gap: "8px",
+          alignItems: "center",
+        }}
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -514,6 +524,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         data-testid="mode-specific-buttons"
         style={{
           display: "flex",
+          flexWrap: "wrap",
           gap: "8px",
           alignItems: "center",
           justifyContent: "flex-end",
