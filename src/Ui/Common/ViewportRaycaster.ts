@@ -229,17 +229,6 @@ export class ViewportRaycaster {
         continue;
       }
 
-      if (
-        isShaded &&
-        !this.occlusionChecker.isFaceFacingCamera(
-          face,
-          meshGeometry,
-          activeCamera
-        )
-      ) {
-        continue;
-      }
-
       const triangles = face.triangulate();
       for (const triangle of triangles) {
         const indexA = triangle.vertexIndices[0];

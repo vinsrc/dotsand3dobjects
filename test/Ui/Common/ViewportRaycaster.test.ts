@@ -186,7 +186,7 @@ describe("ViewportRaycaster", () => {
       expect(resultWireframe).toBe(0);
     });
 
-    it("should disallow selecting a back-facing face in shaded mode", () => {
+    it("should allow selecting a back-facing face in shaded mode when it is the visible surface", () => {
       const screenX = 400;
       const screenY = 300;
 
@@ -199,7 +199,7 @@ describe("ViewportRaycaster", () => {
         600,
         true
       );
-      expect(resultShaded).toBeNull();
+      expect(resultShaded).toBe(0);
     });
 
     it("should allow selecting a front-facing face in shaded mode", () => {
