@@ -42,6 +42,7 @@ export const ThemeColors = {
 
   faceSelection: "#ffaa00",
   faceSelectionTransparent: "rgba(255, 170, 0, 0.35)",
+  faceNormal: "#2ecc71",
 
   decalPlane: "rgba(46, 204, 113, 0.45)",
   decalPlaneBorder: "#2ecc71",

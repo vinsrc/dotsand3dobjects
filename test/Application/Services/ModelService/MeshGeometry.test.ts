@@ -215,6 +215,20 @@ describe("MeshGeometry", () => {
     // Out of bounds faceIndex returns same mesh
     expect(mesh.reverseFaceWinding(-1)).toBe(mesh);
     expect(mesh.reverseFaceWinding(99)).toBe(mesh);
+
+    // reverseFacesWinding with multiple faces
+    const multiFaces = [
+      new Face3D([0, 1, 2, 3]),
+      new Face3D([0, 2, 3]),
+    ];
+    const multiFaceMesh = new MeshGeometry(vertices, multiFaces);
+    const reversedMulti = multiFaceMesh.reverseFacesWinding([0, 1]);
+    expect(reversedMulti.faces[0]?.vertexIndices).toEqual([3, 2, 1, 0]);
+    expect(reversedMulti.faces[1]?.vertexIndices).toEqual([3, 2, 0]);
+
+    // Empty or out of bounds returns original mesh
+    expect(multiFaceMesh.reverseFacesWinding([])).toBe(multiFaceMesh);
+    expect(multiFaceMesh.reverseFacesWinding([-1, 100])).toBe(multiFaceMesh);
   });
 
   it("should rotate vertices around specified axis and center point", () => {

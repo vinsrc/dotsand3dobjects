@@ -3,12 +3,21 @@ import { Vector3D } from "../../Application/Common/Vector3D";
 import { Face3D } from "../../Application/Services/ModelService/Face3D";
 import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeometry";
 import { GridPlaneType } from "../../Application/Services/CameraService/ViewStrategy";
+import { MeshOcclusionChecker } from "./MeshOcclusionChecker";
 
 export class ViewportRaycaster {
   private readonly temporaryVector: THREE.Vector3;
+  private readonly occlusionChecker: MeshOcclusionChecker;
 
-  public constructor() {
+  public constructor(
+    occlusionChecker: MeshOcclusionChecker = new MeshOcclusionChecker()
+  ) {
     this.temporaryVector = new THREE.Vector3();
+    this.occlusionChecker = occlusionChecker;
+  }
+
+  public getOcclusionChecker(): MeshOcclusionChecker {
+    return this.occlusionChecker;
   }
 
   public findNearestVertex(
@@ -19,7 +28,9 @@ export class ViewportRaycaster {
     viewportWidth: number,
     viewportHeight: number,
     tolerancePixels: number = 25,
-    candidateIndices?: readonly number[] | null
+    candidateIndices?: readonly number[] | null,
+    meshGeometry?: MeshGeometry,
+    isShaded: boolean = false
   ): number | null {
     if (vertices.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) {
       return null;
@@ -61,6 +72,23 @@ export class ViewportRaycaster {
       const deltaY = screenY - projectedScreenY;
       const distanceSquared = deltaX * deltaX + deltaY * deltaY;
 
+      if (distanceSquared > tolerancePixels * tolerancePixels) {
+        continue;
+      }
+
+      if (
+        isShaded &&
+        meshGeometry &&
+        this.occlusionChecker.isVertexOccluded(
+          index,
+          vertex,
+          meshGeometry,
+          activeCamera
+        )
+      ) {
+        continue;
+      }
+
       const isSignificantlyCloserDistance =
         distanceSquared < closestDistanceSquared - 0.25;
       const isApproximatelySameDistance =
@@ -88,7 +116,9 @@ export class ViewportRaycaster {
     activeCamera: THREE.Camera,
     viewportWidth: number,
     viewportHeight: number,
-    tolerancePixels: number = 20
+    tolerancePixels: number = 20,
+    meshGeometry?: MeshGeometry,
+    isShaded: boolean = false
   ): [number, number] | null {
     if (edges.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) {
       return null;
@@ -122,19 +152,38 @@ export class ViewportRaycaster {
       const endScreenX = ((this.temporaryVector.x + 1) * viewportWidth) / 2;
       const endScreenY = ((-this.temporaryVector.y + 1) * viewportHeight) / 2;
 
-      const distanceToEdge = this.distancePointToSegment(
-        screenX,
-        screenY,
-        startScreenX,
-        startScreenY,
-        endScreenX,
-        endScreenY
-      );
+      const { distance: distanceToEdge, parameter: projectionParam } =
+        this.distancePointToSegmentWithParam(
+          screenX,
+          screenY,
+          startScreenX,
+          startScreenY,
+          endScreenX,
+          endScreenY
+        );
 
-      if (distanceToEdge < closestDistance) {
-        closestDistance = distanceToEdge;
-        closestEdge = [startIndex, endIndex];
+      if (distanceToEdge >= closestDistance) {
+        continue;
       }
+
+      if (isShaded && meshGeometry) {
+        const pointOnEdge = startVertex.add(
+          endVertex.subtract(startVertex).scaleBy(projectionParam)
+        );
+        if (
+          this.occlusionChecker.isEdgeOccluded(
+            [startIndex, endIndex],
+            pointOnEdge,
+            meshGeometry,
+            activeCamera
+          )
+        ) {
+          continue;
+        }
+      }
+
+      closestDistance = distanceToEdge;
+      closestEdge = [startIndex, endIndex];
     }
 
     return closestEdge;
@@ -146,7 +195,8 @@ export class ViewportRaycaster {
     meshGeometry: MeshGeometry,
     activeCamera: THREE.Camera,
     viewportWidth: number,
-    viewportHeight: number
+    viewportHeight: number,
+    isShaded: boolean = false
   ): number | null {
     const faces = meshGeometry.faces;
     const vertices = meshGeometry.vertices;
@@ -176,6 +226,17 @@ export class ViewportRaycaster {
     for (let faceIndex = 0; faceIndex < faces.length; faceIndex += 1) {
       const face = faces[faceIndex];
       if (!face) {
+        continue;
+      }
+
+      if (
+        isShaded &&
+        !this.occlusionChecker.isFaceFacingCamera(
+          face,
+          meshGeometry,
+          activeCamera
+        )
+      ) {
         continue;
       }
 
@@ -299,14 +360,14 @@ export class ViewportRaycaster {
     );
   }
 
-  private distancePointToSegment(
+  private distancePointToSegmentWithParam(
     pointX: number,
     pointY: number,
     segmentStartX: number,
     segmentStartY: number,
     segmentEndX: number,
     segmentEndY: number
-  ): number {
+  ): { distance: number; parameter: number } {
     const segmentVectorX = segmentEndX - segmentStartX;
     const segmentVectorY = segmentEndY - segmentStartY;
     const segmentLengthSquared =
@@ -315,7 +376,7 @@ export class ViewportRaycaster {
     if (segmentLengthSquared < 0.00001) {
       const deltaX = pointX - segmentStartX;
       const deltaY = pointY - segmentStartY;
-      return Math.hypot(deltaX, deltaY);
+      return { distance: Math.hypot(deltaX, deltaY), parameter: 0 };
     }
 
     const projectionParameter = Math.max(
@@ -331,6 +392,27 @@ export class ViewportRaycaster {
     const closestPointX = segmentStartX + projectionParameter * segmentVectorX;
     const closestPointY = segmentStartY + projectionParameter * segmentVectorY;
 
-    return Math.hypot(pointX - closestPointX, pointY - closestPointY);
+    return {
+      distance: Math.hypot(pointX - closestPointX, pointY - closestPointY),
+      parameter: projectionParameter,
+    };
+  }
+
+  private distancePointToSegment(
+    pointX: number,
+    pointY: number,
+    segmentStartX: number,
+    segmentStartY: number,
+    segmentEndX: number,
+    segmentEndY: number
+  ): number {
+    return this.distancePointToSegmentWithParam(
+      pointX,
+      pointY,
+      segmentStartX,
+      segmentStartY,
+      segmentEndX,
+      segmentEndY
+    ).distance;
   }
 }

@@ -291,18 +291,32 @@ export class MeshGeometry {
     return new MeshGeometry(this.vertices, updatedFaces, this.explicitEdges);
   }
 
-  public reverseFaceWinding(faceIndex: number): MeshGeometry {
-    if (faceIndex < 0 || faceIndex >= this.faces.length) {
+  public reverseFacesWinding(faceIndices: readonly number[]): MeshGeometry {
+    if (faceIndices.length === 0) {
+      return this;
+    }
+
+    const targetIndicesSet = new Set(
+      faceIndices.filter(
+        (targetIndex) => targetIndex >= 0 && targetIndex < this.faces.length
+      )
+    );
+
+    if (targetIndicesSet.size === 0) {
       return this;
     }
 
     const updatedFaces = this.faces.map((face, index) => {
-      if (index === faceIndex) {
+      if (targetIndicesSet.has(index)) {
         return face.withReversedVertices();
       }
       return face;
     });
 
     return new MeshGeometry(this.vertices, updatedFaces, this.explicitEdges);
+  }
+
+  public reverseFaceWinding(faceIndex: number): MeshGeometry {
+    return this.reverseFacesWinding([faceIndex]);
   }
 }

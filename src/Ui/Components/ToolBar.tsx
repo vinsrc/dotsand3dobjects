@@ -48,13 +48,21 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     (controller.getSelectedFaceIndex() !== null ? 1 : 0);
   const hasSelectedFace = selectedFaceCount > 0;
   const isDecalSelected = controller.isDecalSelected();
+  const activeFaceIndex = isFaceOrthographic
+    ? controller.getCameraStateService().getActiveFaceIndex()
+    : null;
+  const hasDecalOnFace =
+    isFaceOrthographic &&
+    activeFaceIndex !== null &&
+    controller.getDecals().some((d) => d.parentFaceIndex === activeFaceIndex);
+  const canDeleteDecal = isDecalSelected || hasDecalOnFace;
   const selectedEdgeCount = controller.getSelectedEdges().length;
   const hasSelectedEdge = selectedEdgeCount > 0 && !isDecalSelected;
   const canClearSelection =
     selectedVertexCount > 0 ||
     hasSelectedEdge ||
     hasSelectedFace ||
-    isDecalSelected;
+    canDeleteDecal;
 
   const handleUndo = () => {
     controller.undo();
@@ -84,16 +92,16 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     controller.clearMaterialOnSelectedFaces();
   };
 
+  const handleFlipFace = () => {
+    controller.flipFace();
+  };
+
   const handleAddDecalPlane = () => {
     controller.addDecalPlaneToSelectedFace();
   };
 
   const handleDeleteDecalPlane = () => {
     controller.deleteSelectedDecal();
-  };
-
-  const handleSetFront = () => {
-    controller.setFaceFront();
   };
 
   const handleLoadClick = () => {
@@ -525,20 +533,6 @@ export const ToolBar: React.FC<ToolBarProps> = ({
             <HelpIcon />
           </button>
         )}
-        {isFaceOrthographic && (
-          <button
-            data-testid="set-front-button"
-            onClick={handleSetFront}
-            title="Set current view as front side of face"
-            style={{
-              ...buttonStyle,
-              backgroundColor: ThemeColors.widget,
-              color: ThemeColors.textPrimary,
-            }}
-          >
-            Set Front
-          </button>
-        )}
       </div>
 
       <div
@@ -551,6 +545,21 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           justifyContent: "flex-end",
         }}
       >
+        {hasSelectedFace && (
+          <button
+            data-testid="flip-face-button"
+            onClick={handleFlipFace}
+            title="Flip Face"
+            style={{
+              ...buttonStyle,
+              backgroundColor: ThemeColors.widget,
+              color: ThemeColors.textPrimary,
+            }}
+          >
+            Flip Face
+          </button>
+        )}
+
         {hasSelectedFace && (
           <button
             data-testid="add-decal-plane-button"
@@ -566,7 +575,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           </button>
         )}
 
-        {isDecalSelected && (
+        {canDeleteDecal && (
           <button
             data-testid="delete-decal-plane-button"
             onClick={handleDeleteDecalPlane}
@@ -582,7 +591,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           </button>
         )}
 
-        {(hasSelectedFace || isDecalSelected) && (
+        {(hasSelectedFace || canDeleteDecal) && (
           <button
             data-testid="clear-material-button"
             onClick={handleClearMaterial}

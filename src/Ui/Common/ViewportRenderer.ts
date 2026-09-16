@@ -11,6 +11,7 @@ import { ThemeColors } from "./Theme";
 import { Material3D } from "../../Application/Services/MaterialService/Material3D";
 import { ViewportGrid } from "./ViewportGrid";
 import { DecalPlane } from "../../Application/Services/DecalService/DecalPlane";
+import { FaceNormalRenderer } from "./FaceNormalRenderer";
 
 export class ViewportRenderer {
   private readonly canvasElement: HTMLCanvasElement;
@@ -45,6 +46,7 @@ export class ViewportRenderer {
   private dynamicMaterials: THREE.MeshStandardMaterial[] = [];
   private readonly loadedTextures: Map<string, THREE.Texture> = new Map();
   private selectedFaceMesh: THREE.Mesh;
+  private readonly faceNormalRenderer: FaceNormalRenderer;
   private activeAxisLabel: string = "";
 
   private readonly decalGroup: THREE.Group;
@@ -193,11 +195,17 @@ export class ViewportRenderer {
     this.decalGroup = new THREE.Group();
     this.sceneInstance.add(this.decalGroup);
 
+    this.faceNormalRenderer = new FaceNormalRenderer(this.sceneInstance);
+
     this.setupLighting();
     this.setupGridHelper();
     this.setupAxesHelper();
     (this.canvasElement as unknown as { __viewportRenderer?: ViewportRenderer }).__viewportRenderer = this;
     (window as unknown as { THREE?: typeof THREE }).THREE = THREE;
+  }
+
+  public getFaceNormalRenderer(): FaceNormalRenderer {
+    return this.faceNormalRenderer;
   }
 
   public getAxisLines(): THREE.LineSegments | null {
@@ -299,6 +307,10 @@ export class ViewportRenderer {
       this.currentSelectedEdges
     );
     this.selectedEdgeLines.visible = this.currentSelectedEdges.length > 0;
+    this.faceNormalRenderer.updateNormals(
+      meshGeometry,
+      this.currentSelectedFaceIndices
+    );
 
     previousSurfaceGeometry.dispose();
     previousWireframeGeometry.dispose();
@@ -381,6 +393,11 @@ export class ViewportRenderer {
       );
       this.selectedEdgeLines.visible = this.currentSelectedEdges.length > 0;
       previousSelectedEdgeGeometry.dispose();
+
+      this.faceNormalRenderer.updateNormals(
+        this.currentModelGeometry,
+        this.currentSelectedFaceIndices
+      );
 
       this.render();
     }
@@ -778,6 +795,8 @@ export class ViewportRenderer {
 
     this.selectedFaceMesh.geometry.dispose();
     (this.selectedFaceMesh.material as THREE.Material).dispose();
+
+    this.faceNormalRenderer.dispose();
 
     if (this.gridHelperInstance) {
       this.gridHelperInstance.geometry.dispose();

@@ -33,3 +33,9 @@ Edge Deletion Constraint: If an edge is part of a face, deletion is disallowed a
 The Transform overlay and dimension dialog unmount immediately when the camera leaves orthographic view.
 
 * use icons for undo and redo button. use icon for help button . no text
+
+* when a face is selected, always show its normal vector.  when a face is selected, a context specific button Flip Face appears on top right tool bar . before Add Decal button.   when Flip Face is clicked, the front of the face is becomes back and back becomes front.  re order vertices for the face accordingly.
+
+* when the view is shaded (not wireframe), only allow selection of face, vertex, edge that is visible to the user.  the user can switch to wireframe is he wants to selects whats behind.
+
+* Display FRONT and BACK on the polygon instead of vector.  only when polygon is selected

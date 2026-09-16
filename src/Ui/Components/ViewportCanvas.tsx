@@ -31,6 +31,7 @@ export const ViewportCanvas: React.FC = () => {
     "VIEW_CHANGED",
     "MODEL_CHANGED",
     "DECALS_CHANGED",
+    "RENDER_MODE_CHANGED",
   ]);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,6 +85,24 @@ export const ViewportCanvas: React.FC = () => {
     if (intersects.length > 0) {
       const hit = intersects[0];
       if (hit?.object?.userData?.decalId) {
+        const isWireframe = controller.getRenderModeService().isWireframe();
+        if (!isWireframe) {
+          const decal = controller
+            .getDecals()
+            .find((item) => item.id === hit.object.userData.decalId);
+          if (decal) {
+            const currentModel = controller.getModelService().getCurrentModel();
+            const parentFace = currentModel.faces[decal.parentFaceIndex];
+            if (
+              parentFace &&
+              !raycasterRef.current
+                .getOcclusionChecker()
+                .isFaceFacingCamera(parentFace, currentModel, camera)
+            ) {
+              return null;
+            }
+          }
+        }
         return hit.object.userData.decalId as string;
       }
     }
@@ -214,6 +233,13 @@ export const ViewportCanvas: React.FC = () => {
           currentHeight,
           controller.getVisibleVertexIndices()
         );
+        viewportRenderer.updateSelection(
+          controller.getSelectionService().getSelectedIndices(),
+          controller.getSelectionService().getActiveVertex(),
+          controller.getSelectedFaceIndices(),
+          controller.getVisibleVertexIndices(),
+          controller.getSelectedEdges()
+        );
       }
     );
 
@@ -226,7 +252,7 @@ export const ViewportCanvas: React.FC = () => {
           "selectedFaceIndices" in payload
             ? (payload as { selectedFaceIndices: readonly number[] })
                 .selectedFaceIndices
-            : controller.getSelectionService().getSelectedFaceIndices();
+            : controller.getSelectedFaceIndices();
         const selectedEdges =
           payload &&
           typeof payload === "object" &&
@@ -415,6 +441,8 @@ export const ViewportCanvas: React.FC = () => {
     const currentModel = controller.getModelService().getCurrentModel();
     const currentMode = controller.getEditorModeService().getMode();
     const hitDecalId = findHitDecal(clickX, clickY);
+    const isWireframe = controller.getRenderModeService().isWireframe();
+    const isShaded = !isWireframe;
 
     const nearestVertex = raycasterRef.current.findNearestVertex(
       clickX,
@@ -424,7 +452,9 @@ export const ViewportCanvas: React.FC = () => {
       rect.width,
       rect.height,
       25,
-      controller.getVisibleVertexIndices()
+      controller.getVisibleVertexIndices(),
+      currentModel,
+      isShaded
     );
 
     if (nearestVertex !== null) {
@@ -714,13 +744,18 @@ export const ViewportCanvas: React.FC = () => {
     const currentModel = controller.getModelService().getCurrentModel();
     const mode = controller.getEditorModeService().getMode();
     const hitDecalId = findHitDecal(clickX, clickY);
+    const isWireframe = controller.getRenderModeService().isWireframe();
+    const isShaded = !isWireframe;
 
     const handleDecalTap = (decalId: string): boolean => {
       const decal = controller.getDecalService().getDecal(decalId);
       if (!decal) {
         return false;
       }
-      if (controller.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
+      if (
+        controller.isFaceOrthographicViewOf(decal.parentFaceIndex) ||
+        controller.getCameraStateService().isOrthographic()
+      ) {
         controller.selectDecal(decalId);
       } else {
         controller.selectFace(decal.parentFaceIndex);
@@ -743,7 +778,8 @@ export const ViewportCanvas: React.FC = () => {
           currentModel,
           camera,
           width,
-          height
+          height,
+          isShaded
         );
         if (nearestFace !== null) {
           controller.selectFace(nearestFace);
@@ -762,7 +798,9 @@ export const ViewportCanvas: React.FC = () => {
         width,
         height,
         25,
-        visibleVertexIndices
+        visibleVertexIndices,
+        currentModel,
+        isShaded
       );
       if (nearestVertex !== null) {
         controller.selectSingleVertex(nearestVertex);
@@ -775,7 +813,9 @@ export const ViewportCanvas: React.FC = () => {
           camera,
           width,
           height,
-          15
+          15,
+          currentModel,
+          isShaded
         );
         if (nearestEdge !== null) {
           controller.selectEdge(nearestEdge);
@@ -786,7 +826,8 @@ export const ViewportCanvas: React.FC = () => {
             currentModel,
             camera,
             width,
-            height
+            height,
+            isShaded
           );
           if (nearestFace !== null) {
             controller.selectFace(nearestFace);
@@ -805,7 +846,9 @@ export const ViewportCanvas: React.FC = () => {
         width,
         height,
         25,
-        visibleVertexIndices
+        visibleVertexIndices,
+        currentModel,
+        isShaded
       );
       if (nearestVertex !== null) {
         controller.toggleVertexSelection(nearestVertex);
@@ -818,7 +861,9 @@ export const ViewportCanvas: React.FC = () => {
           camera,
           width,
           height,
-          15
+          15,
+          currentModel,
+          isShaded
         );
         if (nearestEdge !== null) {
           controller.toggleEdgeSelection(nearestEdge);
@@ -829,7 +874,8 @@ export const ViewportCanvas: React.FC = () => {
             currentModel,
             camera,
             width,
-            height
+            height,
+            isShaded
           );
           if (nearestFace !== null) {
             controller.selectFace(nearestFace);
@@ -846,7 +892,9 @@ export const ViewportCanvas: React.FC = () => {
         width,
         height,
         25,
-        visibleVertexIndices
+        visibleVertexIndices,
+        currentModel,
+        isShaded
       );
       if (nearestVertex !== null) {
         const activeVertex = controller
@@ -878,7 +926,10 @@ export const ViewportCanvas: React.FC = () => {
           currentModel.vertices,
           camera,
           width,
-          height
+          height,
+          20,
+          currentModel,
+          isShaded
         );
         if (nearestEdge) {
           controller.insertVertexOnEdge(nearestEdge[0], nearestEdge[1]);
@@ -926,7 +977,9 @@ export const ViewportCanvas: React.FC = () => {
         width,
         height,
         25,
-        visibleVertexIndices
+        visibleVertexIndices,
+        currentModel,
+        isShaded
       );
       if (nearestVertex !== null) {
         const activeVertex = controller

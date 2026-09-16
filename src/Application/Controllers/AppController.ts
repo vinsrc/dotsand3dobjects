@@ -546,7 +546,17 @@ export class AppController {
     if (!decal) {
       return false;
     }
-    return this.isFaceOrthographicViewOf(decal.parentFaceIndex);
+    if (this.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
+      return true;
+    }
+    if (this.cameraStateService.isOrthographic()) {
+      const cameraDir = this.cameraStateService
+        .getActiveStrategy()
+        .getViewDirection();
+      const dot = cameraDir.calculateDotProduct(decal.normal);
+      return dot > 0.99;
+    }
+    return false;
   }
 
   public selectDecal(id: string | null): boolean {
@@ -563,19 +573,39 @@ export class AppController {
   }
 
   public deleteSelectedDecal(): boolean {
-    if (!this.decalService.isDecalSelected()) {
-      return false;
+    if (this.decalService.isDecalSelected()) {
+      this.recordSnapshot();
+      return this.decalService.deleteDecal();
     }
-    this.recordSnapshot();
-    return this.decalService.deleteDecal();
+    if (this.cameraStateService.isFaceOrthographicView()) {
+      const activeFaceIndex = this.cameraStateService.getActiveFaceIndex();
+      if (activeFaceIndex !== null) {
+        const decalOnFace = this.decalService
+          .getDecals()
+          .find((d) => d.parentFaceIndex === activeFaceIndex);
+        if (decalOnFace) {
+          this.recordSnapshot();
+          this.decalService.selectDecal(decalOnFace.id);
+          return this.decalService.deleteDecal();
+        }
+      }
+    }
+    return false;
   }
 
   public addDecalPlaneToSelectedFace(): boolean {
     const selectedFaces = this.selectionService.getSelectedFaceIndices();
-    const targetFaceIndex =
+    let targetFaceIndex =
       selectedFaces.length > 0
         ? selectedFaces[0]
         : this.selectionService.getSelectedFaceIndex();
+
+    if (
+      (targetFaceIndex === null || targetFaceIndex === undefined) &&
+      this.cameraStateService.isFaceOrthographicView()
+    ) {
+      targetFaceIndex = this.cameraStateService.getActiveFaceIndex();
+    }
 
     if (targetFaceIndex === null || targetFaceIndex === undefined) {
       return false;
@@ -631,7 +661,17 @@ export class AppController {
   }
 
   public getSelectedFaceIndices(): readonly number[] {
-    return this.selectionService.getSelectedFaceIndices();
+    const selected = this.selectionService.getSelectedFaceIndices();
+    if (selected.length > 0) {
+      return selected;
+    }
+    if (this.cameraStateService.isFaceOrthographicView()) {
+      const activeFaceIndex = this.cameraStateService.getActiveFaceIndex();
+      if (activeFaceIndex !== null) {
+        return [activeFaceIndex];
+      }
+    }
+    return [];
   }
 
   public toggleRenderMode(): void {
@@ -640,19 +680,21 @@ export class AppController {
   }
 
   public selectOrthographicView(axisIdentifier: OrthographicAxis): void {
-    if (this.decalService.isDecalSelected()) {
+    const selectedDecal = this.getSelectedDecal();
+    this.cameraStateService.setOrthographicAxis(axisIdentifier);
+    if (selectedDecal && !this.canSelectDecal(selectedDecal.id)) {
       this.decalService.selectDecal(null);
     }
-    this.cameraStateService.setOrthographicAxis(axisIdentifier);
     this.stateNotifier.notify("VIEW_CHANGED");
   }
 
   public switchToClosestOrthographicView(): OrthographicAxis {
-    if (this.decalService.isDecalSelected()) {
-      this.decalService.selectDecal(null);
-    }
+    const selectedDecal = this.getSelectedDecal();
     const closestAxis =
       this.cameraStateService.switchToClosestOrthographicView();
+    if (selectedDecal && !this.canSelectDecal(selectedDecal.id)) {
+      this.decalService.selectDecal(null);
+    }
     this.stateNotifier.notify("VIEW_CHANGED");
     return closestAxis;
   }
@@ -732,47 +774,86 @@ export class AppController {
   }
 
   public getSelectedFaceIndex(): number | null {
-    return this.selectionService.getSelectedFaceIndex();
+    const selected = this.selectionService.getSelectedFaceIndex();
+    if (selected !== null) {
+      return selected;
+    }
+    if (this.cameraStateService.isFaceOrthographicView()) {
+      return this.cameraStateService.getActiveFaceIndex();
+    }
+    return null;
   }
 
   public isFaceOrthographicView(): boolean {
     return this.cameraStateService.isFaceOrthographicView();
   }
 
-  public setFaceFront(): boolean {
-    if (!this.cameraStateService.isFaceOrthographicView()) {
-      return false;
+  public flipFace(): boolean {
+    const selectedFaces = this.selectionService.getSelectedFaceIndices();
+    let targetFaces =
+      selectedFaces.length > 0
+        ? [...selectedFaces]
+        : this.selectionService.getSelectedFaceIndex() !== null
+        ? [this.selectionService.getSelectedFaceIndex() as number]
+        : [];
+
+    if (
+      targetFaces.length === 0 &&
+      this.cameraStateService.isFaceOrthographicView()
+    ) {
+      const activeFaceIndex = this.cameraStateService.getActiveFaceIndex();
+      if (activeFaceIndex !== null) {
+        targetFaces = [activeFaceIndex];
+      }
     }
 
-    const activeFaceIndex = this.cameraStateService.getActiveFaceIndex();
-    if (activeFaceIndex === null) {
+    if (targetFaces.length === 0) {
       return false;
     }
 
     const currentModel = this.modelService.getCurrentModel();
-    const targetFace = currentModel.faces[activeFaceIndex];
-    if (!targetFace) {
+    const validTargetFaces = targetFaces.filter(
+      (faceIndex) => faceIndex >= 0 && faceIndex < currentModel.faces.length
+    );
+
+    if (validTargetFaces.length === 0) {
       return false;
     }
 
     this.recordSnapshot();
 
-    const updatedModel = currentModel.reverseFaceWinding(activeFaceIndex);
+    const updatedModel = currentModel.reverseFacesWinding(validTargetFaces);
     this.modelService.setCurrentModel(updatedModel);
 
-    const updatedFace = updatedModel.faces[activeFaceIndex];
-    if (updatedFace) {
-      const newNormal = updatedFace.calculateNormal(updatedModel.vertices);
-      const faceCenter = updatedModel.calculateFaceCenter(activeFaceIndex);
-      this.cameraStateService.setFaceOrthographicView(
-        activeFaceIndex,
-        newNormal,
-        faceCenter
-      );
+    if (this.cameraStateService.isFaceOrthographicView()) {
+      const activeFaceIndex = this.cameraStateService.getActiveFaceIndex();
+      if (
+        activeFaceIndex !== null &&
+        validTargetFaces.includes(activeFaceIndex)
+      ) {
+        const updatedFace = updatedModel.faces[activeFaceIndex];
+        if (updatedFace) {
+          const newNormal = updatedFace.calculateNormal(updatedModel.vertices);
+          const faceCenter = updatedModel.calculateFaceCenter(activeFaceIndex);
+          this.cameraStateService.setFaceOrthographicView(
+            activeFaceIndex,
+            newNormal,
+            faceCenter
+          );
+        }
+      }
     }
 
     this.stateNotifier.notify("VIEW_CHANGED");
+    this.stateNotifier.notify("MODEL_CHANGED", updatedModel);
+    this.stateNotifier.notify("SELECTION_CHANGED", {
+      selectedFaceIndices: validTargetFaces,
+    });
     return true;
+  }
+
+  public flipSelectedFace(): boolean {
+    return this.flipFace();
   }
 
   public rotateCamera(deltaAzimuth: number, deltaElevation: number): void {

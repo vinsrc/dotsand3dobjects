@@ -1110,22 +1110,20 @@ describe("AppController", () => {
     expect(customizationService.getMaterialLibraryDock()).toBe("right");
   });
 
-  it("should re-order face vertices using setFaceFront in face orthographic view and support undo/redo", () => {
-    const { appController, modelService, cameraStateService } = createController();
-
-    // Not in face orthographic view returns false
-    expect(appController.isFaceOrthographicView()).toBe(false);
-    expect(appController.setFaceFront()).toBe(false);
+  it("should re-order face vertices using flipFace in face orthographic view and support undo/redo", () => {
+    const { appController, modelService } = createController();
 
     // Enter face orthographic view on Face 1 (Front: [4, 5, 6, 7])
     appController.setFaceOrthographicView(1);
     expect(appController.isFaceOrthographicView()).toBe(true);
+    expect(appController.getSelectedFaceIndex()).toBe(1);
+    expect(appController.getSelectedFaceIndices()).toEqual([1]);
 
     const initialFace1 = modelService.getCurrentModel().faces[1];
     expect(initialFace1?.vertexIndices).toEqual([4, 5, 6, 7]);
 
-    // Set face front re-orders vertices
-    const result = appController.setFaceFront();
+    // Flip face in face orthographic view
+    const result = appController.flipFace();
     expect(result).toBe(true);
 
     const updatedFace1 = modelService.getCurrentModel().faces[1];
@@ -1138,13 +1136,78 @@ describe("AppController", () => {
     // Redo re-applies [7, 6, 5, 4]
     appController.redo();
     expect(modelService.getCurrentModel().faces[1]?.vertexIndices).toEqual([7, 6, 5, 4]);
+  });
 
-    // When face index becomes invalid or target face is absent
-    vi.spyOn(cameraStateService, "getActiveFaceIndex").mockReturnValueOnce(999);
-    expect(appController.setFaceFront()).toBe(false);
+  it("should flip selected face vertices, invert normal, and support undo/redo and multi-select", () => {
+    const { appController, modelService, selectionService, cameraStateService } =
+      createController();
 
-    vi.spyOn(cameraStateService, "getActiveFaceIndex").mockReturnValueOnce(null);
-    expect(appController.setFaceFront()).toBe(false);
+    // No face selected -> flipFace returns false
+    expect(appController.flipFace()).toBe(false);
+    expect(appController.flipSelectedFace()).toBe(false);
+
+    // Select Face 1 (Front: vertices [4, 5, 6, 7])
+    appController.selectFace(1);
+    expect(selectionService.getSelectedFaceIndices()).toEqual([1]);
+
+    const initialModel = modelService.getCurrentModel();
+    const initialFace1 = initialModel.faces[1];
+    expect(initialFace1?.vertexIndices).toEqual([4, 5, 6, 7]);
+    const initialNormal = initialFace1!.calculateNormal(initialModel.vertices);
+    expect(initialNormal.coordinateZ).toBeCloseTo(1, 4);
+
+    // Flip face
+    const flipSuccess = appController.flipFace();
+    expect(flipSuccess).toBe(true);
+
+    const flippedModel = modelService.getCurrentModel();
+    const flippedFace1 = flippedModel.faces[1];
+    expect(flippedFace1?.vertexIndices).toEqual([7, 6, 5, 4]);
+    const flippedNormal = flippedFace1!.calculateNormal(flippedModel.vertices);
+    expect(flippedNormal.coordinateZ).toBeCloseTo(-1, 4);
+
+    // Undo reverts back to [4, 5, 6, 7]
+    appController.undo();
+    const undoneModel = modelService.getCurrentModel();
+    expect(undoneModel.faces[1]?.vertexIndices).toEqual([4, 5, 6, 7]);
+    expect(
+      undoneModel.faces[1]!.calculateNormal(undoneModel.vertices).coordinateZ
+    ).toBeCloseTo(1, 4);
+
+    // Redo re-applies [7, 6, 5, 4]
+    appController.redo();
+    const redoneModel = modelService.getCurrentModel();
+    expect(redoneModel.faces[1]?.vertexIndices).toEqual([7, 6, 5, 4]);
+    expect(
+      redoneModel.faces[1]!.calculateNormal(redoneModel.vertices).coordinateZ
+    ).toBeCloseTo(-1, 4);
+
+    // Test in Face Orthographic View
+    appController.setFaceOrthographicView(1);
+    expect(appController.isFaceOrthographicView()).toBe(true);
+
+    // Flip face while in face orthographic view updates the view normal
+    expect(appController.flipFace()).toBe(true);
+    expect(modelService.getCurrentModel().faces[1]?.vertexIndices).toEqual([
+      4, 5, 6, 7,
+    ]);
+
+    // Test multi-select flipping
+    appController.clearSelection();
+    appController.enterMode("MULTI_SELECT");
+    appController.selectFace(0);
+    appController.selectFace(1);
+    expect(selectionService.getSelectedFaceIndices()).toHaveLength(2);
+
+    const beforeMulti = modelService.getCurrentModel();
+    const f0Before = beforeMulti.faces[0]?.vertexIndices;
+    const f1Before = beforeMulti.faces[1]?.vertexIndices;
+
+    expect(appController.flipFace()).toBe(true);
+
+    const afterMulti = modelService.getCurrentModel();
+    expect(afterMulti.faces[0]?.vertexIndices).toEqual([...f0Before!].reverse());
+    expect(afterMulti.faces[1]?.vertexIndices).toEqual([...f1Before!].reverse());
   });
 
   it("should return isAutoConnectEnabled status correctly", () => {
@@ -2108,5 +2171,62 @@ describe("AppController", () => {
       expect(appController.getEditorModeService().getMode()).toBe("MULTI_SELECT");
     });
   });
+
+  describe("Decal & Face Orthographic Operations", () => {
+    it("should add decal plane to selected face and switch to face orthographic view", () => {
+      const { appController, decalService } = createController();
+
+      // Select face 1
+      appController.selectFace(1);
+      expect(appController.getSelectedFaceIndex()).toBe(1);
+
+      // Add decal plane
+      const added = appController.addDecalPlaneToSelectedFace();
+      expect(added).toBe(true);
+      expect(appController.isFaceOrthographicView()).toBe(true);
+      expect(decalService.isDecalSelected()).toBe(true);
+      expect(decalService.getDecals().length).toBe(1);
+
+      // In face orthographic view, getSelectedFaceIndex returns active face
+      expect(appController.getSelectedFaceIndex()).toBe(1);
+      expect(appController.getSelectedFaceIndices()).toEqual([1]);
+
+      // Delete selected decal
+      const deleted = appController.deleteSelectedDecal();
+      expect(deleted).toBe(true);
+      expect(decalService.getDecals().length).toBe(0);
+    });
+
+    it("should add decal plane directly while in face orthographic view without explicit face selection", () => {
+      const { appController, decalService } = createController();
+
+      appController.setFaceOrthographicView(1);
+      expect(appController.isFaceOrthographicView()).toBe(true);
+
+      const added = appController.addDecalPlaneToSelectedFace();
+      expect(added).toBe(true);
+      expect(decalService.getDecals().length).toBe(1);
+      expect(decalService.getDecals()[0]?.parentFaceIndex).toBe(1);
+    });
+
+    it("should allow selecting decal in orthographic view", () => {
+      const { appController, decalService } = createController();
+
+      appController.selectFace(1);
+      appController.addDecalPlaneToSelectedFace();
+      const decalId = decalService.getSelectedDecalId()!;
+
+      // Deselect decal
+      appController.selectDecal(null);
+      expect(decalService.isDecalSelected()).toBe(false);
+
+      // Select decal in orthographic view
+      appController.selectOrthographicView("+Z");
+      expect(appController.canSelectDecal(decalId)).toBe(true);
+      expect(appController.selectDecal(decalId)).toBe(true);
+      expect(decalService.isDecalSelected()).toBe(true);
+    });
+  });
 });
+
 
