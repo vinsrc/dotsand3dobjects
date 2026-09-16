@@ -35,7 +35,8 @@ export class DecalPlane {
     parentFaceIndex: number,
     faceVertices: readonly Vector3D[],
     sizeFraction: number = 0.6,
-    normalOffset: number = 0.005
+    normalOffset: number = 0.02,
+    explicitNormal?: Vector3D
   ): DecalPlane {
     if (faceVertices.length < 3) {
       throw new Error("Cannot create decal plane: face has fewer than 3 vertices");
@@ -56,23 +57,28 @@ export class DecalPlane {
       sumZ / faceVertices.length
     );
 
-    // Normal calculation via Newell's method
-    let normalX = 0;
-    let normalY = 0;
-    let normalZ = 0;
-    const vertexCount = faceVertices.length;
-    for (let index = 0; index < vertexCount; index += 1) {
-      const current = faceVertices[index] as Vector3D;
-      const next = faceVertices[(index + 1) % vertexCount] as Vector3D;
-      normalX += (current.coordinateY - next.coordinateY) * (current.coordinateZ + next.coordinateZ);
-      normalY += (current.coordinateZ - next.coordinateZ) * (current.coordinateX + next.coordinateX);
-      normalZ += (current.coordinateX - next.coordinateX) * (current.coordinateY + next.coordinateY);
+    let unitNormal: Vector3D;
+    if (explicitNormal && explicitNormal.calculateMagnitude() > 0.0001) {
+      unitNormal = explicitNormal.normalize();
+    } else {
+      // Normal calculation via Newell's method
+      let normalX = 0;
+      let normalY = 0;
+      let normalZ = 0;
+      const vertexCount = faceVertices.length;
+      for (let index = 0; index < vertexCount; index += 1) {
+        const current = faceVertices[index] as Vector3D;
+        const next = faceVertices[(index + 1) % vertexCount] as Vector3D;
+        normalX += (current.coordinateY - next.coordinateY) * (current.coordinateZ + next.coordinateZ);
+        normalY += (current.coordinateZ - next.coordinateZ) * (current.coordinateX + next.coordinateX);
+        normalZ += (current.coordinateX - next.coordinateX) * (current.coordinateY + next.coordinateY);
+      }
+      let faceNormal = new Vector3D(normalX, normalY, normalZ);
+      if (faceNormal.calculateMagnitude() < 0.0001) {
+        faceNormal = new Vector3D(0, 0, 1);
+      }
+      unitNormal = faceNormal.normalize();
     }
-    let faceNormal = new Vector3D(normalX, normalY, normalZ);
-    if (faceNormal.calculateMagnitude() < 0.0001) {
-      faceNormal = new Vector3D(0, 0, 1);
-    }
-    const unitNormal = faceNormal.normalize();
 
     // Determine scale from average distance to vertices
     let totalDist = 0;
@@ -94,7 +100,7 @@ export class DecalPlane {
     const unitBasisU = basisU.normalize();
     const unitBasisV = unitNormal.calculateCrossProduct(unitBasisU).normalize();
 
-    // Offset center slightly along normal to sit cleanly like a sticker
+    // Offset center slightly along normal to sit cleanly like a sticker above the face
     const stickerCenter = faceCenter.add(unitNormal.scaleBy(normalOffset));
 
     // Compute quad vertices
@@ -116,6 +122,31 @@ export class DecalPlane {
       0,
       [v0, v1, v2, v3],
       null
+    );
+  }
+
+  public flip(faceCenter: Vector3D, newNormal: Vector3D): DecalPlane {
+    const unitNewNormal = newNormal.normalize();
+    const currentDistance = Math.abs(
+      this.center.subtract(faceCenter).calculateDotProduct(this.normal)
+    );
+    const offsetDistance = currentDistance > 0.0001 ? currentDistance : 0.02;
+    const newCenter = faceCenter.add(unitNewNormal.scaleBy(offsetDistance));
+
+    const newV0 = newCenter.add(this.vertices[0].subtract(this.center));
+    const newV1 = newCenter.add(this.vertices[3].subtract(this.center));
+    const newV2 = newCenter.add(this.vertices[2].subtract(this.center));
+    const newV3 = newCenter.add(this.vertices[1].subtract(this.center));
+
+    return new DecalPlane(
+      this.id,
+      this.parentFaceIndex,
+      newCenter,
+      unitNewNormal,
+      this.size,
+      this.rotationAngle,
+      [newV0, newV1, newV2, newV3],
+      this.materialId
     );
   }
 

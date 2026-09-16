@@ -1467,7 +1467,7 @@ describe("AppController", () => {
       expect(appController.getDecals().length).toBe(0);
     });
 
-    it("should allow decal selection only in face orthographic view of its parent face", () => {
+    it("should allow decal selection in all views and retain selection when orbiting or switching views", () => {
       const { appController, cameraStateService } = createController();
       appController.selectFace(0);
       appController.addDecalPlaneToSelectedFace();
@@ -1475,28 +1475,67 @@ describe("AppController", () => {
 
       expect(appController.isFaceOrthographicViewOf(0)).toBe(true);
       expect(appController.canSelectDecal(decal.id)).toBe(true);
+      expect(appController.isDecalSelected()).toBe(true);
 
       // Switch to a different view (e.g. +X orthographic)
       appController.selectOrthographicView("+X");
-      expect(appController.isDecalSelected()).toBe(false);
-      expect(appController.canSelectDecal(decal.id)).toBe(false);
-
-      // Selecting decal while outside parent face orthographic view should fail
-      const selectResult = appController.selectDecal(decal.id);
-      expect(selectResult).toBe(false);
-      expect(appController.isDecalSelected()).toBe(false);
-
-      // Switch back to parent face orthographic view
-      appController.setFaceOrthographicView(0);
       expect(appController.canSelectDecal(decal.id)).toBe(true);
-      const selectResult2 = appController.selectDecal(decal.id);
-      expect(selectResult2).toBe(true);
       expect(appController.isDecalSelected()).toBe(true);
 
-      // Orbiting camera should auto-deselect decal
+      // Deselect decal and re-select it in +X orthographic view
+      appController.selectDecal(null);
+      expect(appController.isDecalSelected()).toBe(false);
+      const selectResult = appController.selectDecal(decal.id);
+      expect(selectResult).toBe(true);
+      expect(appController.isDecalSelected()).toBe(true);
+
+      // Orbiting camera to perspective view should retain decal selection
       appController.rotateCamera(0.2, 0.3);
       expect(cameraStateService.isOrthographic()).toBe(false);
+      expect(appController.isDecalSelected()).toBe(true);
+
+      // In perspective view, selecting decal should still succeed
+      appController.selectDecal(null);
+      expect(appController.selectDecal(decal.id)).toBe(true);
+      expect(appController.isDecalSelected()).toBe(true);
+    });
+
+    it("should support selectParentFace to switch selection from decal to parent face", () => {
+      const { appController } = createController();
+      expect(appController.selectParentFace()).toBe(false);
+
+      appController.selectFace(0);
+      appController.addDecalPlaneToSelectedFace();
+      expect(appController.isDecalSelected()).toBe(true);
+
+      const success = appController.selectParentFace();
+      expect(success).toBe(true);
       expect(appController.isDecalSelected()).toBe(false);
+      expect(appController.getSelectedFaceIndex()).toBe(0);
+    });
+
+    it("should allow switching selection between decal and faces in TRANSFORM mode", () => {
+      const { appController } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSFORM");
+
+      appController.selectFace(0);
+      expect(appController.getSelectedFaceIndex()).toBe(0);
+      expect(appController.isDecalSelected()).toBe(false);
+
+      appController.addDecalPlaneToSelectedFace();
+      const decal = appController.getSelectedDecal()!;
+      expect(appController.isDecalSelected()).toBe(true);
+
+      // In TRANSFORM mode, selecting a face directly deselects decal and selects the face
+      appController.selectFace(0);
+      expect(appController.getSelectedFaceIndex()).toBe(0);
+      expect(appController.isDecalSelected()).toBe(false);
+
+      // In TRANSFORM mode, selecting decal deselects face and selects decal
+      appController.selectDecal(decal.id);
+      expect(appController.isDecalSelected()).toBe(true);
+      expect(appController.getSelectionService().getSelectedFaceIndices().length).toBe(0);
     });
   });
 
@@ -2225,6 +2264,45 @@ describe("AppController", () => {
       expect(appController.canSelectDecal(decalId)).toBe(true);
       expect(appController.selectDecal(decalId)).toBe(true);
       expect(decalService.isDecalSelected()).toBe(true);
+    });
+
+    it("should flip face and also flip existing decals on that face", () => {
+      const { appController, decalService, modelService } = createController();
+
+      // Face 1 on starter cube has normal (0, 0, 1)
+      appController.selectFace(1);
+      appController.addDecalPlaneToSelectedFace();
+      const decal = decalService.getSelectedDecal()!;
+      expect(decal.normal.coordinateZ).toBeCloseTo(1, 4);
+      expect(decal.center.coordinateZ).toBeCloseTo(1.02, 4);
+
+      // Flip face 1
+      const flipped = appController.flipFace();
+      expect(flipped).toBe(true);
+
+      // Face 1 normal should now be (0, 0, -1)
+      const currentModel = modelService.getCurrentModel();
+      const face1 = currentModel.faces[1]!;
+      const faceNormal = face1.calculateNormal(currentModel.vertices);
+      expect(faceNormal.coordinateZ).toBeCloseTo(-1, 4);
+
+      // The decal on face 1 should also have flipped normal and center
+      const flippedDecal = decalService.getDecal(decal.id)!;
+      expect(flippedDecal.normal.coordinateZ).toBeCloseTo(-1, 4);
+      expect(flippedDecal.center.coordinateZ).toBeCloseTo(0.98, 4);
+    });
+
+    it("should allow selecting face after decal plane is added, deselecting the decal", () => {
+      const { appController, decalService } = createController();
+
+      appController.selectFace(1);
+      appController.addDecalPlaneToSelectedFace();
+      expect(decalService.isDecalSelected()).toBe(true);
+
+      // Select face 1 again
+      appController.selectFace(1);
+      expect(decalService.isDecalSelected()).toBe(false);
+      expect(appController.getSelectedFaceIndices()).toEqual([1]);
     });
   });
 });

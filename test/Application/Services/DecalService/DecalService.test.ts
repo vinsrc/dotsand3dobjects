@@ -169,4 +169,22 @@ describe("DecalService", () => {
     service.remapFaceIndicesAfterFaceDeletion(10);
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it("should flip decals for face and notify DECALS_CHANGED", () => {
+    const stateNotifier = new ApplicationStateNotifier();
+    const service = new DecalService(stateNotifier);
+    const decal = service.createDecalOnFace(0, quadVertices, new Vector3D(0, 0, 1));
+
+    const listener = vi.fn();
+    stateNotifier.subscribe("DECALS_CHANGED", listener);
+
+    const faceCenter = new Vector3D(0, 0, 1);
+    const newNormal = new Vector3D(0, 0, -1);
+    service.flipDecalsForFace(0, faceCenter, newNormal);
+
+    const updated = service.getDecal(decal.id);
+    expect(updated?.normal.coordinateZ).toBeCloseTo(-1, 4);
+    expect(updated?.center.coordinateZ).toBeCloseTo(0.98, 4);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
 });

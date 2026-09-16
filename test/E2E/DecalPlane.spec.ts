@@ -81,8 +81,8 @@ test.describe("Decal Plane Functional Tests", () => {
     expect(decalInfo.meshCount).toBe(1);
     expect(decalInfo.firstDecalId).not.toBeNull();
 
-    // Verify view switched to Face Orthographic (Set Front button is visible only in face orthographic view)
-    await expect(page.getByTestId("set-front-button")).toBeVisible();
+    // Verify Select Parent Face button is visible because decal is selected
+    await expect(page.getByTestId("select-parent-face-button")).toBeVisible();
 
     // Verify Clear Material button is visible because decal is selected
     await expect(page.getByTestId("clear-material-button")).toBeVisible();
@@ -172,7 +172,7 @@ test.describe("Decal Plane Functional Tests", () => {
     await expect(centerBtn).toBeDisabled();
   });
 
-  test("Decal plane selection constraint: touching decal in perspective view selects parent face, double tap switches to face ortho view where touching decal selects it", async ({
+  test("Decal plane selection in all views: can be selected in perspective view, shows Select Parent Face, hides Add Decal Plane, and supports selecting parent face", async ({
     page,
   }) => {
     await page.getByTestId("gizmo-axis-+Z").click();
@@ -192,34 +192,35 @@ test.describe("Decal Plane Functional Tests", () => {
     const decalX = (newCanvasBox?.x ?? 0) + (newCanvasBox?.width ?? 0) / 2;
     const decalY = (newCanvasBox?.y ?? 0) + (newCanvasBox?.height ?? 0) / 2;
 
+    // Decal is initially selected: Select Parent Face and Delete Decal Plane are visible, Add Decal Plane is hidden
+    await expect(page.getByTestId("select-parent-face-button")).toBeVisible();
+    await expect(page.getByTestId("delete-decal-plane-button")).toBeVisible();
+    await expect(page.getByTestId("add-decal-plane-button")).toHaveCount(0);
+
     // Drag on canvas to orbit and switch view to perspective (small drag to stay focused on face)
     await page.mouse.move(decalX, decalY);
     await page.mouse.down();
     await page.mouse.move(decalX + 15, decalY + 15);
     await page.mouse.up();
 
-    // Verify camera is no longer in face orthographic view
-    await expect(page.getByTestId("set-front-button")).toHaveCount(0);
-
-    // In perspective view, decal cannot be selected
-    await expect(page.getByTestId("delete-decal-plane-button")).toHaveCount(0);
-
-    // Single click on decal plane outside of parent face ortho view should select the parent face
-    await page.mouse.click(decalX, decalY);
-
-    // Parent face is selected: Add Decal Plane button appears, Delete Decal Plane does not
-    await expect(page.getByTestId("add-decal-plane-button")).toBeVisible();
-    await expect(page.getByTestId("delete-decal-plane-button")).toHaveCount(0);
-
-    // Click Nearest Orthographic View button to switch to face orthographic view of selected parent face
-    await page.getByTestId("nearest-ortho-view-button").click();
-    await expect(page.getByTestId("set-front-button")).toBeVisible();
-
-    await page.waitForTimeout(350);
-    // Now in face orthographic view, single-click selects the decal plane!
-    await page.mouse.click(decalX, decalY);
+    // Decal remains selected in perspective view: Select Parent Face and Delete Decal Plane are still visible
+    await expect(page.getByTestId("select-parent-face-button")).toBeVisible();
     await expect(page.getByTestId("delete-decal-plane-button")).toBeVisible();
-    await expect(page.getByTestId("clear-material-button")).toBeVisible();
+    await expect(page.getByTestId("add-decal-plane-button")).toHaveCount(0);
+
+    // Clicking Select Parent Face switches selection to parent face
+    await page.getByTestId("select-parent-face-button").click();
+
+    // Parent face is now selected: Add Decal Plane and Flip Face are visible, Select Parent Face is hidden
+    await expect(page.getByTestId("add-decal-plane-button")).toBeVisible();
+    await expect(page.getByTestId("flip-face-button")).toBeVisible();
+    await expect(page.getByTestId("select-parent-face-button")).toHaveCount(0);
+
+    // In perspective view, clicking on the decal plane selects the decal plane again!
+    await page.mouse.click(decalX, decalY);
+    await expect(page.getByTestId("select-parent-face-button")).toBeVisible();
+    await expect(page.getByTestId("delete-decal-plane-button")).toBeVisible();
+    await expect(page.getByTestId("add-decal-plane-button")).toHaveCount(0);
   });
 
   test("Decal plane can be adjusted using Rotate mode with 4 corner handles", async ({

@@ -104,6 +104,10 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     controller.deleteSelectedDecal();
   };
 
+  const handleSelectParentFace = () => {
+    controller.selectParentFace();
+  };
+
   const handleLoadClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -545,7 +549,22 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           justifyContent: "flex-end",
         }}
       >
-        {hasSelectedFace && (
+        {isDecalSelected && (
+          <button
+            data-testid="select-parent-face-button"
+            onClick={handleSelectParentFace}
+            title="Select Parent Face"
+            style={{
+              ...buttonStyle,
+              backgroundColor: ThemeColors.widget,
+              color: ThemeColors.textPrimary,
+            }}
+          >
+            Select Parent Face
+          </button>
+        )}
+
+        {hasSelectedFace && !isDecalSelected && (
           <button
             data-testid="flip-face-button"
             onClick={handleFlipFace}
@@ -560,7 +579,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           </button>
         )}
 
-        {hasSelectedFace && (
+        {hasSelectedFace && !isDecalSelected && (
           <button
             data-testid="add-decal-plane-button"
             onClick={handleAddDecalPlane}

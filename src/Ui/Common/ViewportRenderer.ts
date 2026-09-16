@@ -536,20 +536,23 @@ export class ViewportRenderer {
             roughness: 0.5,
             metalness: 0.0,
             transparent: true,
+            depthWrite: false,
             side: THREE.DoubleSide,
             polygonOffset: true,
-            polygonOffsetFactor: -2,
-            polygonOffsetUnits: -2,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4,
           });
         } else {
           quadMat = new THREE.MeshStandardMaterial({
             color: new THREE.Color(assignedMat.baseColor),
             roughness: assignedMat.roughness,
             metalness: assignedMat.metalness,
+            transparent: true,
+            depthWrite: false,
             side: THREE.DoubleSide,
             polygonOffset: true,
-            polygonOffsetFactor: -2,
-            polygonOffsetUnits: -2,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4,
           });
         }
       } else {
@@ -558,17 +561,18 @@ export class ViewportRenderer {
           color: isSelected ? 0xffaa00 : 0x2ecc71,
           transparent: true,
           opacity: isSelected ? 0.5 : 0.45,
+          depthWrite: false,
           side: THREE.DoubleSide,
           depthTest: true,
           polygonOffset: true,
-          polygonOffsetFactor: -2,
-          polygonOffsetUnits: -2,
+          polygonOffsetFactor: -4,
+          polygonOffsetUnits: -4,
         });
       }
 
       const quadMesh = new THREE.Mesh(quadGeo, quadMat);
       quadMesh.userData = { decalId: decal.id };
-      quadMesh.renderOrder = 3;
+      quadMesh.renderOrder = 5;
       this.decalGroup.add(quadMesh);
       this.decalMeshesList.push(quadMesh);
 
@@ -594,7 +598,7 @@ export class ViewportRenderer {
         depthTest: true,
       });
       const borderLine = new THREE.LineSegments(borderGeo, borderMat);
-      borderLine.renderOrder = 4;
+      borderLine.renderOrder = 6;
       this.decalGroup.add(borderLine);
     }
   }

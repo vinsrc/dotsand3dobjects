@@ -95,6 +95,7 @@ export const ViewportCanvas: React.FC = () => {
             const parentFace = currentModel.faces[decal.parentFaceIndex];
             if (
               parentFace &&
+              !controller.isFaceOrthographicViewOf(decal.parentFaceIndex) &&
               !raycasterRef.current
                 .getOcclusionChecker()
                 .isFaceFacingCamera(parentFace, currentModel, camera)
@@ -752,14 +753,7 @@ export const ViewportCanvas: React.FC = () => {
       if (!decal) {
         return false;
       }
-      if (
-        controller.isFaceOrthographicViewOf(decal.parentFaceIndex) ||
-        controller.getCameraStateService().isOrthographic()
-      ) {
-        controller.selectDecal(decalId);
-      } else {
-        controller.selectFace(decal.parentFaceIndex);
-      }
+      controller.selectDecal(decalId);
       return true;
     };
 
@@ -784,6 +778,22 @@ export const ViewportCanvas: React.FC = () => {
         if (nearestFace !== null) {
           controller.selectFace(nearestFace);
         }
+      }
+      return;
+    }
+
+    if (mode === "TRANSFORM" || mode === "ROTATE" || mode === "SCALE") {
+      const nearestFace = raycasterRef.current.findNearestFace(
+        clickX,
+        clickY,
+        currentModel,
+        camera,
+        width,
+        height,
+        isShaded
+      );
+      if (nearestFace !== null) {
+        controller.selectFace(nearestFace);
       }
       return;
     }

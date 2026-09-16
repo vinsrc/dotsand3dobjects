@@ -118,4 +118,39 @@ describe("DecalPlane", () => {
     expect(decal.parentFaceIndex).toBe(3);
     expect(updated.id).toBe(decal.id);
   });
+
+  it("should flip decal plane when parent face is flipped", () => {
+    const decal = DecalPlane.createFromFace(
+      "decal_flip",
+      0,
+      quadVertices,
+      0.6,
+      0.02,
+      new Vector3D(0, 0, 1)
+    );
+    expect(decal.normal.coordinateZ).toBeCloseTo(1, 4);
+    expect(decal.center.coordinateZ).toBeCloseTo(1.02, 4);
+
+    const faceCenter = new Vector3D(0, 0, 1);
+    const newNormal = new Vector3D(0, 0, -1);
+    const flipped = decal.flip(faceCenter, newNormal);
+
+    expect(flipped.normal.coordinateZ).toBeCloseTo(-1, 4);
+    expect(flipped.center.coordinateZ).toBeCloseTo(0.98, 4);
+    expect(flipped.id).toBe(decal.id);
+    expect(flipped.parentFaceIndex).toBe(decal.parentFaceIndex);
+  });
+
+  it("should accept explicitNormal during createFromFace", () => {
+    const decal = DecalPlane.createFromFace(
+      "decal_exp",
+      1,
+      quadVertices,
+      0.6,
+      0.02,
+      new Vector3D(0, 1, 0)
+    );
+    expect(decal.normal.coordinateY).toBeCloseTo(1, 4);
+    expect(decal.normal.coordinateZ).toBeCloseTo(0, 4);
+  });
 });

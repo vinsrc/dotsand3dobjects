@@ -17,14 +17,18 @@ export class DecalService {
 
   public createDecalOnFace(
     parentFaceIndex: number,
-    faceVertices: readonly Vector3D[]
+    faceVertices: readonly Vector3D[],
+    explicitNormal?: Vector3D
   ): DecalPlane {
     this.idCounter += 1;
     const decalId = `decal_${this.idCounter}`;
     const newDecal = DecalPlane.createFromFace(
       decalId,
       parentFaceIndex,
-      faceVertices
+      faceVertices,
+      0.6,
+      0.02,
+      explicitNormal
     );
 
     this.decalsMap.set(decalId, newDecal);
@@ -91,6 +95,24 @@ export class DecalService {
         if (this.selectedDecalId === id) {
           this.selectedDecalId = null;
         }
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.notifyDecalsChanged();
+    }
+  }
+
+  public flipDecalsForFace(
+    faceIndex: number,
+    faceCenter: Vector3D,
+    newNormal: Vector3D
+  ): void {
+    let changed = false;
+    for (const [id, decal] of Array.from(this.decalsMap.entries())) {
+      if (decal.isChildOfFace(faceIndex)) {
+        const flippedDecal = decal.flip(faceCenter, newNormal);
+        this.decalsMap.set(id, flippedDecal);
         changed = true;
       }
     }

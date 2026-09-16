@@ -543,20 +543,7 @@ export class AppController {
 
   public canSelectDecal(decalId: string): boolean {
     const decal = this.decalService.getDecal(decalId);
-    if (!decal) {
-      return false;
-    }
-    if (this.isFaceOrthographicViewOf(decal.parentFaceIndex)) {
-      return true;
-    }
-    if (this.cameraStateService.isOrthographic()) {
-      const cameraDir = this.cameraStateService
-        .getActiveStrategy()
-        .getViewDirection();
-      const dot = cameraDir.calculateDotProduct(decal.normal);
-      return dot > 0.99;
-    }
-    return false;
+    return decal !== null && decal !== undefined;
   }
 
   public selectDecal(id: string | null): boolean {
@@ -569,6 +556,16 @@ export class AppController {
     }
     this.selectionService.clearSelection();
     this.decalService.selectDecal(id);
+    return true;
+  }
+
+  public selectParentFace(): boolean {
+    const selectedDecal = this.decalService.getSelectedDecal();
+    if (!selectedDecal) {
+      return false;
+    }
+    const parentFaceIndex = selectedDecal.parentFaceIndex;
+    this.selectFace(parentFaceIndex);
     return true;
   }
 
@@ -625,15 +622,16 @@ export class AppController {
     }
 
     this.recordSnapshot();
+    const faceNormal = face.calculateNormal(currentModel.vertices);
+    const faceCenter = currentModel.calculateFaceCenter(targetFaceIndex);
     const newDecal = this.decalService.createDecalOnFace(
       targetFaceIndex,
-      faceVertices
+      faceVertices,
+      faceNormal
     );
     this.selectionService.clearSelection();
 
     // Switch to face orthographic view so decal can be selected and manipulated
-    const faceNormal = face.calculateNormal(currentModel.vertices);
-    const faceCenter = currentModel.calculateFaceCenter(targetFaceIndex);
     this.cameraStateService.setFaceOrthographicView(
       targetFaceIndex,
       faceNormal,
@@ -825,6 +823,15 @@ export class AppController {
     const updatedModel = currentModel.reverseFacesWinding(validTargetFaces);
     this.modelService.setCurrentModel(updatedModel);
 
+    for (const faceIndex of validTargetFaces) {
+      const face = updatedModel.faces[faceIndex];
+      if (face) {
+        const newNormal = face.calculateNormal(updatedModel.vertices);
+        const faceCenter = updatedModel.calculateFaceCenter(faceIndex);
+        this.decalService.flipDecalsForFace(faceIndex, faceCenter, newNormal);
+      }
+    }
+
     if (this.cameraStateService.isFaceOrthographicView()) {
       const activeFaceIndex = this.cameraStateService.getActiveFaceIndex();
       if (
@@ -857,9 +864,6 @@ export class AppController {
   }
 
   public rotateCamera(deltaAzimuth: number, deltaElevation: number): void {
-    if (this.decalService.isDecalSelected()) {
-      this.decalService.selectDecal(null);
-    }
     if (this.editorModeService.isOrthographicRequired()) {
       this.finishMode();
     }

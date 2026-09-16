@@ -39,3 +39,7 @@ The Transform overlay and dimension dialog unmount immediately when the camera l
 * when the view is shaded (not wireframe), only allow selection of face, vertex, edge that is visible to the user.  the user can switch to wireframe is he wants to selects whats behind.
 
 * Display FRONT and BACK on the polygon instead of vector.  only when polygon is selected
+
+* previously we had constraint that decal plane is only selectable in Orthographic mode. its highly unintuitive. make it selectable in all mode.  its a face for us . thats all. 
+
+* this is actually becoming unintuitive to select decal planes or delete it only in orthographic view. the only issue if we allow decal plane selection in perspective is if decal plane is fully covering the face and the user cant select the face.  Allow selecting decal planes in all views and if a decal plane is selected add a "Select Parent Face" button in the top tool bar before Flip Face.  on clicking the button it should selected the parent face instead. if current selection is a decal plane, then Add Decal plane button should not be visible, we dont support adding decal plane to a decal plane.
