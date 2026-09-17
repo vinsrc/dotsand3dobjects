@@ -2305,6 +2305,133 @@ describe("AppController", () => {
       expect(appController.getSelectedFaceIndices()).toEqual([1]);
     });
   });
+
+  describe("Move vertex with Clone and Edge Selection", () => {
+    it("should toggle cloneEnabled via appController", () => {
+      const { appController } = createController();
+      expect(appController.isCloneEnabled()).toBe(false);
+
+      appController.toggleClone();
+      expect(appController.isCloneEnabled()).toBe(true);
+
+      appController.toggleClone();
+      expect(appController.isCloneEnabled()).toBe(false);
+    });
+
+    it("should clone and move vertex without connecting edge when clone is ON and auto-connect is OFF", () => {
+      const { appController, modelService, selectionService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSLATE");
+
+      // Select vertex 0
+      selectionService.selectSingle(0);
+      const originalVertex = modelService.getCurrentModel().vertices[0]!;
+      const originalCount = modelService.getCurrentModel().vertices.length;
+
+      // Enable clone, ensure auto-connect is OFF
+      appController.toggleClone();
+      expect(appController.isCloneEnabled()).toBe(true);
+      if (appController.isAutoConnectEnabled()) {
+        appController.toggleAutoConnect();
+      }
+
+      appController.beginTranslation();
+      appController.applyDragTranslation(new Vector3D(1, 0, 0));
+
+      const updatedModel = modelService.getCurrentModel();
+      // Should have created one new vertex
+      expect(updatedModel.vertices.length).toBe(originalCount + 1);
+      // Original vertex 0 remains unchanged
+      expect(updatedModel.vertices[0]!.equals(originalVertex)).toBe(true);
+      // Cloned vertex (index originalCount) was translated
+      const clonedVertex = updatedModel.vertices[originalCount]!;
+      expect(clonedVertex.coordinateX).toBeCloseTo(originalVertex.coordinateX + 1, 4);
+      // Selection should now be the cloned vertex
+      expect(selectionService.getSelectedIndices()).toEqual([originalCount]);
+      // No new explicit edge was created
+      expect(updatedModel.explicitEdges.length).toBe(0);
+
+      // Subsequent drag in same session moves the clone, does not create another clone
+      appController.applyDragTranslation(new Vector3D(2, 0, 0));
+      expect(modelService.getCurrentModel().vertices.length).toBe(originalCount + 1);
+
+      appController.endTranslation();
+
+      // Undo should revert the clone and move
+      appController.undo();
+      expect(modelService.getCurrentModel().vertices.length).toBe(originalCount);
+      expect(selectionService.getSelectedIndices()).toEqual([0]);
+    });
+
+    it("should clone and move vertex with connecting edge when clone is ON and auto-connect is ON", () => {
+      const { appController, modelService, selectionService } = createController();
+      appController.selectOrthographicView("+Z");
+      appController.enterMode("TRANSLATE");
+
+      // Select vertex 0
+      selectionService.selectSingle(0);
+      const originalVertex = modelService.getCurrentModel().vertices[0]!;
+      const originalCount = modelService.getCurrentModel().vertices.length;
+
+      // Enable clone and enable auto-connect
+      appController.toggleClone();
+      if (!appController.isAutoConnectEnabled()) {
+        appController.toggleAutoConnect();
+      }
+      expect(appController.isCloneEnabled()).toBe(true);
+      expect(appController.isAutoConnectEnabled()).toBe(true);
+
+      appController.beginTranslation();
+      appController.applyDragTranslation(new Vector3D(1, 1, 0));
+
+      const updatedModel = modelService.getCurrentModel();
+      expect(updatedModel.vertices.length).toBe(originalCount + 1);
+      // Original vertex 0 intact
+      expect(updatedModel.vertices[0]!.equals(originalVertex)).toBe(true);
+      // Cloned vertex translated
+      const clonedVertex = updatedModel.vertices[originalCount]!;
+      expect(clonedVertex.coordinateX).toBeCloseTo(originalVertex.coordinateX + 1, 4);
+      expect(clonedVertex.coordinateY).toBeCloseTo(originalVertex.coordinateY + 1, 4);
+
+      // Connecting edge between original (0) and clone (originalCount)
+      expect(updatedModel.explicitEdges).toContainEqual([0, originalCount]);
+
+      appController.endTranslation();
+
+      // Undo reverts both vertex and edge
+      appController.undo();
+      expect(modelService.getCurrentModel().vertices.length).toBe(originalCount);
+      expect(modelService.getCurrentModel().explicitEdges.length).toBe(0);
+    });
+
+    it("should ensure deleteSelectedEdges only deletes the edge and leaves selected vertices intact", () => {
+      const { appController, modelService, selectionService } = createController();
+      const currentModel = modelService.getCurrentModel();
+
+      // Add a standalone explicit edge [0, 6]
+      modelService.setCurrentModel(
+        new MeshGeometry(currentModel.vertices, currentModel.faces, [[0, 6]])
+      );
+
+      // Selecting the edge also selects its vertices [0, 6]
+      appController.selectEdge([0, 6]);
+      expect(appController.getSelectedEdges()).toEqual([[0, 6]]);
+      expect(selectionService.getSelectedIndices()).toEqual([0, 6]);
+
+      const vertexCountBefore = modelService.getCurrentModel().vertices.length;
+      const success = appController.deleteSelectedEdges();
+      expect(success).toBe(true);
+
+      const modelAfter = modelService.getCurrentModel();
+      // Edge is deleted
+      expect(modelAfter.explicitEdges.length).toBe(0);
+      // All vertices remain intact!
+      expect(modelAfter.vertices.length).toBe(vertexCountBefore);
+      // Selection cleared
+      expect(selectionService.getSelectedIndices()).toEqual([]);
+      expect(appController.getSelectedEdges()).toEqual([]);
+    });
+  });
 });
 
 

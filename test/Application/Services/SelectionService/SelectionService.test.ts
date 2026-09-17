@@ -211,11 +211,12 @@ describe("SelectionService", () => {
     expect(service.isEdgeSelected([0, 1])).toBe(true);
     expect(service.isEdgeSelected([1, 0])).toBe(true);
     expect(service.isEdgeSelected([1, 2])).toBe(false);
-    expect(service.getSelectedIndices()).toEqual([]);
+    expect(service.getSelectedIndices()).toEqual([0, 1]);
+    expect(service.getActiveVertex()).toBe(1);
     expect(service.getSelectedFaceIndex()).toBeNull();
     expect(listener).toHaveBeenCalledWith({
-      selectedIndices: [],
-      activeVertexIndex: null,
+      selectedIndices: [0, 1],
+      activeVertexIndex: 1,
       selectedFaceIndex: null,
       selectedFaceIndices: [],
       selectedEdges: [[0, 1]],
@@ -224,6 +225,8 @@ describe("SelectionService", () => {
     // Second click on the same edge deselects it
     service.selectEdge([1, 0]);
     expect(service.getSelectedEdges()).toEqual([]);
+    expect(service.getSelectedIndices()).toEqual([]);
+    expect(service.getActiveVertex()).toBeNull();
   });
 
   it("should toggle edge selection in multi-select mode", () => {
@@ -232,19 +235,23 @@ describe("SelectionService", () => {
 
     service.toggleEdgeSelection([0, 1]);
     expect(service.getSelectedEdges()).toEqual([[0, 1]]);
+    expect(service.getSelectedIndices()).toEqual([0, 1]);
 
     service.toggleEdgeSelection([2, 3]);
     expect(service.getSelectedEdges().length).toBe(2);
     expect(service.isEdgeSelected([0, 1])).toBe(true);
     expect(service.isEdgeSelected([2, 3])).toBe(true);
+    expect(service.getSelectedIndices()).toEqual([0, 1, 2, 3]);
 
     // Toggle off [0, 1]
     service.toggleEdgeSelection([1, 0]);
     expect(service.getSelectedEdges()).toEqual([[2, 3]]);
+    expect(service.getSelectedIndices()).toEqual([2, 3]);
 
     // Clear selection clears edges
     service.clearSelection();
     expect(service.getSelectedEdges()).toEqual([]);
+    expect(service.getSelectedIndices()).toEqual([]);
   });
 
   it("should restore edge selection", () => {

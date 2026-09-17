@@ -168,4 +168,42 @@ describe("EditorModeService", () => {
     service.setMode("TRANSFORM", true);
     expect(service.isOrthographicRequired()).toBe(true);
   });
+
+  it("should support toggling and setting cloneEnabled and reset on mode exit", () => {
+    const notifier = new ApplicationStateNotifier();
+    const cloneListener = vi.fn();
+    notifier.subscribe("CLONE_CHANGED", cloneListener);
+
+    const service = new EditorModeService(notifier);
+    expect(service.isCloneEnabled()).toBe(false);
+
+    service.toggleClone();
+    expect(service.isCloneEnabled()).toBe(true);
+    expect(cloneListener).toHaveBeenCalledWith(true);
+
+    service.setCloneEnabled(false);
+    expect(service.isCloneEnabled()).toBe(false);
+    expect(cloneListener).toHaveBeenCalledWith(false);
+
+    // Setting same value should not emit notification
+    cloneListener.mockClear();
+    service.setCloneEnabled(false);
+    expect(cloneListener).not.toHaveBeenCalled();
+
+    // In TRANSLATE mode, toggle clone ON
+    service.setMode("TRANSLATE", true);
+    service.toggleClone();
+    expect(service.isCloneEnabled()).toBe(true);
+
+    // Switching to another mode should reset clone to false
+    service.setMode("MULTI_SELECT", true);
+    expect(service.isCloneEnabled()).toBe(false);
+
+    // Re-enable clone, then finishMode should reset it
+    service.setMode("TRANSLATE", true);
+    service.setCloneEnabled(true);
+    expect(service.isCloneEnabled()).toBe(true);
+    service.finishMode();
+    expect(service.isCloneEnabled()).toBe(false);
+  });
 });

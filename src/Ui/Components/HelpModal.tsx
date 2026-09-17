@@ -124,7 +124,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
             <li><strong>Multi-Select</strong>: Toggle selection of multiple vertices and faces.</li>
             <li><strong>Move Vertex</strong>: Move selected vertices on orthographic grid.</li>
             <li><strong>Transform</strong>: Rotate, scale, or move mesh or selected decal plane in orthographic view using handles.</li>
-            <li><strong>Insert</strong>: Add vertices on grid or split edges.</li>
+            <li><strong>New Vertex</strong>: Add vertices on grid or split edges.</li>
             <li><strong>Draw Edge</strong>: Connect vertices with edges.</li>
           </ul>
         </div>

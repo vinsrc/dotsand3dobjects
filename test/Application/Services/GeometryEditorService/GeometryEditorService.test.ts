@@ -183,6 +183,29 @@ describe("GeometryEditorService", () => {
     expect(modelService.getCurrentModel().getWireframeEdges().length).toBe(1);
   });
 
+  it("should automatically split face into two when connecting vertices cuts across face", () => {
+    const { modelService, editorService } = setupService();
+    const vertices = [
+      new Vector3D(0, 0, 0),
+      new Vector3D(1, 0, 0),
+      new Vector3D(1, 1, 0),
+      new Vector3D(0, 1, 0),
+    ];
+    const quad = new Face3D([0, 1, 2, 3], "test_mat");
+    modelService.setCurrentModel(new MeshGeometry(vertices, [quad]));
+
+    expect(modelService.getCurrentModel().faces.length).toBe(1);
+
+    editorService.connectVertices(0, 2);
+
+    const updatedModel = modelService.getCurrentModel();
+    expect(updatedModel.faces.length).toBe(2);
+    expect(updatedModel.faces[0]?.vertexIndices).toEqual([0, 1, 2]);
+    expect(updatedModel.faces[1]?.vertexIndices).toEqual([2, 3, 0]);
+    expect(updatedModel.faces[0]?.materialId).toBe("test_mat");
+    expect(updatedModel.faces[1]?.materialId).toBe("test_mat");
+  });
+
   it("should ignore connecting invalid vertex indices", () => {
     const { modelService, editorService } = setupService();
     const initialEdges = modelService.getCurrentModel().getWireframeEdges().length;

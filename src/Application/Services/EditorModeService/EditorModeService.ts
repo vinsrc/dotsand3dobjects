@@ -15,12 +15,14 @@ export class EditorModeService {
   private currentMode: UiMode;
   private autoConnectEnabled: boolean;
   private gridSnapEnabled: boolean;
+  private cloneEnabled: boolean;
 
   public constructor(stateNotifier: ApplicationStateNotifier) {
     this.stateNotifier = stateNotifier;
     this.currentMode = "DEFAULT";
     this.autoConnectEnabled = false;
     this.gridSnapEnabled = true;
+    this.cloneEnabled = false;
   }
 
   public getMode(): UiMode {
@@ -45,14 +47,38 @@ export class EditorModeService {
       return false;
     }
 
+    if (targetMode !== "TRANSLATE" && this.cloneEnabled) {
+      this.cloneEnabled = false;
+      this.stateNotifier.notify("CLONE_CHANGED", this.cloneEnabled);
+    }
+
     this.currentMode = targetMode;
     this.stateNotifier.notify("MODE_CHANGED", this.currentMode);
     return true;
   }
 
   public finishMode(): void {
+    if (this.cloneEnabled) {
+      this.cloneEnabled = false;
+      this.stateNotifier.notify("CLONE_CHANGED", this.cloneEnabled);
+    }
     this.currentMode = "DEFAULT";
     this.stateNotifier.notify("MODE_CHANGED", this.currentMode);
+  }
+
+  public isCloneEnabled(): boolean {
+    return this.cloneEnabled;
+  }
+
+  public setCloneEnabled(enabled: boolean): void {
+    if (this.cloneEnabled !== enabled) {
+      this.cloneEnabled = enabled;
+      this.stateNotifier.notify("CLONE_CHANGED", this.cloneEnabled);
+    }
+  }
+
+  public toggleClone(): void {
+    this.setCloneEnabled(!this.cloneEnabled);
   }
 
   public isAutoConnectEnabled(): boolean {

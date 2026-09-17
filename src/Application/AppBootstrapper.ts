@@ -11,6 +11,8 @@ import { RenderModeService } from "./Services/RenderModeService/RenderModeServic
 import { EditorModeService } from "./Services/EditorModeService/EditorModeService";
 import { SelectionService } from "./Services/SelectionService/SelectionService";
 import { GeometryEditorService } from "./Services/GeometryEditorService/GeometryEditorService";
+import { FaceSplitter } from "./Services/GeometryEditorService/FaceSplitter";
+import { VertexCloner } from "./Services/GeometryEditorService/VertexCloner";
 import { GeometryTransformService } from "./Services/GeometryTransformService/GeometryTransformService";
 import { UndoRedoService } from "./Services/UndoRedoService/UndoRedoService";
 import { AppController } from "./Controllers/AppController";
@@ -69,9 +71,11 @@ export class AppBootstrapper {
 
     const editorModeService = new EditorModeService(stateNotifier);
     const selectionService = new SelectionService(stateNotifier);
+    const faceSplitter = new FaceSplitter();
     const geometryEditorService = new GeometryEditorService(
       modelService,
-      selectionService
+      selectionService,
+      faceSplitter
     );
     const geometryTransformService = new GeometryTransformService(
       modelService,
@@ -101,6 +105,7 @@ export class AppBootstrapper {
       decalService
     );
 
+    const vertexCloner = new VertexCloner();
     const appController = new AppController(
       modelService,
       cameraStateService,
@@ -117,7 +122,8 @@ export class AppBootstrapper {
       zipExportService,
       dataUrlConverter,
       zipImportService,
-      vertexMergeService
+      vertexMergeService,
+      vertexCloner
     );
 
     const keyboardShortcutService = new KeyboardShortcutService(appController);

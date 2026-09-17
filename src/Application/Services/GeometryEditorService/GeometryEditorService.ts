@@ -4,17 +4,21 @@ import { MeshGeometry } from "../ModelService/MeshGeometry";
 import { ModelService } from "../ModelService/ModelService";
 import { SelectionService } from "../SelectionService/SelectionService";
 import { GridPlaneType } from "../CameraService/ViewStrategy";
+import { FaceSplitter } from "./FaceSplitter";
 
 export class GeometryEditorService {
   private readonly modelService: ModelService;
   private readonly selectionService: SelectionService;
+  private readonly faceSplitter: FaceSplitter;
 
   public constructor(
     modelService: ModelService,
-    selectionService: SelectionService
+    selectionService: SelectionService,
+    faceSplitter: FaceSplitter = new FaceSplitter()
   ) {
     this.modelService = modelService;
     this.selectionService = selectionService;
+    this.faceSplitter = faceSplitter;
   }
 
   public snapToGrid(worldPosition: Vector3D, gridSize: number = 0.25): Vector3D {
@@ -270,14 +274,22 @@ export class GeometryEditorService {
           Math.max(firstEdgeVertex, secondEdgeVertex) === higher
       );
 
-    if (!alreadyExists) {
-      const updatedExplicitEdges: [number, number][] = [
-        ...currentModel.explicitEdges,
-        [firstVertexIndex, secondVertexIndex],
-      ];
+    const splitResult = this.faceSplitter.splitFacesByEdge(
+      currentModel.faces,
+      firstVertexIndex,
+      secondVertexIndex
+    );
+
+    if (splitResult.wasSplit || !alreadyExists) {
+      const updatedExplicitEdges: [number, number][] = alreadyExists
+        ? [...currentModel.explicitEdges]
+        : [
+            ...currentModel.explicitEdges,
+            [firstVertexIndex, secondVertexIndex],
+          ];
       const updatedModel = new MeshGeometry(
         currentModel.vertices,
-        currentModel.faces,
+        splitResult.wasSplit ? splitResult.faces : currentModel.faces,
         updatedExplicitEdges
       );
       this.modelService.setCurrentModel(updatedModel);

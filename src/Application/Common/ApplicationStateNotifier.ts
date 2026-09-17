@@ -11,7 +11,8 @@ export type StateEventType =
   | "MATERIAL_PANEL_CHANGED"
   | "MATERIALS_CHANGED"
   | "UI_CUSTOMIZATION_CHANGED"
-  | "DECALS_CHANGED";
+  | "DECALS_CHANGED"
+  | "CLONE_CHANGED";
 
 export type StateListenerCallback = (payload?: unknown) => void;
 export type UnsubscribeCallback = () => void;

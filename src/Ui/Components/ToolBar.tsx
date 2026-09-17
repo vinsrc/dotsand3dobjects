@@ -26,6 +26,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     "DECALS_CHANGED",
     "GRID_SNAP_CHANGED",
     "UNDO_REDO_STATE_CHANGED",
+    "CLONE_CHANGED",
   ]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,6 +38,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
   const isPerspectiveView = !controller.getCameraStateService().isOrthographic();
   const currentMode = controller.getEditorModeService().getMode();
   const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
+  const isClone = controller.isCloneEnabled();
   const isGridSnap = controller.isGridSnapEnabled();
   const canUndo = controller.canUndo();
   const canRedo = controller.canRedo();
@@ -304,6 +306,10 @@ export const ToolBar: React.FC<ToolBarProps> = ({
 
   const handleToggleAutoConnect = () => {
     controller.toggleAutoConnect();
+  };
+
+  const handleToggleClone = () => {
+    controller.toggleClone();
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -640,6 +646,41 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           >
             {isAutoConnect ? "Auto Connect: ON" : "Auto Connect: OFF"}
           </button>
+        )}
+
+        {currentMode === "TRANSLATE" && (
+          <>
+            <button
+              data-testid="clone-toggle-button"
+              onClick={handleToggleClone}
+              style={{
+                ...buttonStyle,
+                backgroundColor: isClone ? ThemeColors.success : ThemeColors.widget,
+                color: isClone ? "#ffffff" : ThemeColors.textPrimary,
+                borderColor: isClone
+                  ? ThemeColors.successBorder
+                  : ThemeColors.borderStrong,
+              }}
+            >
+              {isClone ? "Clone: ON" : "Clone: OFF"}
+            </button>
+            {isClone && (
+              <button
+                data-testid="clone-auto-connect-button"
+                onClick={handleToggleAutoConnect}
+                style={{
+                  ...buttonStyle,
+                  backgroundColor: isAutoConnect ? ThemeColors.success : ThemeColors.widget,
+                  color: isAutoConnect ? "#ffffff" : ThemeColors.textPrimary,
+                  borderColor: isAutoConnect
+                    ? ThemeColors.successBorder
+                    : ThemeColors.borderStrong,
+                }}
+              >
+                {isAutoConnect ? "Auto Connect: ON" : "Auto Connect: OFF"}
+              </button>
+            )}
+          </>
         )}
 
       </div>

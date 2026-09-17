@@ -157,6 +157,7 @@ export const SideToolBar: React.FC = () => {
         data-testid="mode-insert-button"
         onClick={() => handleEnterMode("INSERT")}
         disabled={isDecalSelected}
+        title="New Vertex"
         style={
           isDecalSelected
             ? disabledButtonStyle
@@ -165,7 +166,7 @@ export const SideToolBar: React.FC = () => {
             : buttonStyle
         }
       >
-        Insert
+        New Vertex
       </button>
 
       <button

@@ -43,3 +43,11 @@ The Transform overlay and dimension dialog unmount immediately when the camera l
 * previously we had constraint that decal plane is only selectable in Orthographic mode. its highly unintuitive. make it selectable in all mode.  its a face for us . thats all. 
 
 * this is actually becoming unintuitive to select decal planes or delete it only in orthographic view. the only issue if we allow decal plane selection in perspective is if decal plane is fully covering the face and the user cant select the face.  Allow selecting decal planes in all views and if a decal plane is selected add a "Select Parent Face" button in the top tool bar before Flip Face.  on clicking the button it should selected the parent face instead. if current selection is a decal plane, then Add Decal plane button should not be visible, we dont support adding decal plane to a decal plane.
+
+* Rename Insert Vertex to New Vertex.
+
+* when face is selected, the vertex that make up wht face are also selected. but when edge is selected, the vertex that make the edge is not selected.  the vertices of the edge needs to be selected too.
+
+* Split faces in to two automatically if an edge is added that cuts them into two pieces.
+
+* Move vertex with Clone - on clicking move vertex, there should a context specific button on the top right bar called "Clone".  when the user toggles clone, and then starts moving the vertex, a new vertex is created from the existing vertex and then the new vertex is moved. its more like extrude. When Clone is toggled on,  show Auto Connect button next to Clone button, if Auto Connect is ON, then connect the new and old vertex with edge when the user moves the vertex.

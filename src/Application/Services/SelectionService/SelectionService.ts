@@ -47,9 +47,11 @@ export class SelectionService {
     this.selectedFaceIndex = null;
     this.selectedFaceIndicesSet.clear();
     this.selectedIndicesSet.clear();
-    this.activeVertexIndex = null;
     this.selectedEdgesSet.clear();
     this.selectedEdgesSet.add(key);
+    this.selectedIndicesSet.add(edge[0]);
+    this.selectedIndicesSet.add(edge[1]);
+    this.activeVertexIndex = edge[1];
     this.notifySelectionChange();
   }
 
@@ -62,6 +64,17 @@ export class SelectionService {
     } else {
       this.selectedEdgesSet.add(key);
     }
+    this.selectedIndicesSet.clear();
+    for (const selectedKey of this.selectedEdgesSet) {
+      const [v0, v1] = this.keyToEdge(selectedKey);
+      this.selectedIndicesSet.add(v0);
+      this.selectedIndicesSet.add(v1);
+    }
+    const remainingIndices = Array.from(this.selectedIndicesSet);
+    this.activeVertexIndex =
+      remainingIndices.length > 0
+        ? (remainingIndices[remainingIndices.length - 1] as number)
+        : null;
     this.notifySelectionChange();
   }
 

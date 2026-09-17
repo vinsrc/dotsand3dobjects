@@ -28,6 +28,7 @@ import { ZipFileEntry } from "../Services/ZipExportService/ZipFileEntry";
 import { DataUrlConverter } from "../Common/DataUrlConverter";
 import { GeometryTransformService } from "../Services/GeometryTransformService/GeometryTransformService";
 import { VertexMergeService } from "../Services/VertexMergeService/VertexMergeService";
+import { VertexCloner } from "../Services/GeometryEditorService/VertexCloner";
 
 export class AppController {
   private readonly modelService: ModelService;
@@ -46,6 +47,8 @@ export class AppController {
   private readonly zipImportService: ZipImportService;
   private readonly dataUrlConverter: DataUrlConverter;
   private readonly vertexMergeService: VertexMergeService;
+  private readonly vertexCloner: VertexCloner;
+  private hasClonedForCurrentDrag: boolean = false;
   private translationInitialModel: MeshGeometry | null = null;
   private rotationInitialModel: MeshGeometry | null = null;
   private scalingInitialModel: MeshGeometry | null = null;
@@ -72,7 +75,8 @@ export class AppController {
     zipExportService: ZipExportService,
     dataUrlConverter: DataUrlConverter,
     zipImportService: ZipImportService,
-    vertexMergeService?: VertexMergeService
+    vertexMergeService?: VertexMergeService,
+    vertexCloner?: VertexCloner
   ) {
     this.modelService = modelService;
     this.cameraStateService = cameraStateService;
@@ -92,6 +96,7 @@ export class AppController {
     this.vertexMergeService =
       vertexMergeService ??
       new VertexMergeService(modelService, selectionService, decalService);
+    this.vertexCloner = vertexCloner ?? new VertexCloner();
   }
 
   public getVertexMergeService(): VertexMergeService {
@@ -943,6 +948,14 @@ export class AppController {
     this.editorModeService.toggleAutoConnect();
   }
 
+  public isCloneEnabled(): boolean {
+    return this.editorModeService.isCloneEnabled();
+  }
+
+  public toggleClone(): void {
+    this.editorModeService.toggleClone();
+  }
+
   public isGridSnapEnabled(): boolean {
     return this.editorModeService.isGridSnapEnabled();
   }
@@ -1166,9 +1179,11 @@ export class AppController {
   public beginTranslation(): void {
     this.recordSnapshot();
     this.translationInitialModel = this.modelService.getCurrentModel();
+    this.hasClonedForCurrentDrag = false;
   }
 
   public endTranslation(): void {
+    this.hasClonedForCurrentDrag = false;
     if (this.translationInitialModel) {
       const currentModel = this.modelService.getCurrentModel();
       const initialVertices = this.translationInitialModel.vertices;
@@ -1207,6 +1222,28 @@ export class AppController {
 
     if (!this.translationInitialModel) {
       this.translationInitialModel = this.modelService.getCurrentModel();
+    }
+
+    if (
+      this.editorModeService.isCloneEnabled() &&
+      !this.hasClonedForCurrentDrag
+    ) {
+      const selectedIndices = this.selectionService.getSelectedIndices();
+      if (selectedIndices.length > 0) {
+        const autoConnect = this.editorModeService.isAutoConnectEnabled();
+        const cloneResult = this.vertexCloner.cloneVertices(
+          this.translationInitialModel,
+          selectedIndices,
+          autoConnect
+        );
+        this.modelService.setCurrentModel(cloneResult.updatedModel);
+        this.translationInitialModel = cloneResult.updatedModel;
+        this.selectionService.restoreSelection(
+          cloneResult.newVertexIndices,
+          cloneResult.newVertexIndices[cloneResult.newVertexIndices.length - 1] ?? null
+        );
+        this.hasClonedForCurrentDrag = true;
+      }
     }
 
     const activeGridPlane = this.cameraStateService
