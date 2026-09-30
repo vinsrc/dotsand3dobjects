@@ -1,0 +1,109 @@
+import { ApplicationStateNotifier } from "../../Common/ApplicationStateNotifier";
+
+export type UiMode =
+  | "DEFAULT"
+  | "MULTI_SELECT"
+  | "TRANSLATE"
+  | "ROTATE"
+  | "SCALE"
+  | "INSERT"
+  | "FILL"
+  | "TRANSFORM";
+
+export class EditorModeService {
+  private readonly stateNotifier: ApplicationStateNotifier;
+  private currentMode: UiMode;
+  private autoConnectEnabled: boolean;
+  private gridSnapEnabled: boolean;
+  private cloneEnabled: boolean;
+
+  public constructor(stateNotifier: ApplicationStateNotifier) {
+    this.stateNotifier = stateNotifier;
+    this.currentMode = "DEFAULT";
+    this.autoConnectEnabled = false;
+    this.gridSnapEnabled = true;
+    this.cloneEnabled = false;
+  }
+
+  public getMode(): UiMode {
+    return this.currentMode;
+  }
+
+  public isOrthographicRequired(mode: UiMode = this.currentMode): boolean {
+    return (
+      mode === "TRANSLATE" ||
+      mode === "ROTATE" ||
+      mode === "SCALE" ||
+      mode === "TRANSFORM"
+    );
+  }
+
+  public setMode(targetMode: UiMode, isOrthographic: boolean): boolean {
+    if (this.isOrthographicRequired(targetMode) && !isOrthographic) {
+      this.stateNotifier.notify(
+        "ERROR_OCCURRED",
+        "Switch to an Orthographic view"
+      );
+      return false;
+    }
+
+    if (targetMode !== "TRANSLATE" && this.cloneEnabled) {
+      this.cloneEnabled = false;
+      this.stateNotifier.notify("CLONE_CHANGED", this.cloneEnabled);
+    }
+
+    this.currentMode = targetMode;
+    this.stateNotifier.notify("MODE_CHANGED", this.currentMode);
+    return true;
+  }
+
+  public finishMode(): void {
+    if (this.cloneEnabled) {
+      this.cloneEnabled = false;
+      this.stateNotifier.notify("CLONE_CHANGED", this.cloneEnabled);
+    }
+    this.currentMode = "DEFAULT";
+    this.stateNotifier.notify("MODE_CHANGED", this.currentMode);
+  }
+
+  public isCloneEnabled(): boolean {
+    return this.cloneEnabled;
+  }
+
+  public setCloneEnabled(enabled: boolean): void {
+    if (this.cloneEnabled !== enabled) {
+      this.cloneEnabled = enabled;
+      this.stateNotifier.notify("CLONE_CHANGED", this.cloneEnabled);
+    }
+  }
+
+  public toggleClone(): void {
+    this.setCloneEnabled(!this.cloneEnabled);
+  }
+
+  public isAutoConnectEnabled(): boolean {
+    return this.autoConnectEnabled;
+  }
+
+  public toggleAutoConnect(): void {
+    this.autoConnectEnabled = !this.autoConnectEnabled;
+    this.stateNotifier.notify(
+      "AUTO_CONNECT_CHANGED",
+      this.autoConnectEnabled
+    );
+  }
+
+  public isGridSnapEnabled(): boolean {
+    return this.gridSnapEnabled;
+  }
+
+  public toggleGridSnap(): void {
+    this.gridSnapEnabled = !this.gridSnapEnabled;
+    this.stateNotifier.notify("GRID_SNAP_CHANGED", this.gridSnapEnabled);
+  }
+
+  public setGridSnapEnabled(enabled: boolean): void {
+    this.gridSnapEnabled = enabled;
+    this.stateNotifier.notify("GRID_SNAP_CHANGED", this.gridSnapEnabled);
+  }
+}

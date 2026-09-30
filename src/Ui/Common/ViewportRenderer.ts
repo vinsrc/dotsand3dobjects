@@ -1,0 +1,1408 @@
+import * as THREE from "three";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { MeshGeometry } from "../../Application/Services/ModelService/MeshGeometry";
+import { RenderMode } from "../../Application/Services/RenderModeService/RenderModeService";
+import { CameraStateService } from "../../Application/Services/CameraService/CameraStateService";
+import { GridPlaneType } from "../../Application/Services/CameraService/ViewStrategy";
+import { AXIS_COLORS } from "./AxisColors";
+import { ThemeColors } from "./Theme";
+import { Material3D } from "../../Application/Services/MaterialService/Material3D";
+import { ViewportGrid } from "./ViewportGrid";
+import { DecalPlane } from "../../Application/Services/DecalService/DecalPlane";
+import { FaceNormalRenderer } from "./FaceNormalRenderer";
+
+export class ViewportRenderer {
+  private readonly canvasElement: HTMLCanvasElement;
+  private readonly webGlRenderer: THREE.WebGLRenderer;
+  private readonly sceneInstance: THREE.Scene;
+  private readonly perspectiveCameraInstance: THREE.PerspectiveCamera;
+  private readonly orthographicCameraInstance: THREE.OrthographicCamera;
+
+  private surfaceMesh: THREE.Mesh;
+  private wireframeLines: LineSegments2;
+  private readonly wireframeMaterial: LineMaterial;
+  private selectedEdgeLines: LineSegments2;
+  private readonly selectedEdgeMaterial: LineMaterial;
+  private currentSelectedEdges: readonly [number, number][] = [];
+  private vertexPoints: THREE.Points;
+  private inactiveVertexPoints: THREE.Points;
+  private inactiveOutlineTexture: THREE.CanvasTexture | null = null;
+  private selectedPoints: THREE.Points;
+  private gridHelperInstance: THREE.LineSegments | null = null;
+  private axisLinesInstance: THREE.LineSegments | null = null;
+  private isOrthographicViewActive: boolean = false;
+  private isRendererDisposed: boolean = false;
+
+  private currentModelGeometry: MeshGeometry = MeshGeometry.createEmpty();
+  private currentSelectedIndices: readonly number[] = [];
+  private currentVisibleVertexIndices: readonly number[] | null = null;
+  private currentActiveVertexIndex: number | null = null;
+  private currentSelectedFaceIndex: number | null = null;
+  private currentSelectedFaceIndices: readonly number[] = [];
+  private currentMaterials: readonly Material3D[] = [];
+  private readonly defaultSurfaceMaterial: THREE.MeshStandardMaterial;
+  private dynamicMaterials: THREE.MeshStandardMaterial[] = [];
+  private readonly loadedTextures: Map<string, THREE.Texture> = new Map();
+  private selectedFaceMesh: THREE.Mesh;
+  private readonly faceNormalRenderer: FaceNormalRenderer;
+  private activeAxisLabel: string = "";
+
+  private readonly decalGroup: THREE.Group;
+  private currentDecals: readonly DecalPlane[] = [];
+  private currentSelectedDecalId: string | null = null;
+  private decalMeshesList: THREE.Mesh[] = [];
+
+  public constructor(
+    canvasElement: HTMLCanvasElement,
+    initialEdgeLineWidth: number = 2
+  ) {
+    this.canvasElement = canvasElement;
+
+    this.webGlRenderer = new THREE.WebGLRenderer({
+      canvas: this.canvasElement,
+      antialias: true,
+      alpha: true,
+    });
+    this.webGlRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    this.sceneInstance = new THREE.Scene();
+
+    this.perspectiveCameraInstance = new THREE.PerspectiveCamera(
+      45,
+      1,
+      0.1,
+      1000
+    );
+    this.orthographicCameraInstance = new THREE.OrthographicCamera(
+      -1,
+      1,
+      1,
+      -1,
+      0.1,
+      1000
+    );
+
+    this.defaultSurfaceMaterial = new THREE.MeshStandardMaterial({
+      color: 0xcccccc,
+      roughness: 0.7,
+      metalness: 0.1,
+      flatShading: true,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
+    });
+    this.surfaceMesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      this.defaultSurfaceMaterial
+    );
+    this.sceneInstance.add(this.surfaceMesh);
+
+    const initialWidth = this.canvasElement.clientWidth || 800;
+    const initialHeight = this.canvasElement.clientHeight || 600;
+
+    this.wireframeMaterial = new LineMaterial({
+      color: new THREE.Color(ThemeColors.edgeShaded).getHex(),
+      linewidth: initialEdgeLineWidth,
+      resolution: new THREE.Vector2(initialWidth, initialHeight),
+      depthTest: true,
+      transparent: false,
+      opacity: 1.0,
+    });
+    const initialWireframeGeometry = new LineSegmentsGeometry();
+    initialWireframeGeometry.setPositions([]);
+    this.wireframeLines = new LineSegments2(
+      initialWireframeGeometry,
+      this.wireframeMaterial
+    );
+    this.wireframeLines.renderOrder = 2;
+    this.sceneInstance.add(this.wireframeLines);
+
+    this.selectedEdgeMaterial = new LineMaterial({
+      color: 0xff6600,
+      linewidth: Math.max(initialEdgeLineWidth * 1.5, 3),
+      resolution: new THREE.Vector2(initialWidth, initialHeight),
+      depthTest: false,
+      transparent: false,
+      opacity: 1.0,
+    });
+    const initialSelectedEdgeGeometry = new LineSegmentsGeometry();
+    initialSelectedEdgeGeometry.setPositions([]);
+    this.selectedEdgeLines = new LineSegments2(
+      initialSelectedEdgeGeometry,
+      this.selectedEdgeMaterial
+    );
+    this.selectedEdgeLines.renderOrder = 996;
+    this.selectedEdgeLines.visible = false;
+    this.sceneInstance.add(this.selectedEdgeLines);
+
+    this.vertexPoints = new THREE.Points(
+      new THREE.BufferGeometry(),
+      new THREE.PointsMaterial({
+        color: 0xcccccc,
+        size: 7,
+        sizeAttenuation: false,
+        depthTest: false,
+      })
+    );
+    this.vertexPoints.renderOrder = 998;
+    this.sceneInstance.add(this.vertexPoints);
+
+    const outlineTexture = this.createVertexOutlineTexture();
+    this.inactiveOutlineTexture = outlineTexture;
+    this.inactiveVertexPoints = new THREE.Points(
+      new THREE.BufferGeometry(),
+      new THREE.PointsMaterial({
+        color: 0xcccccc,
+        size: 9,
+        sizeAttenuation: false,
+        map: outlineTexture ?? undefined,
+        transparent: true,
+        opacity: 0.35,
+        depthTest: false,
+      })
+    );
+    this.inactiveVertexPoints.renderOrder = 997;
+    this.sceneInstance.add(this.inactiveVertexPoints);
+
+    this.selectedPoints = new THREE.Points(
+      new THREE.BufferGeometry(),
+      new THREE.PointsMaterial({
+        color: 0xff6600,
+        size: 13,
+        sizeAttenuation: false,
+        depthTest: false,
+      })
+    );
+    this.selectedPoints.renderOrder = 999;
+    this.sceneInstance.add(this.selectedPoints);
+
+    this.selectedFaceMesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial({
+        color: 0xffaa00,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        depthTest: true,
+      })
+    );
+    this.selectedFaceMesh.renderOrder = 2;
+    this.sceneInstance.add(this.selectedFaceMesh);
+
+    this.decalGroup = new THREE.Group();
+    this.sceneInstance.add(this.decalGroup);
+
+    this.faceNormalRenderer = new FaceNormalRenderer(this.sceneInstance);
+
+    this.setupLighting();
+    this.setupGridHelper();
+    this.setupAxesHelper();
+    (this.canvasElement as unknown as { __viewportRenderer?: ViewportRenderer }).__viewportRenderer = this;
+    (window as unknown as { THREE?: typeof THREE }).THREE = THREE;
+  }
+
+  public getFaceNormalRenderer(): FaceNormalRenderer {
+    return this.faceNormalRenderer;
+  }
+
+  public getAxisLines(): THREE.LineSegments | null {
+    return this.axisLinesInstance;
+  }
+
+  public getGridLines(): THREE.LineSegments | null {
+    return this.gridHelperInstance;
+  }
+
+  public getCurrentModel(): MeshGeometry | null {
+    return this.currentModelGeometry;
+  }
+
+  public getActiveAxisLabel(): string {
+    return this.activeAxisLabel;
+  }
+
+  public getSelectedFaceIndex(): number | null {
+    return this.currentSelectedFaceIndex;
+  }
+
+  public render(): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+
+    const activeCamera = this.getActiveCamera();
+    this.webGlRenderer.render(this.sceneInstance, activeCamera);
+  }
+
+  public getActiveCamera(): THREE.Camera {
+    return this.isOrthographicViewActive
+      ? this.orthographicCameraInstance
+      : this.perspectiveCameraInstance;
+  }
+
+  public updateMaterials(materials: readonly Material3D[]): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+    this.currentMaterials = materials;
+    if (this.currentModelGeometry) {
+      const previousSurfaceGeometry = this.surfaceMesh.geometry;
+      this.surfaceMesh.geometry = this.buildSurfaceGeometry(
+        this.currentModelGeometry
+      );
+      previousSurfaceGeometry.dispose();
+      this.render();
+    }
+  }
+
+  public updateModel(
+    meshGeometry: MeshGeometry,
+    materials?: readonly Material3D[],
+    visibleIndices?: readonly number[] | null
+  ): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+
+    if (materials !== undefined) {
+      this.currentMaterials = materials;
+    }
+    if (visibleIndices !== undefined) {
+      this.currentVisibleVertexIndices = visibleIndices;
+    }
+
+    this.currentModelGeometry = meshGeometry;
+
+    const previousSurfaceGeometry = this.surfaceMesh.geometry;
+    const previousWireframeGeometry = this.wireframeLines.geometry;
+    const previousVertexPointsGeometry = this.vertexPoints.geometry;
+    const previousInactiveGeometry = this.inactiveVertexPoints.geometry;
+    const previousSelectedGeometry = this.selectedPoints.geometry;
+    const previousSelectedFaceGeometry = this.selectedFaceMesh.geometry;
+    const previousSelectedEdgeGeometry = this.selectedEdgeLines.geometry;
+
+    this.surfaceMesh.geometry = this.buildSurfaceGeometry(meshGeometry);
+    this.wireframeLines.geometry = this.buildWireframeGeometry(meshGeometry);
+    this.vertexPoints.geometry = this.buildVertexPointsGeometry(
+      meshGeometry,
+      this.currentVisibleVertexIndices
+    );
+    this.inactiveVertexPoints.geometry = this.buildInactiveVertexPointsGeometry(
+      meshGeometry,
+      this.currentVisibleVertexIndices
+    );
+    this.selectedPoints.geometry = this.buildSelectedPointsGeometry(
+      meshGeometry,
+      this.currentSelectedIndices
+    );
+    this.selectedFaceMesh.geometry = this.buildSelectedFaceGeometry(
+      meshGeometry,
+      this.currentSelectedFaceIndices
+    );
+    this.selectedEdgeLines.geometry = this.buildSelectedEdgeGeometry(
+      meshGeometry,
+      this.currentSelectedEdges
+    );
+    this.selectedEdgeLines.visible = this.currentSelectedEdges.length > 0;
+    this.faceNormalRenderer.updateNormals(
+      meshGeometry,
+      this.currentSelectedFaceIndices
+    );
+
+    previousSurfaceGeometry.dispose();
+    previousWireframeGeometry.dispose();
+    previousVertexPointsGeometry.dispose();
+    previousInactiveGeometry.dispose();
+    previousSelectedGeometry.dispose();
+    previousSelectedFaceGeometry.dispose();
+    previousSelectedEdgeGeometry.dispose();
+
+    this.render();
+  }
+
+  public updateSelection(
+    selectedIndices: readonly number[],
+    _activeIndex: number | null,
+    selectedFaceIndexOrIndices: number | readonly number[] | null = null,
+    visibleIndices?: readonly number[] | null,
+    selectedEdges?: readonly [number, number][]
+  ): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+
+    if (visibleIndices !== undefined) {
+      this.currentVisibleVertexIndices = visibleIndices;
+    }
+
+    if (selectedEdges !== undefined) {
+      this.currentSelectedEdges = selectedEdges;
+    }
+
+    this.currentSelectedIndices = selectedIndices;
+    if (selectedFaceIndexOrIndices === null) {
+      this.currentSelectedFaceIndices = [];
+      this.currentSelectedFaceIndex = null;
+    } else if (typeof selectedFaceIndexOrIndices === "number") {
+      this.currentSelectedFaceIndices = [selectedFaceIndexOrIndices];
+      this.currentSelectedFaceIndex = selectedFaceIndexOrIndices;
+    } else {
+      this.currentSelectedFaceIndices = selectedFaceIndexOrIndices;
+      this.currentSelectedFaceIndex =
+        selectedFaceIndexOrIndices.length > 0
+          ? (selectedFaceIndexOrIndices[0] as number)
+          : null;
+    }
+
+    if (this.currentModelGeometry) {
+      const previousVertexPointsGeometry = this.vertexPoints.geometry;
+      this.vertexPoints.geometry = this.buildVertexPointsGeometry(
+        this.currentModelGeometry,
+        this.currentVisibleVertexIndices
+      );
+      previousVertexPointsGeometry.dispose();
+
+      const previousInactiveGeometry = this.inactiveVertexPoints.geometry;
+      this.inactiveVertexPoints.geometry = this.buildInactiveVertexPointsGeometry(
+        this.currentModelGeometry,
+        this.currentVisibleVertexIndices
+      );
+      previousInactiveGeometry.dispose();
+
+      const previousSelectedGeometry = this.selectedPoints.geometry;
+      this.selectedPoints.geometry = this.buildSelectedPointsGeometry(
+        this.currentModelGeometry,
+        this.currentSelectedIndices
+      );
+      previousSelectedGeometry.dispose();
+
+      const previousSelectedFaceGeometry = this.selectedFaceMesh.geometry;
+      this.selectedFaceMesh.geometry = this.buildSelectedFaceGeometry(
+        this.currentModelGeometry,
+        this.currentSelectedFaceIndices
+      );
+      previousSelectedFaceGeometry.dispose();
+
+      const previousSelectedEdgeGeometry = this.selectedEdgeLines.geometry;
+      this.selectedEdgeLines.geometry = this.buildSelectedEdgeGeometry(
+        this.currentModelGeometry,
+        this.currentSelectedEdges
+      );
+      this.selectedEdgeLines.visible = this.currentSelectedEdges.length > 0;
+      previousSelectedEdgeGeometry.dispose();
+
+      this.faceNormalRenderer.updateNormals(
+        this.currentModelGeometry,
+        this.currentSelectedFaceIndices
+      );
+
+      this.render();
+    }
+  }
+
+  public updateVisibleVertices(
+    visibleIndices: readonly number[] | null
+  ): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+    this.currentVisibleVertexIndices = visibleIndices;
+    if (this.currentModelGeometry) {
+      const previousVertexPointsGeometry = this.vertexPoints.geometry;
+      this.vertexPoints.geometry = this.buildVertexPointsGeometry(
+        this.currentModelGeometry,
+        this.currentVisibleVertexIndices
+      );
+      previousVertexPointsGeometry.dispose();
+
+      const previousInactiveGeometry = this.inactiveVertexPoints.geometry;
+      this.inactiveVertexPoints.geometry = this.buildInactiveVertexPointsGeometry(
+        this.currentModelGeometry,
+        this.currentVisibleVertexIndices
+      );
+      previousInactiveGeometry.dispose();
+
+      this.render();
+    }
+  }
+
+  public updateRenderMode(renderMode: RenderMode): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+
+    if (renderMode === "FLAT_SHADED") {
+      this.surfaceMesh.visible = true;
+      this.wireframeLines.visible = true;
+      this.wireframeMaterial.color.set(ThemeColors.edgeShaded);
+      this.wireframeMaterial.transparent = false;
+      this.wireframeMaterial.opacity = 1.0;
+    } else {
+      this.surfaceMesh.visible = false;
+      this.wireframeLines.visible = true;
+      this.wireframeMaterial.color.set(ThemeColors.edgeWireframe);
+      this.wireframeMaterial.transparent = false;
+      this.wireframeMaterial.opacity = 1.0;
+    }
+
+    this.wireframeMaterial.needsUpdate = true;
+    this.render();
+  }
+
+  public getDecalMeshes(): readonly THREE.Mesh[] {
+    return this.decalMeshesList;
+  }
+
+  public getCurrentDecals(): readonly DecalPlane[] {
+    return this.currentDecals;
+  }
+
+  public updateDecals(
+    decals: readonly DecalPlane[],
+    selectedDecalId: string | null,
+    materials?: readonly Material3D[]
+  ): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+    this.currentDecals = decals;
+    this.currentSelectedDecalId = selectedDecalId;
+    if (materials) {
+      this.currentMaterials = materials;
+    }
+    this.rebuildDecalMeshes();
+    this.render();
+  }
+
+  private rebuildDecalMeshes(): void {
+    while (this.decalGroup.children.length > 0) {
+      const child = this.decalGroup.children[0] as THREE.Object3D;
+      this.decalGroup.remove(child);
+      if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    }
+    this.decalMeshesList = [];
+
+    const materialMap = new Map<string, Material3D>();
+    for (const mat of this.currentMaterials) {
+      materialMap.set(mat.id, mat);
+    }
+
+    for (const decal of this.currentDecals) {
+      const isSelected = decal.id === this.currentSelectedDecalId;
+      const [v0, v1, v2, v3] = decal.vertices;
+
+      const positions = [
+        v0.coordinateX, v0.coordinateY, v0.coordinateZ,
+        v1.coordinateX, v1.coordinateY, v1.coordinateZ,
+        v2.coordinateX, v2.coordinateY, v2.coordinateZ,
+
+        v0.coordinateX, v0.coordinateY, v0.coordinateZ,
+        v2.coordinateX, v2.coordinateY, v2.coordinateZ,
+        v3.coordinateX, v3.coordinateY, v3.coordinateZ,
+      ];
+
+      const uvs = [
+        0, 0,
+        1, 0,
+        1, 1,
+
+        0, 0,
+        1, 1,
+        0, 1,
+      ];
+
+      const quadGeo = new THREE.BufferGeometry();
+      quadGeo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      quadGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      quadGeo.computeVertexNormals();
+
+      let quadMat: THREE.Material;
+      const assignedMat = decal.materialId ? materialMap.get(decal.materialId) : null;
+      if (assignedMat) {
+        if (assignedMat.hasImage() && assignedMat.imageUrl) {
+          const texture = this.getTexture(assignedMat.imageUrl);
+          quadMat = new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.5,
+            metalness: 0.0,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4,
+          });
+        } else {
+          quadMat = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(assignedMat.baseColor),
+            roughness: assignedMat.roughness,
+            metalness: assignedMat.metalness,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4,
+          });
+        }
+      } else {
+        // Transparent light green decal, same as face selection color (0xffaa00) when selected
+        quadMat = new THREE.MeshBasicMaterial({
+          color: isSelected ? 0xffaa00 : 0x2ecc71,
+          transparent: true,
+          opacity: isSelected ? 0.5 : 0.45,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          depthTest: true,
+          polygonOffset: true,
+          polygonOffsetFactor: -4,
+          polygonOffsetUnits: -4,
+        });
+      }
+
+      const quadMesh = new THREE.Mesh(quadGeo, quadMat);
+      quadMesh.userData = { decalId: decal.id };
+      quadMesh.renderOrder = 5;
+      this.decalGroup.add(quadMesh);
+      this.decalMeshesList.push(quadMesh);
+
+      // Border outline
+      const borderPositions = [
+        v0.coordinateX, v0.coordinateY, v0.coordinateZ,
+        v1.coordinateX, v1.coordinateY, v1.coordinateZ,
+
+        v1.coordinateX, v1.coordinateY, v1.coordinateZ,
+        v2.coordinateX, v2.coordinateY, v2.coordinateZ,
+
+        v2.coordinateX, v2.coordinateY, v2.coordinateZ,
+        v3.coordinateX, v3.coordinateY, v3.coordinateZ,
+
+        v3.coordinateX, v3.coordinateY, v3.coordinateZ,
+        v0.coordinateX, v0.coordinateY, v0.coordinateZ,
+      ];
+      const borderGeo = new THREE.BufferGeometry();
+      borderGeo.setAttribute("position", new THREE.Float32BufferAttribute(borderPositions, 3));
+      const borderMat = new THREE.LineBasicMaterial({
+        color: isSelected ? 0xffaa00 : 0x2ecc71,
+        transparent: false,
+        depthTest: true,
+      });
+      const borderLine = new THREE.LineSegments(borderGeo, borderMat);
+      borderLine.renderOrder = 6;
+      this.decalGroup.add(borderLine);
+    }
+  }
+
+  public updateCamera(
+    cameraService: CameraStateService,
+    viewportWidth: number,
+    viewportHeight: number,
+    visibleIndices?: readonly number[] | null
+  ): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+
+    if (visibleIndices !== undefined) {
+      this.currentVisibleVertexIndices = visibleIndices;
+    } else if (!cameraService.isOrthographic()) {
+      this.currentVisibleVertexIndices = null;
+    }
+
+    if (this.currentModelGeometry) {
+      const previousVertexPointsGeometry = this.vertexPoints.geometry;
+      this.vertexPoints.geometry = this.buildVertexPointsGeometry(
+        this.currentModelGeometry,
+        this.currentVisibleVertexIndices
+      );
+      previousVertexPointsGeometry.dispose();
+
+      const previousInactiveGeometry = this.inactiveVertexPoints.geometry;
+      this.inactiveVertexPoints.geometry = this.buildInactiveVertexPointsGeometry(
+        this.currentModelGeometry,
+        this.currentVisibleVertexIndices
+      );
+      previousInactiveGeometry.dispose();
+    }
+
+    const activeStrategy = cameraService.getActiveStrategy();
+    this.activeAxisLabel = activeStrategy.getAxisLabel();
+    this.isOrthographicViewActive = cameraService.isOrthographic();
+
+    const cameraDistance = cameraService.getCameraDistance();
+    const targetPoint = cameraService.getTargetPoint();
+    const viewDirection = activeStrategy.getViewDirection();
+    const upDirection = activeStrategy.getUpDirection();
+
+    const positionX =
+      targetPoint.coordinateX + viewDirection.coordinateX * cameraDistance;
+    const positionY =
+      targetPoint.coordinateY + viewDirection.coordinateY * cameraDistance;
+    const positionZ =
+      targetPoint.coordinateZ + viewDirection.coordinateZ * cameraDistance;
+
+    const safeHeight = viewportHeight > 0 ? viewportHeight : 1;
+    const aspectRatio = viewportWidth / safeHeight;
+
+    if (this.isOrthographicViewActive) {
+      const frustumHeight = cameraDistance;
+      const frustumWidth = frustumHeight * aspectRatio;
+
+      this.orthographicCameraInstance.left = -frustumWidth / 2;
+      this.orthographicCameraInstance.right = frustumWidth / 2;
+      this.orthographicCameraInstance.top = frustumHeight / 2;
+      this.orthographicCameraInstance.bottom = -frustumHeight / 2;
+
+      this.orthographicCameraInstance.position.set(
+        positionX,
+        positionY,
+        positionZ
+      );
+      this.orthographicCameraInstance.up.set(
+        upDirection.coordinateX,
+        upDirection.coordinateY,
+        upDirection.coordinateZ
+      );
+      this.orthographicCameraInstance.lookAt(
+        targetPoint.coordinateX,
+        targetPoint.coordinateY,
+        targetPoint.coordinateZ
+      );
+      this.orthographicCameraInstance.updateProjectionMatrix();
+    } else {
+      this.perspectiveCameraInstance.aspect = aspectRatio;
+      this.perspectiveCameraInstance.position.set(
+        positionX,
+        positionY,
+        positionZ
+      );
+      this.perspectiveCameraInstance.up.set(
+        upDirection.coordinateX,
+        upDirection.coordinateY,
+        upDirection.coordinateZ
+      );
+      this.perspectiveCameraInstance.lookAt(
+        targetPoint.coordinateX,
+        targetPoint.coordinateY,
+        targetPoint.coordinateZ
+      );
+      this.perspectiveCameraInstance.updateProjectionMatrix();
+    }
+
+    this.updateGrid(activeStrategy.getGridPlane(), this.isOrthographicViewActive);
+    this.render();
+  }
+
+  public updateGrid(
+    gridPlane: GridPlaneType,
+    isOrthographic: boolean
+  ): void {
+    if (this.isRendererDisposed || !this.gridHelperInstance) {
+      return;
+    }
+
+    if (isOrthographic) {
+      if (gridPlane === "NONE") {
+        this.gridHelperInstance.visible = false;
+        return;
+      }
+
+      this.gridHelperInstance.visible = true;
+
+      switch (gridPlane) {
+        case "XY":
+          this.gridHelperInstance.rotation.set(Math.PI / 2, 0, 0);
+          break;
+        case "YZ":
+          this.gridHelperInstance.rotation.set(0, 0, Math.PI / 2);
+          break;
+        case "XZ":
+        default:
+          this.gridHelperInstance.rotation.set(0, 0, 0);
+          break;
+      }
+    } else {
+      this.gridHelperInstance.visible = true;
+      this.gridHelperInstance.rotation.set(0, 0, 0);
+    }
+  }
+
+  public resize(viewportWidth: number, viewportHeight: number): void {
+    if (this.isRendererDisposed || viewportWidth <= 0 || viewportHeight <= 0) {
+      return;
+    }
+
+    this.webGlRenderer.setSize(viewportWidth, viewportHeight, false);
+    this.wireframeMaterial.resolution.set(viewportWidth, viewportHeight);
+    this.selectedEdgeMaterial.resolution.set(viewportWidth, viewportHeight);
+    this.render();
+  }
+
+  public setEdgeLineWidth(lineWidth: number): void {
+    if (this.wireframeMaterial.linewidth !== lineWidth) {
+      this.wireframeMaterial.linewidth = lineWidth;
+      this.wireframeMaterial.needsUpdate = true;
+      this.render();
+    }
+  }
+
+  public getEdgeLineWidth(): number {
+    return this.wireframeMaterial.linewidth;
+  }
+
+  public dispose(): void {
+    if (this.isRendererDisposed) {
+      return;
+    }
+
+    this.isRendererDisposed = true;
+
+    this.surfaceMesh.geometry.dispose();
+    this.defaultSurfaceMaterial.dispose();
+    for (const dynamicMaterial of this.dynamicMaterials) {
+      dynamicMaterial.dispose();
+    }
+    this.dynamicMaterials = [];
+    for (const texture of this.loadedTextures.values()) {
+      texture.dispose();
+    }
+    this.loadedTextures.clear();
+
+    this.wireframeLines.geometry.dispose();
+    this.wireframeMaterial.dispose();
+
+    this.selectedEdgeLines.geometry.dispose();
+    this.selectedEdgeMaterial.dispose();
+
+    this.vertexPoints.geometry.dispose();
+    (this.vertexPoints.material as THREE.Material).dispose();
+
+    this.inactiveVertexPoints.geometry.dispose();
+    (this.inactiveVertexPoints.material as THREE.Material).dispose();
+    if (this.inactiveOutlineTexture) {
+      this.inactiveOutlineTexture.dispose();
+      this.inactiveOutlineTexture = null;
+    }
+
+    this.selectedPoints.geometry.dispose();
+    (this.selectedPoints.material as THREE.Material).dispose();
+
+    this.selectedFaceMesh.geometry.dispose();
+    (this.selectedFaceMesh.material as THREE.Material).dispose();
+
+    this.faceNormalRenderer.dispose();
+
+    if (this.gridHelperInstance) {
+      this.gridHelperInstance.geometry.dispose();
+      if (Array.isArray(this.gridHelperInstance.material)) {
+        for (const materialInstance of this.gridHelperInstance.material) {
+          materialInstance.dispose();
+        }
+      } else {
+        this.gridHelperInstance.material.dispose();
+      }
+      this.gridHelperInstance = null;
+    }
+
+    if (this.axisLinesInstance) {
+      this.axisLinesInstance.geometry.dispose();
+      (this.axisLinesInstance.material as THREE.Material).dispose();
+      this.axisLinesInstance = null;
+    }
+
+    while (this.decalGroup.children.length > 0) {
+      const child = this.decalGroup.children[0] as THREE.Object3D;
+      this.decalGroup.remove(child);
+      if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    }
+    this.decalMeshesList = [];
+
+    this.webGlRenderer.dispose();
+  }
+
+  private setupLighting(): void {
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    this.sceneInstance.add(ambientLight);
+
+    const primaryDirectionalLight = new THREE.DirectionalLight(
+      0xffffff,
+      1.2
+    );
+    primaryDirectionalLight.position.set(10, 20, 15);
+    this.sceneInstance.add(primaryDirectionalLight);
+
+    const secondaryDirectionalLight = new THREE.DirectionalLight(
+      0xffffff,
+      0.4
+    );
+    secondaryDirectionalLight.position.set(-10, -10, -10);
+    this.sceneInstance.add(secondaryDirectionalLight);
+  }
+
+  private setupGridHelper(): void {
+    const gridSize = 100;
+    const gridDivisions = 100; // 100 / 100 = 1.0 unit cell spacing
+    this.gridHelperInstance = ViewportGrid.createGrid(
+      gridSize,
+      gridDivisions,
+      ThemeColors.gridCenterLine,
+      ThemeColors.gridLine,
+      ThemeColors.gridSubLine,
+      4
+    );
+    this.gridHelperInstance.position.set(0, 0, 0);
+    this.gridHelperInstance.visible = true;
+    this.sceneInstance.add(this.gridHelperInstance);
+  }
+
+  private setupAxesHelper(): void {
+    const axisExtent = 100;
+    const linePositions: number[] = [
+      // X axis: positive ray (0 to axisExtent)
+      0, 0, 0, axisExtent, 0, 0,
+      // X axis: negative ray (-axisExtent to 0)
+      -axisExtent, 0, 0, 0, 0, 0,
+
+      // Y axis: positive ray (0 to axisExtent)
+      0, 0, 0, 0, axisExtent, 0,
+      // Y axis: negative ray (-axisExtent to 0)
+      0, -axisExtent, 0, 0, 0, 0,
+
+      // Z axis: positive ray (0 to axisExtent)
+      0, 0, 0, 0, 0, axisExtent,
+      // Z axis: negative ray (-axisExtent to 0)
+      0, 0, -axisExtent, 0, 0, 0,
+    ];
+
+    const positiveColorX = new THREE.Color(AXIS_COLORS.positiveX);
+    const negativeColorX = new THREE.Color(AXIS_COLORS.negativeX);
+    const positiveColorY = new THREE.Color(AXIS_COLORS.positiveY);
+    const negativeColorY = new THREE.Color(AXIS_COLORS.negativeY);
+    const positiveColorZ = new THREE.Color(AXIS_COLORS.positiveZ);
+    const negativeColorZ = new THREE.Color(AXIS_COLORS.negativeZ);
+
+    const lineColors: number[] = [
+      // X+ ray
+      positiveColorX.r, positiveColorX.g, positiveColorX.b,
+      positiveColorX.r, positiveColorX.g, positiveColorX.b,
+      // X- ray
+      negativeColorX.r, negativeColorX.g, negativeColorX.b,
+      negativeColorX.r, negativeColorX.g, negativeColorX.b,
+
+      // Y+ ray
+      positiveColorY.r, positiveColorY.g, positiveColorY.b,
+      positiveColorY.r, positiveColorY.g, positiveColorY.b,
+      // Y- ray
+      negativeColorY.r, negativeColorY.g, negativeColorY.b,
+      negativeColorY.r, negativeColorY.g, negativeColorY.b,
+
+      // Z+ ray
+      positiveColorZ.r, positiveColorZ.g, positiveColorZ.b,
+      positiveColorZ.r, positiveColorZ.g, positiveColorZ.b,
+      // Z- ray
+      negativeColorZ.r, negativeColorZ.g, negativeColorZ.b,
+      negativeColorZ.r, negativeColorZ.g, negativeColorZ.b,
+    ];
+
+    const axisBufferGeometry = new THREE.BufferGeometry();
+    axisBufferGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(linePositions, 3)
+    );
+    axisBufferGeometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(lineColors, 3)
+    );
+
+    const axisLineMaterial = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+    });
+
+    this.axisLinesInstance = new THREE.LineSegments(
+      axisBufferGeometry,
+      axisLineMaterial
+    );
+    this.axisLinesInstance.renderOrder = 1;
+    this.sceneInstance.add(this.axisLinesInstance);
+  }
+
+  private getTexture(imageUrl: string): THREE.Texture {
+    let texture = this.loadedTextures.get(imageUrl);
+    if (!texture) {
+      const textureLoader = new THREE.TextureLoader();
+      texture = textureLoader.load(imageUrl, () => {
+        if (!this.isRendererDisposed) {
+          this.render();
+        }
+      });
+      this.loadedTextures.set(imageUrl, texture);
+    }
+    return texture;
+  }
+
+  private buildSurfaceGeometry(
+    meshGeometry: MeshGeometry
+  ): THREE.BufferGeometry {
+    const surfaceBufferGeometry = new THREE.BufferGeometry();
+
+    const materialIndexMap = new Map<string, number>();
+    const createdMaterials: THREE.MeshStandardMaterial[] = [];
+
+    for (
+      let materialIndex = 0;
+      materialIndex < this.currentMaterials.length;
+      materialIndex += 1
+    ) {
+      const currentMaterial = this.currentMaterials[materialIndex];
+      materialIndexMap.set(currentMaterial.id, materialIndex + 1);
+
+      if (currentMaterial.hasImage() && currentMaterial.imageUrl) {
+        const texture = this.getTexture(currentMaterial.imageUrl);
+        createdMaterials.push(
+          new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.5,
+            metalness: 0.0,
+            flatShading: true,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1,
+          })
+        );
+      } else {
+        createdMaterials.push(
+          new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentMaterial.baseColor),
+            roughness: currentMaterial.roughness,
+            metalness: currentMaterial.metalness,
+            flatShading: true,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1,
+          })
+        );
+      }
+    }
+
+    for (const dynamicMaterial of this.dynamicMaterials) {
+      dynamicMaterial.dispose();
+    }
+    this.dynamicMaterials = createdMaterials;
+
+    if (this.dynamicMaterials.length > 0) {
+      this.surfaceMesh.material = [
+        this.defaultSurfaceMaterial,
+        ...this.dynamicMaterials,
+      ];
+    } else {
+      this.surfaceMesh.material = this.defaultSurfaceMaterial;
+    }
+
+    if (meshGeometry.isEmpty()) {
+      return surfaceBufferGeometry;
+    }
+
+    const surfacePositions: number[] = [];
+    const surfaceUvs: number[] = [];
+    let currentVertexOffset = 0;
+
+    for (const currentFace of meshGeometry.faces) {
+      const triangulatedFaces = currentFace.triangulate();
+      const faceVertices = currentFace.vertexIndices
+        .map((vertexIndex) => meshGeometry.vertices[vertexIndex])
+        .filter(Boolean);
+
+      let minPlanarU = Infinity;
+      let maxPlanarU = -Infinity;
+      let minPlanarV = Infinity;
+      let maxPlanarV = -Infinity;
+
+      let planeProjectionMode: "xy" | "yz" | "xz" = "xy";
+      if (faceVertices.length >= 3) {
+        const firstVertex = faceVertices[0];
+        const secondVertex = faceVertices[1];
+        const thirdVertex = faceVertices[2];
+        const vector1X = secondVertex.coordinateX - firstVertex.coordinateX;
+        const vector1Y = secondVertex.coordinateY - firstVertex.coordinateY;
+        const vector1Z = secondVertex.coordinateZ - firstVertex.coordinateZ;
+        const vector2X = thirdVertex.coordinateX - firstVertex.coordinateX;
+        const vector2Y = thirdVertex.coordinateY - firstVertex.coordinateY;
+        const vector2Z = thirdVertex.coordinateZ - firstVertex.coordinateZ;
+
+        const normalX = vector1Y * vector2Z - vector1Z * vector2Y;
+        const normalY = vector1Z * vector2X - vector1X * vector2Z;
+        const normalZ = vector1X * vector2Y - vector1Y * vector2X;
+
+        const absoluteNormalX = Math.abs(normalX);
+        const absoluteNormalY = Math.abs(normalY);
+        const absoluteNormalZ = Math.abs(normalZ);
+
+        if (
+          absoluteNormalZ >= absoluteNormalX &&
+          absoluteNormalZ >= absoluteNormalY
+        ) {
+          planeProjectionMode = "xy";
+        } else if (
+          absoluteNormalX >= absoluteNormalY &&
+          absoluteNormalX >= absoluteNormalZ
+        ) {
+          planeProjectionMode = "yz";
+        } else {
+          planeProjectionMode = "xz";
+        }
+      }
+
+      for (const vertex of faceVertices) {
+        let planarCoordinateU = vertex.coordinateX;
+        let planarCoordinateV = vertex.coordinateY;
+        if (planeProjectionMode === "yz") {
+          planarCoordinateU = vertex.coordinateY;
+          planarCoordinateV = vertex.coordinateZ;
+        } else if (planeProjectionMode === "xz") {
+          planarCoordinateU = vertex.coordinateX;
+          planarCoordinateV = vertex.coordinateZ;
+        }
+        if (planarCoordinateU < minPlanarU) minPlanarU = planarCoordinateU;
+        if (planarCoordinateU > maxPlanarU) maxPlanarU = planarCoordinateU;
+        if (planarCoordinateV < minPlanarV) minPlanarV = planarCoordinateV;
+        if (planarCoordinateV > maxPlanarV) maxPlanarV = planarCoordinateV;
+      }
+
+      const planarRangeU =
+        maxPlanarU - minPlanarU > 1e-6 ? maxPlanarU - minPlanarU : 1;
+      const planarRangeV =
+        maxPlanarV - minPlanarV > 1e-6 ? maxPlanarV - minPlanarV : 1;
+
+      let faceVertexCount = 0;
+      for (const triangleFace of triangulatedFaces) {
+        for (const vertexIndex of triangleFace.vertexIndices) {
+          const currentVertex = meshGeometry.vertices[vertexIndex];
+          if (currentVertex) {
+            surfacePositions.push(
+              currentVertex.coordinateX,
+              currentVertex.coordinateY,
+              currentVertex.coordinateZ
+            );
+
+            let planarCoordinateU = currentVertex.coordinateX;
+            let planarCoordinateV = currentVertex.coordinateY;
+            if (planeProjectionMode === "yz") {
+              planarCoordinateU = currentVertex.coordinateY;
+              planarCoordinateV = currentVertex.coordinateZ;
+            } else if (planeProjectionMode === "xz") {
+              planarCoordinateU = currentVertex.coordinateX;
+              planarCoordinateV = currentVertex.coordinateZ;
+            }
+
+            const uvCoordinateU = (planarCoordinateU - minPlanarU) / planarRangeU;
+            const uvCoordinateV = (planarCoordinateV - minPlanarV) / planarRangeV;
+            surfaceUvs.push(uvCoordinateU, uvCoordinateV);
+            faceVertexCount += 1;
+          }
+        }
+      }
+
+      const materialGroupIndex =
+        currentFace.materialId && materialIndexMap.has(currentFace.materialId)
+          ? (materialIndexMap.get(currentFace.materialId) as number)
+          : 0;
+
+      if (this.dynamicMaterials.length > 0 && faceVertexCount > 0) {
+        surfaceBufferGeometry.addGroup(
+          currentVertexOffset,
+          faceVertexCount,
+          materialGroupIndex
+        );
+      }
+      currentVertexOffset += faceVertexCount;
+    }
+
+    surfaceBufferGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(surfacePositions, 3)
+    );
+    surfaceBufferGeometry.setAttribute(
+      "uv",
+      new THREE.Float32BufferAttribute(surfaceUvs, 2)
+    );
+    surfaceBufferGeometry.computeVertexNormals();
+
+    return surfaceBufferGeometry;
+  }
+
+  private buildWireframeGeometry(
+    meshGeometry: MeshGeometry
+  ): LineSegmentsGeometry {
+    const wireframeBufferGeometry = new LineSegmentsGeometry();
+
+    if (meshGeometry.isEmpty()) {
+      wireframeBufferGeometry.setPositions([]);
+      return wireframeBufferGeometry;
+    }
+
+    const wireframePositions: number[] = [];
+    const wireframeEdges = meshGeometry.getWireframeEdges();
+
+    for (const [startVertexIndex, endVertexIndex] of wireframeEdges) {
+      const startVertex = meshGeometry.vertices[startVertexIndex];
+      const endVertex = meshGeometry.vertices[endVertexIndex];
+
+      if (startVertex && endVertex) {
+        wireframePositions.push(
+          startVertex.coordinateX,
+          startVertex.coordinateY,
+          startVertex.coordinateZ,
+          endVertex.coordinateX,
+          endVertex.coordinateY,
+          endVertex.coordinateZ
+        );
+      }
+    }
+
+    wireframeBufferGeometry.setPositions(wireframePositions);
+
+    return wireframeBufferGeometry;
+  }
+
+  private buildSelectedEdgeGeometry(
+    meshGeometry: MeshGeometry,
+    selectedEdges: readonly [number, number][]
+  ): LineSegmentsGeometry {
+    const geometry = new LineSegmentsGeometry();
+    if (meshGeometry.isEmpty() || selectedEdges.length === 0) {
+      geometry.setPositions([]);
+      return geometry;
+    }
+
+    const positions: number[] = [];
+    for (const [startIndex, endIndex] of selectedEdges) {
+      const startVertex = meshGeometry.vertices[startIndex];
+      const endVertex = meshGeometry.vertices[endIndex];
+      if (startVertex && endVertex) {
+        positions.push(
+          startVertex.coordinateX,
+          startVertex.coordinateY,
+          startVertex.coordinateZ,
+          endVertex.coordinateX,
+          endVertex.coordinateY,
+          endVertex.coordinateZ
+        );
+      }
+    }
+
+    geometry.setPositions(positions);
+    return geometry;
+  }
+
+  private buildVertexPointsGeometry(
+    meshGeometry: MeshGeometry,
+    visibleIndices?: readonly number[] | null
+  ): THREE.BufferGeometry {
+    const pointsBufferGeometry = new THREE.BufferGeometry();
+
+    if (meshGeometry.isEmpty()) {
+      return pointsBufferGeometry;
+    }
+
+    const positions: number[] = [];
+    if (visibleIndices !== null && visibleIndices !== undefined) {
+      for (const index of visibleIndices) {
+        const currentVertex = meshGeometry.vertices[index];
+        if (currentVertex) {
+          positions.push(
+            currentVertex.coordinateX,
+            currentVertex.coordinateY,
+            currentVertex.coordinateZ
+          );
+        }
+      }
+    } else {
+      for (const currentVertex of meshGeometry.vertices) {
+        positions.push(
+          currentVertex.coordinateX,
+          currentVertex.coordinateY,
+          currentVertex.coordinateZ
+        );
+      }
+    }
+
+    pointsBufferGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
+
+    return pointsBufferGeometry;
+  }
+
+  private buildSelectedPointsGeometry(
+    meshGeometry: MeshGeometry,
+    selectedIndices: readonly number[]
+  ): THREE.BufferGeometry {
+    const pointsBufferGeometry = new THREE.BufferGeometry();
+
+    if (meshGeometry.isEmpty() || selectedIndices.length === 0) {
+      return pointsBufferGeometry;
+    }
+
+    const positions: number[] = [];
+    for (const index of selectedIndices) {
+      const selectedVertex = meshGeometry.vertices[index];
+      if (selectedVertex) {
+        positions.push(
+          selectedVertex.coordinateX,
+          selectedVertex.coordinateY,
+          selectedVertex.coordinateZ
+        );
+      }
+    }
+
+    pointsBufferGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
+
+    return pointsBufferGeometry;
+  }
+
+  private buildSelectedFaceGeometry(
+    meshGeometry: MeshGeometry,
+    selectedFaceIndices: readonly number[]
+  ): THREE.BufferGeometry {
+    const faceGeometry = new THREE.BufferGeometry();
+    if (meshGeometry.isEmpty() || selectedFaceIndices.length === 0) {
+      return faceGeometry;
+    }
+
+    const positions: number[] = [];
+    for (const selectedFaceIndex of selectedFaceIndices) {
+      if (
+        selectedFaceIndex < 0 ||
+        selectedFaceIndex >= meshGeometry.faces.length
+      ) {
+        continue;
+      }
+
+      const face = meshGeometry.faces[selectedFaceIndex];
+      const baseVertex = meshGeometry.vertices[face.vertexIndices[0]];
+      for (
+        let triangleIndex = 1;
+        triangleIndex < face.vertexIndices.length - 1;
+        triangleIndex += 1
+      ) {
+        const secondVertex =
+          meshGeometry.vertices[face.vertexIndices[triangleIndex]];
+        const thirdVertex =
+          meshGeometry.vertices[face.vertexIndices[triangleIndex + 1]];
+        if (baseVertex && secondVertex && thirdVertex) {
+          positions.push(
+            baseVertex.coordinateX,
+            baseVertex.coordinateY,
+            baseVertex.coordinateZ,
+            secondVertex.coordinateX,
+            secondVertex.coordinateY,
+            secondVertex.coordinateZ,
+            thirdVertex.coordinateX,
+            thirdVertex.coordinateY,
+            thirdVertex.coordinateZ
+          );
+        }
+      }
+    }
+
+    faceGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
+    faceGeometry.computeVertexNormals();
+    return faceGeometry;
+  }
+
+  public getVertexPoints(): THREE.Points {
+    return this.vertexPoints;
+  }
+
+  public getInactiveVertexPoints(): THREE.Points {
+    return this.inactiveVertexPoints;
+  }
+
+  private createVertexOutlineTexture(): THREE.CanvasTexture | null {
+    if (typeof document === "undefined") {
+      return null;
+    }
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, 64, 64);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 10;
+        ctx.strokeRect(10, 10, 44, 44);
+      }
+      return new THREE.CanvasTexture(canvas);
+    } catch {
+      return null;
+    }
+  }
+
+  private buildInactiveVertexPointsGeometry(
+    meshGeometry: MeshGeometry,
+    visibleIndices?: readonly number[] | null
+  ): THREE.BufferGeometry {
+    const pointsBufferGeometry = new THREE.BufferGeometry();
+
+    if (
+      meshGeometry.isEmpty() ||
+      visibleIndices === null ||
+      visibleIndices === undefined
+    ) {
+      return pointsBufferGeometry;
+    }
+
+    const visibleSet = new Set(visibleIndices);
+    const positions: number[] = [];
+
+    for (let index = 0; index < meshGeometry.vertices.length; index += 1) {
+      if (!visibleSet.has(index)) {
+        const currentVertex = meshGeometry.vertices[index];
+        if (currentVertex) {
+          positions.push(
+            currentVertex.coordinateX,
+            currentVertex.coordinateY,
+            currentVertex.coordinateZ
+          );
+        }
+      }
+    }
+
+    pointsBufferGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
+
+    return pointsBufferGeometry;
+  }
+}
+
