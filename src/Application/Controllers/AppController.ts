@@ -29,6 +29,10 @@ import { DataUrlConverter } from "../Common/DataUrlConverter";
 import { GeometryTransformService } from "../Services/GeometryTransformService/GeometryTransformService";
 import { VertexMergeService } from "../Services/VertexMergeService/VertexMergeService";
 import { VertexCloner } from "../Services/GeometryEditorService/VertexCloner";
+import { ProjectSaveService } from "../Services/ProjectSaveService/ProjectSaveService";
+import { LocalStorageProjectSaveStorage } from "../Services/ProjectSaveService/LocalStorageProjectSaveStorage";
+import { RestoredProjectState, ProjectStateToSave } from "../Services/ProjectSaveService/ProjectSaveSerializer";
+import { ProjectSaveListItem } from "../Services/ProjectSaveService/ProjectSaveDocument";
 
 export class AppController {
   private readonly modelService: ModelService;
@@ -48,6 +52,7 @@ export class AppController {
   private readonly dataUrlConverter: DataUrlConverter;
   private readonly vertexMergeService: VertexMergeService;
   private readonly vertexCloner: VertexCloner;
+  private readonly projectSaveService: ProjectSaveService;
   private hasClonedForCurrentDrag: boolean = false;
   private translationInitialModel: MeshGeometry | null = null;
   private rotationInitialModel: MeshGeometry | null = null;
@@ -76,7 +81,8 @@ export class AppController {
     dataUrlConverter: DataUrlConverter,
     zipImportService: ZipImportService,
     vertexMergeService?: VertexMergeService,
-    vertexCloner?: VertexCloner
+    vertexCloner?: VertexCloner,
+    projectSaveService?: ProjectSaveService
   ) {
     this.modelService = modelService;
     this.cameraStateService = cameraStateService;
@@ -97,6 +103,9 @@ export class AppController {
       vertexMergeService ??
       new VertexMergeService(modelService, selectionService, decalService);
     this.vertexCloner = vertexCloner ?? new VertexCloner();
+    this.projectSaveService =
+      projectSaveService ??
+      new ProjectSaveService(new LocalStorageProjectSaveStorage());
   }
 
   public getVertexMergeService(): VertexMergeService {
@@ -199,6 +208,7 @@ export class AppController {
       );
       this.selectionService.clearSelection();
       this.undoRedoService.clear();
+      this.projectSaveService.clearActiveSave();
       this.stateNotifier.notify("VIEW_CHANGED");
     } catch (caughtError) {
       // Notification is already dispatched by ModelService
@@ -387,6 +397,7 @@ export class AppController {
       );
       this.selectionService.clearSelection();
       this.undoRedoService.clear();
+      this.projectSaveService.clearActiveSave();
       this.stateNotifier.notify("VIEW_CHANGED");
     } catch (caughtError) {
       const errorMessage =
@@ -399,6 +410,54 @@ export class AppController {
 
   public getZipImportService(): ZipImportService {
     return this.zipImportService;
+  }
+
+  public needsProjectSaveName(): boolean {
+    return this.projectSaveService.needsSaveName();
+  }
+
+  public getActiveProjectSaveName(): string | null {
+    return this.projectSaveService.getActiveSaveName();
+  }
+
+  public listProjectSaves(): readonly ProjectSaveListItem[] {
+    return this.projectSaveService.listSaves();
+  }
+
+  public saveProject(saveName?: string): boolean {
+    try {
+      this.projectSaveService.save(this.captureProjectState(), saveName);
+      return true;
+    } catch (caughtError) {
+      this.notifyCaughtError(caughtError, "Failed to save project");
+      return false;
+    }
+  }
+
+  public loadProjectSave(saveId: string): boolean {
+    try {
+      const restoredState = this.projectSaveService.loadById(saveId);
+      this.applyRestoredProjectState(restoredState);
+      return true;
+    } catch (caughtError) {
+      this.notifyCaughtError(caughtError, "Failed to load saved project");
+      return false;
+    }
+  }
+
+  public exportProjectSaveJson(): string {
+    return this.projectSaveService.exportJson(this.captureProjectState());
+  }
+
+  public loadProjectFromJson(jsonText: string): boolean {
+    try {
+      const imported = this.projectSaveService.importJson(jsonText);
+      this.applyRestoredProjectState(imported.state);
+      return true;
+    } catch (caughtError) {
+      this.notifyCaughtError(caughtError, "Failed to load save file");
+      return false;
+    }
   }
 
   private shouldBundleImage(
@@ -427,6 +486,36 @@ export class AppController {
       fileName,
       content: new TextEncoder().encode(textContent),
     };
+  }
+
+  private captureProjectState(): ProjectStateToSave {
+    return {
+      mesh: this.modelService.getCurrentModel(),
+      materials: this.materialService.getMaterials(),
+      selectedMaterialId: this.materialService.getSelectedMaterialId(),
+      decals: this.decalService.getDecals(),
+    };
+  }
+
+  private applyRestoredProjectState(restoredState: RestoredProjectState): void {
+    this.modelService.setCurrentModel(restoredState.mesh);
+    this.materialService.restoreMaterials(
+      restoredState.materials,
+      restoredState.selectedMaterialId
+    );
+    this.decalService.restoreState(restoredState.decals, null);
+    const boundingRadius = restoredState.mesh.calculateBoundingRadius();
+    this.cameraStateService.fitToRadius(boundingRadius);
+    this.cameraStateService.setTargetPoint(restoredState.mesh.calculateCenter());
+    this.selectionService.clearSelection();
+    this.undoRedoService.clear();
+    this.stateNotifier.notify("VIEW_CHANGED");
+  }
+
+  private notifyCaughtError(caughtError: unknown, fallbackMessage: string): void {
+    const errorMessage =
+      caughtError instanceof Error ? caughtError.message : fallbackMessage;
+    this.stateNotifier.notify("ERROR_OCCURRED", errorMessage);
   }
 
   public getMaterialService(): MaterialService {

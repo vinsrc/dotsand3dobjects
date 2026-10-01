@@ -22,6 +22,8 @@ import { DecalService } from "../../../src/Application/Services/DecalService/Dec
 import { ZipExportService } from "../../../src/Application/Services/ZipExportService/ZipExportService";
 import { ZipImportService } from "../../../src/Application/Services/ZipExportService/ZipImportService";
 import { DataUrlConverter } from "../../../src/Application/Common/DataUrlConverter";
+import { ProjectSaveService } from "../../../src/Application/Services/ProjectSaveService/ProjectSaveService";
+import { MemoryProjectSaveStorage } from "../../../src/Application/Services/ProjectSaveService/MemoryProjectSaveStorage";
 
 describe("AppController", () => {
   const createController = () => {
@@ -59,6 +61,9 @@ describe("AppController", () => {
     const zipExportService = new ZipExportService();
     const dataUrlConverter = new DataUrlConverter();
     const zipImportService = new ZipImportService(dataUrlConverter);
+    const projectSaveService = new ProjectSaveService(
+      new MemoryProjectSaveStorage()
+    );
 
     const appController = new AppController(
       modelService,
@@ -75,7 +80,10 @@ describe("AppController", () => {
       decalService,
       zipExportService,
       dataUrlConverter,
-      zipImportService
+      zipImportService,
+      undefined,
+      undefined,
+      projectSaveService
     );
 
     return {
@@ -2430,6 +2438,53 @@ describe("AppController", () => {
       // Selection cleared
       expect(selectionService.getSelectedIndices()).toEqual([]);
       expect(appController.getSelectedEdges()).toEqual([]);
+    });
+
+    it("should support saveProject, listProjectSaves, loadProjectSave, exportProjectSaveJson and loadProjectFromJson", () => {
+      const { appController, modelService, materialService, decalService, stateNotifier } =
+        createController();
+      const errorListener = vi.fn();
+      stateNotifier.subscribe("ERROR_OCCURRED", errorListener);
+
+      expect(appController.needsProjectSaveName()).toBe(true);
+      expect(appController.getActiveProjectSaveName()).toBeNull();
+      expect(appController.listProjectSaves()).toEqual([]);
+
+      // Saving without a name fails gracefully and emits error
+      const failedSave = appController.saveProject("");
+      expect(failedSave).toBe(false);
+      expect(errorListener).toHaveBeenCalled();
+
+      // Saving with a valid name succeeds
+      const saved = appController.saveProject("My First Project");
+      expect(saved).toBe(true);
+      expect(appController.needsProjectSaveName()).toBe(false);
+      expect(appController.getActiveProjectSaveName()).toBe("My First Project");
+
+      const saves = appController.listProjectSaves();
+      expect(saves.length).toBe(1);
+      expect(saves[0].name).toBe("My First Project");
+
+      // Export JSON
+      const json = appController.exportProjectSaveJson();
+      expect(typeof json).toBe("string");
+      expect(json).toContain("My First Project");
+
+      // Load save by ID
+      const loaded = appController.loadProjectSave(saves[0].id);
+      expect(loaded).toBe(true);
+
+      // Loading non-existent save handles error
+      const loadBad = appController.loadProjectSave("invalid_id");
+      expect(loadBad).toBe(false);
+
+      // Import JSON
+      const imported = appController.loadProjectFromJson(json);
+      expect(imported).toBe(true);
+
+      // Import invalid JSON handles error
+      const badImport = appController.loadProjectFromJson("not valid json");
+      expect(badImport).toBe(false);
     });
   });
 });

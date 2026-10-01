@@ -123,7 +123,7 @@ export const SideToolBar: React.FC = () => {
           currentMode === "TRANSFORM" ? activeModeButtonStyle : buttonStyle
         }
       >
-        Transform
+        Transform Object
       </button>
 
       <button
@@ -162,8 +162,8 @@ export const SideToolBar: React.FC = () => {
           isDecalSelected
             ? disabledButtonStyle
             : currentMode === "INSERT"
-            ? activeModeButtonStyle
-            : buttonStyle
+              ? activeModeButtonStyle
+              : buttonStyle
         }
       >
         New Vertex
@@ -177,8 +177,8 @@ export const SideToolBar: React.FC = () => {
           isDecalSelected
             ? disabledButtonStyle
             : currentMode === "TRANSLATE"
-            ? activeModeButtonStyle
-            : buttonStyle
+              ? activeModeButtonStyle
+              : buttonStyle
         }
       >
         Move Vertex
@@ -192,8 +192,8 @@ export const SideToolBar: React.FC = () => {
           isDecalSelected
             ? disabledButtonStyle
             : currentMode === "FILL"
-            ? activeModeButtonStyle
-            : buttonStyle
+              ? activeModeButtonStyle
+              : buttonStyle
         }
       >
         Draw Edge

@@ -26,6 +26,8 @@ import { ZipImportService } from "./Services/ZipExportService/ZipImportService";
 import { DataUrlConverter } from "./Common/DataUrlConverter";
 import { KeyboardShortcutService } from "./Services/KeyboardShortcutService/KeyboardShortcutService";
 import { VertexMergeService } from "./Services/VertexMergeService/VertexMergeService";
+import { ProjectSaveService } from "./Services/ProjectSaveService/ProjectSaveService";
+import { LocalStorageProjectSaveStorage } from "./Services/ProjectSaveService/LocalStorageProjectSaveStorage";
 
 export class AppBootstrapper {
   public static createApplication(): {
@@ -106,6 +108,9 @@ export class AppBootstrapper {
     );
 
     const vertexCloner = new VertexCloner();
+    const projectSaveService = new ProjectSaveService(
+      new LocalStorageProjectSaveStorage()
+    );
     const appController = new AppController(
       modelService,
       cameraStateService,
@@ -123,7 +128,8 @@ export class AppBootstrapper {
       dataUrlConverter,
       zipImportService,
       vertexMergeService,
-      vertexCloner
+      vertexCloner,
+      projectSaveService
     );
 
     const keyboardShortcutService = new KeyboardShortcutService(appController);

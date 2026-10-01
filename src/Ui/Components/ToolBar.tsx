@@ -1,9 +1,13 @@
-import React, { useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useAppController } from "../Common/AppContext";
 import { useApplicationState } from "../Common/UseApplicationState";
 import { FileMenu } from "./FileMenu";
 import { ThemeColors } from "../Common/Theme";
 import { UndoIcon, RedoIcon, HelpIcon } from "./ToolBarIcons";
+import { ModeSpecificButtons } from "./ModeSpecificButtons";
+import { SaveProjectModal } from "./SaveProjectModal";
+import { LoadProjectModal } from "./LoadProjectModal";
+import { FileOperationsHandler } from "./FileOperationsHandler";
 
 export interface ToolBarProps {
   onOpenHelp?: () => void;
@@ -29,12 +33,21 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     "CLONE_CHANGED",
   ]);
 
+  const fileOperationsHandler = useMemo(
+    () => new FileOperationsHandler(controller),
+    [controller]
+  );
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mtlFileInputRef = useRef<HTMLInputElement>(null);
   const zipFileInputRef = useRef<HTMLInputElement>(null);
+  const saveFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState<boolean>(false);
+
   const isWireframe = controller.getRenderModeService().isWireframe();
   const isMaterialPanelOpen = controller.isMaterialLibraryPanelOpen();
-  const isFaceOrthographic = controller.isFaceOrthographicView();
   const isPerspectiveView = !controller.getCameraStateService().isOrthographic();
   const currentMode = controller.getEditorModeService().getMode();
   const isAutoConnect = controller.getEditorModeService().isAutoConnectEnabled();
@@ -50,6 +63,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     (controller.getSelectedFaceIndex() !== null ? 1 : 0);
   const hasSelectedFace = selectedFaceCount > 0;
   const isDecalSelected = controller.isDecalSelected();
+  const isFaceOrthographic = controller.isFaceOrthographicView();
   const activeFaceIndex = isFaceOrthographic
     ? controller.getCameraStateService().getActiveFaceIndex()
     : null;
@@ -66,250 +80,22 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     hasSelectedFace ||
     canDeleteDecal;
 
-  const handleUndo = () => {
-    controller.undo();
-  };
-
-  const handleRedo = () => {
-    controller.redo();
-  };
-
-  const handleToggleGridSnap = () => {
-    controller.toggleGridSnap();
-  };
-
-  const handleClearSelection = () => {
-    controller.clearSelection();
-  };
-
-  const handleToggleMultiSelect = () => {
-    if (currentMode === "MULTI_SELECT") {
-      controller.finishMode();
+  const handleSaveMenuClick = () => {
+    if (controller.needsProjectSaveName()) {
+      setIsSaveModalOpen(true);
     } else {
-      controller.enterMode("MULTI_SELECT");
+      controller.saveProject();
     }
   };
 
-  const handleClearMaterial = () => {
-    controller.clearMaterialOnSelectedFaces();
+  const handleConfirmSaveModal = (saveName: string) => {
+    setIsSaveModalOpen(false);
+    controller.saveProject(saveName);
   };
 
-  const handleFlipFace = () => {
-    controller.flipFace();
-  };
-
-  const handleAddDecalPlane = () => {
-    controller.addDecalPlaneToSelectedFace();
-  };
-
-  const handleDeleteDecalPlane = () => {
-    controller.deleteSelectedDecal();
-  };
-
-  const handleSelectParentFace = () => {
-    controller.selectParentFace();
-  };
-
-  const handleLoadClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleLoadMtlClick = () => {
-    if (mtlFileInputRef.current) {
-      mtlFileInputRef.current.value = "";
-      mtlFileInputRef.current.click();
-    }
-  };
-
-  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = event.target.files;
-    if (!selectedFiles || selectedFiles.length === 0) {
-      return;
-    }
-
-    const fileList = Array.from(selectedFiles);
-    const objFile = fileList.find((file) =>
-      file.name.toLowerCase().endsWith(".obj")
-    );
-    const mtlFile = fileList.find((file) =>
-      file.name.toLowerCase().endsWith(".mtl")
-    );
-
-    if (objFile && mtlFile) {
-      const objReader = new FileReader();
-      objReader.onload = () => {
-        const objString = objReader.result as string;
-        const mtlReader = new FileReader();
-        mtlReader.onload = () => {
-          const mtlString = mtlReader.result as string;
-          controller.loadModelFromFile(objFile.name, objString, mtlString);
-        };
-        mtlReader.readAsText(mtlFile);
-      };
-      objReader.readAsText(objFile);
-    } else if (objFile) {
-      const objReader = new FileReader();
-      objReader.onload = () => {
-        const objString = objReader.result as string;
-        controller.loadModelFromFile(objFile.name, objString);
-      };
-      objReader.readAsText(objFile);
-    } else if (mtlFile) {
-      const mtlReader = new FileReader();
-      mtlReader.onload = () => {
-        const mtlString = mtlReader.result as string;
-        controller.loadMaterialsFromFile(mtlFile.name, mtlString);
-      };
-      mtlReader.readAsText(mtlFile);
-    } else if (fileList.length > 0) {
-      const fallbackFile = fileList[0];
-      const fallbackReader = new FileReader();
-      fallbackReader.onload = () => {
-        const fallbackString = fallbackReader.result as string;
-        controller.loadModelFromFile(fallbackFile.name, fallbackString);
-      };
-      fallbackReader.readAsText(fallbackFile);
-    }
-  };
-
-  const handleMtlFileSelected = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const selectedFiles = event.target.files;
-    if (!selectedFiles || selectedFiles.length === 0) {
-      return;
-    }
-    const targetFile = selectedFiles[0];
-    if (!targetFile) {
-      return;
-    }
-    const fileReader = new FileReader();
-    fileReader.onload = () => {
-      const fileContentString = fileReader.result as string;
-      controller.loadMaterialsFromFile(targetFile.name, fileContentString);
-    };
-    fileReader.readAsText(targetFile);
-  };
-
-  const handleImportZipClick = () => {
-    if (zipFileInputRef.current) {
-      zipFileInputRef.current.value = "";
-      zipFileInputRef.current.click();
-    }
-  };
-
-  const handleZipFileSelected = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const selectedFiles = event.target.files;
-    if (!selectedFiles || selectedFiles.length === 0) {
-      return;
-    }
-    const targetFile = selectedFiles[0];
-    if (!targetFile) {
-      return;
-    }
-    const fileReader = new FileReader();
-    fileReader.onload = () => {
-      const arrayBuffer = fileReader.result as ArrayBuffer;
-      controller.importZip(arrayBuffer, targetFile.name);
-    };
-    fileReader.readAsArrayBuffer(targetFile);
-  };
-
-  const dataUrlToBlob = (dataUrl: string): Blob => {
-    const parts = dataUrl.split(",");
-    const mimeMatch = parts[0]?.match(/:(.*?);/);
-    const mimeType = mimeMatch ? mimeMatch[1] : "image/png";
-    const b64Data = parts[1] || "";
-    const byteCharacters = atob(b64Data);
-    const byteNumbers = new Uint8Array(byteCharacters.length);
-    for (let index = 0; index < byteCharacters.length; index += 1) {
-      byteNumbers[index] = byteCharacters.charCodeAt(index);
-    }
-    return new Blob([byteNumbers], { type: mimeType });
-  };
-
-  const handleExportClick = () => {
-    const objContent = controller.exportModelToFile();
-    const textBlob = new Blob([objContent], { type: "text/plain" });
-    const downloadUrl = URL.createObjectURL(textBlob);
-    const anchorElement = document.createElement("a");
-    anchorElement.href = downloadUrl;
-    anchorElement.download = "model.obj";
-    document.body.appendChild(anchorElement);
-    anchorElement.click();
-    document.body.removeChild(anchorElement);
-    URL.revokeObjectURL(downloadUrl);
-
-    const materials = controller.getMaterialService().getMaterials();
-    if (materials.length > 0) {
-      const mtlContent = controller.exportMtlFile("model");
-      const mtlBlob = new Blob([mtlContent], { type: "text/plain" });
-      const mtlDownloadUrl = URL.createObjectURL(mtlBlob);
-      const mtlAnchorElement = document.createElement("a");
-      mtlAnchorElement.href = mtlDownloadUrl;
-      mtlAnchorElement.download = "model.mtl";
-      document.body.appendChild(mtlAnchorElement);
-      mtlAnchorElement.click();
-      document.body.removeChild(mtlAnchorElement);
-      URL.revokeObjectURL(mtlDownloadUrl);
-
-      const exportedImages = controller.exportImages("model");
-      for (const image of exportedImages) {
-        if (image.dataUrl.startsWith("data:")) {
-          const imgBlob = dataUrlToBlob(image.dataUrl);
-          const imgDownloadUrl = URL.createObjectURL(imgBlob);
-          const imgAnchor = document.createElement("a");
-          imgAnchor.href = imgDownloadUrl;
-          imgAnchor.download = image.fileName;
-          document.body.appendChild(imgAnchor);
-          imgAnchor.click();
-          document.body.removeChild(imgAnchor);
-          URL.revokeObjectURL(imgDownloadUrl);
-        } else if (
-          image.dataUrl.startsWith("blob:") ||
-          image.dataUrl.startsWith("http")
-        ) {
-          const imgAnchor = document.createElement("a");
-          imgAnchor.href = image.dataUrl;
-          imgAnchor.download = image.fileName;
-          document.body.appendChild(imgAnchor);
-          imgAnchor.click();
-          document.body.removeChild(imgAnchor);
-        }
-      }
-    }
-  };
-
-  const handleExportZipClick = () => {
-    const zipContent = controller.exportModelAsZip();
-    const zipBlob = new Blob([new Uint8Array(zipContent)], {
-      type: "application/zip",
-    });
-    const downloadUrl = URL.createObjectURL(zipBlob);
-    const anchorElement = document.createElement("a");
-    anchorElement.href = downloadUrl;
-    anchorElement.download = "model.zip";
-    document.body.appendChild(anchorElement);
-    anchorElement.click();
-    document.body.removeChild(anchorElement);
-    URL.revokeObjectURL(downloadUrl);
-  };
-
-  const handleToggleRenderMode = () => {
-    controller.toggleRenderMode();
-  };
-
-  const handleToggleAutoConnect = () => {
-    controller.toggleAutoConnect();
-  };
-
-  const handleToggleClone = () => {
-    controller.toggleClone();
+  const handleSelectProjectToLoad = (saveId: string) => {
+    setIsLoadModalOpen(false);
+    controller.loadProjectSave(saveId);
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -370,7 +156,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           accept=".obj,.mtl"
           data-testid="file-input"
           style={{ display: "none" }}
-          onChange={handleFileSelected}
+          onChange={(event) => fileOperationsHandler.handleFileSelected(event)}
         />
         <input
           ref={mtlFileInputRef}
@@ -378,7 +164,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           accept=".mtl"
           data-testid="mtl-file-input"
           style={{ display: "none" }}
-          onChange={handleMtlFileSelected}
+          onChange={(event) => fileOperationsHandler.handleMtlFileSelected(event)}
         />
         <input
           ref={zipFileInputRef}
@@ -386,19 +172,51 @@ export const ToolBar: React.FC<ToolBarProps> = ({
           accept=".zip"
           data-testid="zip-file-input"
           style={{ display: "none" }}
-          onChange={handleZipFileSelected}
+          onChange={(event) => fileOperationsHandler.handleZipFileSelected(event)}
+        />
+        <input
+          ref={saveFileInputRef}
+          type="file"
+          accept=".json,application/json"
+          data-testid="save-file-input"
+          style={{ display: "none" }}
+          onChange={(event) => fileOperationsHandler.handleSaveFileSelected(event)}
         />
         <FileMenu
-          onLoadClick={handleLoadClick}
-          onLoadMtlClick={handleLoadMtlClick}
-          onImportZipClick={handleImportZipClick}
-          onExportClick={handleExportClick}
-          onExportZipClick={handleExportZipClick}
+          onLoadClick={() => {
+            if (fileInputRef.current) {
+              fileInputRef.current.value = "";
+              fileInputRef.current.click();
+            }
+          }}
+          onLoadMtlClick={() => {
+            if (mtlFileInputRef.current) {
+              mtlFileInputRef.current.value = "";
+              mtlFileInputRef.current.click();
+            }
+          }}
+          onImportZipClick={() => {
+            if (zipFileInputRef.current) {
+              zipFileInputRef.current.value = "";
+              zipFileInputRef.current.click();
+            }
+          }}
+          onExportClick={() => fileOperationsHandler.exportModelAndMaterials()}
+          onExportZipClick={() => fileOperationsHandler.exportZip()}
+          onSaveClick={handleSaveMenuClick}
+          onLoadProjectClick={() => setIsLoadModalOpen(true)}
+          onExportSaveFileClick={() => fileOperationsHandler.exportProjectSaveFile()}
+          onLoadSaveFileClick={() => {
+            if (saveFileInputRef.current) {
+              saveFileInputRef.current.value = "";
+              saveFileInputRef.current.click();
+            }
+          }}
           onCustomizeUiClick={onOpenCustomizeUi}
         />
         <button
           data-testid="undo-button"
-          onClick={handleUndo}
+          onClick={() => controller.undo()}
           disabled={!canUndo}
           title="Undo (Ctrl+Z)"
           aria-label="Undo"
@@ -414,7 +232,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         </button>
         <button
           data-testid="redo-button"
-          onClick={handleRedo}
+          onClick={() => controller.redo()}
           disabled={!canRedo}
           title="Redo (Ctrl+Y)"
           aria-label="Redo"
@@ -430,7 +248,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         </button>
         <button
           data-testid="grid-snap-toggle-button"
-          onClick={handleToggleGridSnap}
+          onClick={() => controller.toggleGridSnap()}
           title="Toggle Grid Snap"
           style={{
             ...buttonStyle,
@@ -445,7 +263,13 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         </button>
         <button
           data-testid="mode-multi-select-button"
-          onClick={handleToggleMultiSelect}
+          onClick={() => {
+            if (currentMode === "MULTI_SELECT") {
+              controller.finishMode();
+            } else {
+              controller.enterMode("MULTI_SELECT");
+            }
+          }}
           title="Multi selection"
           style={
             currentMode === "MULTI_SELECT"
@@ -462,7 +286,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         </button>
         <button
           data-testid="clear-selection-button"
-          onClick={handleClearSelection}
+          onClick={() => controller.clearSelection()}
           disabled={!canClearSelection}
           title="Clear selection"
           style={canClearSelection ? buttonStyle : disabledButtonStyle}
@@ -494,7 +318,7 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         </button>
         <button
           data-testid="toggle-view-button"
-          onClick={handleToggleRenderMode}
+          onClick={() => controller.toggleRenderMode()}
           title="Toggle Wireframe"
           style={{
             ...buttonStyle,
@@ -545,145 +369,35 @@ export const ToolBar: React.FC<ToolBarProps> = ({
         )}
       </div>
 
-      <div
-        data-testid="mode-specific-buttons"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "8px",
-          alignItems: "center",
-          justifyContent: "flex-end",
-        }}
-      >
-        {isDecalSelected && (
-          <button
-            data-testid="select-parent-face-button"
-            onClick={handleSelectParentFace}
-            title="Select Parent Face"
-            style={{
-              ...buttonStyle,
-              backgroundColor: ThemeColors.widget,
-              color: ThemeColors.textPrimary,
-            }}
-          >
-            Select Parent Face
-          </button>
-        )}
+      <ModeSpecificButtons
+        isDecalSelected={isDecalSelected}
+        hasSelectedFace={hasSelectedFace}
+        canDeleteDecal={canDeleteDecal}
+        currentMode={currentMode}
+        isAutoConnect={isAutoConnect}
+        isClone={isClone}
+        onSelectParentFace={() => controller.selectParentFace()}
+        onFlipFace={() => controller.flipFace()}
+        onAddDecalPlane={() => controller.addDecalPlaneToSelectedFace()}
+        onDeleteDecalPlane={() => controller.deleteSelectedDecal()}
+        onClearMaterial={() => controller.clearMaterialOnSelectedFaces()}
+        onToggleAutoConnect={() => controller.toggleAutoConnect()}
+        onToggleClone={() => controller.toggleClone()}
+      />
 
-        {hasSelectedFace && !isDecalSelected && (
-          <button
-            data-testid="flip-face-button"
-            onClick={handleFlipFace}
-            title="Flip Face"
-            style={{
-              ...buttonStyle,
-              backgroundColor: ThemeColors.widget,
-              color: ThemeColors.textPrimary,
-            }}
-          >
-            Flip Face
-          </button>
-        )}
+      <SaveProjectModal
+        isOpen={isSaveModalOpen}
+        suggestedName={controller.getActiveProjectSaveName() ?? "Untitled Project"}
+        onCancel={() => setIsSaveModalOpen(false)}
+        onSave={handleConfirmSaveModal}
+      />
 
-        {hasSelectedFace && !isDecalSelected && (
-          <button
-            data-testid="add-decal-plane-button"
-            onClick={handleAddDecalPlane}
-            title="Add Decal Plane to selected face"
-            style={{
-              ...buttonStyle,
-              backgroundColor: ThemeColors.widget,
-              color: ThemeColors.textPrimary,
-            }}
-          >
-            Add Decal Plane
-          </button>
-        )}
-
-        {canDeleteDecal && (
-          <button
-            data-testid="delete-decal-plane-button"
-            onClick={handleDeleteDecalPlane}
-            title="Delete selected Decal Plane"
-            style={{
-              ...buttonStyle,
-              backgroundColor: ThemeColors.widget,
-              color: ThemeColors.danger,
-              borderColor: ThemeColors.dangerBorder ?? ThemeColors.borderStrong,
-            }}
-          >
-            Delete Decal Plane
-          </button>
-        )}
-
-        {(hasSelectedFace || canDeleteDecal) && (
-          <button
-            data-testid="clear-material-button"
-            onClick={handleClearMaterial}
-            title="Clear material from selected face or decal"
-            style={{
-              ...buttonStyle,
-              backgroundColor: ThemeColors.widget,
-              color: ThemeColors.textPrimary,
-            }}
-          >
-            Clear Material
-          </button>
-        )}
-
-        {currentMode === "INSERT" && (
-          <button
-            data-testid="auto-connect-toggle-button"
-            onClick={handleToggleAutoConnect}
-            style={{
-              ...buttonStyle,
-              backgroundColor: isAutoConnect ? ThemeColors.success : ThemeColors.widget,
-              color: isAutoConnect ? "#ffffff" : ThemeColors.textPrimary,
-              borderColor: isAutoConnect
-                ? ThemeColors.successBorder
-                : ThemeColors.borderStrong,
-            }}
-          >
-            {isAutoConnect ? "Auto Connect: ON" : "Auto Connect: OFF"}
-          </button>
-        )}
-
-        {currentMode === "TRANSLATE" && (
-          <>
-            <button
-              data-testid="clone-toggle-button"
-              onClick={handleToggleClone}
-              style={{
-                ...buttonStyle,
-                backgroundColor: isClone ? ThemeColors.success : ThemeColors.widget,
-                color: isClone ? "#ffffff" : ThemeColors.textPrimary,
-                borderColor: isClone
-                  ? ThemeColors.successBorder
-                  : ThemeColors.borderStrong,
-              }}
-            >
-              {isClone ? "Clone: ON" : "Clone: OFF"}
-            </button>
-            {isClone && (
-              <button
-                data-testid="clone-auto-connect-button"
-                onClick={handleToggleAutoConnect}
-                style={{
-                  ...buttonStyle,
-                  backgroundColor: isAutoConnect ? ThemeColors.success : ThemeColors.widget,
-                  color: isAutoConnect ? "#ffffff" : ThemeColors.textPrimary,
-                  borderColor: isAutoConnect
-                    ? ThemeColors.successBorder
-                    : ThemeColors.borderStrong,
-                }}
-              >
-                {isAutoConnect ? "Auto Connect: ON" : "Auto Connect: OFF"}
-              </button>
-            )}
-          </>
-        )}
-
-      </div>
+      <LoadProjectModal
+        isOpen={isLoadModalOpen}
+        saves={isLoadModalOpen ? controller.listProjectSaves() : []}
+        onSelectSave={handleSelectProjectToLoad}
+        onClose={() => setIsLoadModalOpen(false)}
+      />
     </header>
   );
 };

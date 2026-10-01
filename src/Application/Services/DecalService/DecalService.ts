@@ -205,9 +205,18 @@ export class DecalService {
     selectedDecalId: string | null
   ): void {
     this.decalsMap.clear();
+    let maximumNumericId = this.idCounter;
     for (const decal of decals) {
       this.decalsMap.set(decal.id, decal);
+      const numericMatch = /^decal_(\d+)$/.exec(decal.id);
+      if (numericMatch) {
+        const numericId = Number(numericMatch[1]);
+        if (numericId > maximumNumericId) {
+          maximumNumericId = numericId;
+        }
+      }
     }
+    this.idCounter = maximumNumericId;
     this.selectedDecalId = selectedDecalId;
     this.notifyDecalsChanged();
   }

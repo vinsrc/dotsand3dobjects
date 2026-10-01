@@ -51,3 +51,13 @@ The Transform overlay and dimension dialog unmount immediately when the camera l
 * Split faces in to two automatically if an edge is added that cuts them into two pieces.
 
 * Move vertex with Clone - on clicking move vertex, there should a context specific button on the top right bar called "Clone".  when the user toggles clone, and then starts moving the vertex, a new vertex is created from the existing vertex and then the new vertex is moved. its more like extrude. When Clone is toggled on,  show Auto Connect button next to Clone button, if Auto Connect is ON, then connect the new and old vertex with edge when the user moves the vertex.
+
+* Save and Load functionality:  
+
+Add a Save menu item in the file menu. it should save the current work into browser local storage as a json file.  it should ask for a name if its a new save else it should save it to the existing data.
+
+Add a load menu item in the file menu, it should show a list of saved json files from the local storage , on clicking the saved item
+
+Add an export save file menu item, it should export the current data model into a json file. 
+
+add an load save file menu item, it should load the save json file into the current window.

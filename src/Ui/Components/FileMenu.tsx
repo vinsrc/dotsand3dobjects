@@ -7,6 +7,10 @@ export interface FileMenuProps {
   onImportZipClick?: () => void;
   onExportClick: () => void;
   onExportZipClick?: () => void;
+  onSaveClick?: () => void;
+  onLoadProjectClick?: () => void;
+  onExportSaveFileClick?: () => void;
+  onLoadSaveFileClick?: () => void;
   onCustomizeUiClick?: () => void;
 }
 
@@ -16,6 +20,10 @@ export const FileMenu: React.FC<FileMenuProps> = ({
   onImportZipClick,
   onExportClick,
   onExportZipClick,
+  onSaveClick,
+  onLoadProjectClick,
+  onExportSaveFileClick,
+  onLoadSaveFileClick,
   onCustomizeUiClick,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
@@ -120,6 +128,42 @@ export const FileMenu: React.FC<FileMenuProps> = ({
 
       {isOpen && (
         <div data-testid="file-menu-dropdown" style={dropdownContainerStyle}>
+          <button
+            data-testid="save-project-button"
+            onClick={() => handleItemClick(() => onSaveClick?.())}
+            onMouseEnter={() => setHoveredItem("save-project")}
+            onMouseLeave={() => setHoveredItem(null)}
+            style={getMenuItemStyle("save-project")}
+          >
+            Save
+          </button>
+          <button
+            data-testid="load-project-button"
+            onClick={() => handleItemClick(() => onLoadProjectClick?.())}
+            onMouseEnter={() => setHoveredItem("load-project")}
+            onMouseLeave={() => setHoveredItem(null)}
+            style={getMenuItemStyle("load-project")}
+          >
+            Load
+          </button>
+          <button
+            data-testid="export-save-file-button"
+            onClick={() => handleItemClick(() => onExportSaveFileClick?.())}
+            onMouseEnter={() => setHoveredItem("export-save-file")}
+            onMouseLeave={() => setHoveredItem(null)}
+            style={getMenuItemStyle("export-save-file")}
+          >
+            Export Save File
+          </button>
+          <button
+            data-testid="load-save-file-button"
+            onClick={() => handleItemClick(() => onLoadSaveFileClick?.())}
+            onMouseEnter={() => setHoveredItem("load-save-file")}
+            onMouseLeave={() => setHoveredItem(null)}
+            style={getMenuItemStyle("load-save-file")}
+          >
+            Load Save File
+          </button>
           <button
             data-testid="load-obj-button"
             onClick={() => handleItemClick(onLoadClick)}
