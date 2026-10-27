@@ -63,10 +63,6 @@ if its a facade class like controller. the facade class itself can have many fun
 Write unit tests for all application layer classes. 
 Overall 80% code coverage in application layer. but 100% code coverage for functions that define behaviors in classes. 
 
-# Rules:
-
-Dont fetch git repository or push to git repository ever.
-
 # Iteration Delivery :
 
 Read  @docs/workflows/local-iteration-workflow.md and Follow the Iteration Delivery Workflow to deliver the iteration backlog.
