@@ -3,6 +3,9 @@ name: Manual Build
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
@@ -28,3 +31,23 @@ jobs:
           name: app-html
           path: dist/index.html
           retention-days: 30
+
+      # Publishes the build to the gh-pages branch under a folder named after the
+      # branch that was built, so every branch gets its own link:
+      # https://<owner>.github.io/<repo>/<branch>/
+      - name: Compute page folder name
+        id: page
+        run: echo "folder=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish build to GitHub Pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: dist
+          publish_branch: gh-pages
+          destination_dir: ${{ steps.page.outputs.folder }}
+          keep_files: true
+
+      - name: Show page link
+        run: |
+          echo "Page: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ steps.page.outputs.folder }}/" >> "$GITHUB_STEP_SUMMARY"
