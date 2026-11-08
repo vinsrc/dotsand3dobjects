@@ -5,6 +5,7 @@ import { OrthographicAxis } from "../../Application/Services/CameraService/Ortho
 import { Vector3D } from "../../Application/Common/Vector3D";
 import { AXIS_COLOR_STRINGS } from "../Common/AxisColors";
 import { ThemeColors } from "../Common/Theme";
+import { OrthographicViewButtons } from "./OrthographicViewButtons";
 
 interface AxisDefinition {
   readonly axisId: OrthographicAxis;
@@ -163,6 +164,7 @@ export const AxisGizmo: React.FC = () => {
   });
 
   return (
+    <>
     <div
       ref={gizmoContainerRef}
       data-testid="3d-axis-gizmo"
@@ -247,5 +249,7 @@ export const AxisGizmo: React.FC = () => {
         );
       })}
     </div>
+    <OrthographicViewButtons onAxisSelect={handleAxisSelect} />
+    </>
   );
 };
